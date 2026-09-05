@@ -47,7 +47,7 @@
             official -> "EMQX Enterprise";
             Flavor -> io_lib:format("EMQX Enterprise(~s)", [Flavor])
         end,
-    ce => "EMQX"
+    ce => "OpenQTT"
 }).
 
 -define(EMQX_REL_NAME, #{
