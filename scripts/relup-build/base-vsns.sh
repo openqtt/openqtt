@@ -11,7 +11,7 @@ cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 ## if not provided, it's taken from pkg-vsn.sh
 
 usage() {
-    echo "Usage: $0 <EMQX_PROFILE> [<CURRENT_VERSION>]"
+    echo "Usage: $0 <PROFILE> [<CURRENT_VERSION>]"
     echo "e.g.   $0 enterprise 4.3.10"
     exit 1
 }

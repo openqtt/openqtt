@@ -34,14 +34,14 @@ services:
 
   emqx_1:
     container_name: emqx_1
-    image: emqx/emqx-enterprise:${EMQX_IMAGE_TAG}
+    image: emqx/emqx-enterprise:${OPENQTT_IMAGE_TAG}
     hostname: emqx_1.emqx.influx.io
     ports:
       - "1883:1883"
       - "18083:18083"
     environment:
-      EMQX_LOG__CONSOLE_HANDLER__LEVEL: warning
-      EMQX_NODE_NAME: "emqx@emqx_1.emqx.influx.io"
+      OPENQTT_LOG__CONSOLE_HANDLER__LEVEL: warning
+      OPENQTT_NODE_NAME: "emqx@emqx_1.emqx.influx.io"
     volumes:
       - "${PWD}/emqx.conf:/opt/emqx/etc/emqx.conf"
       - "${PWD}/influx-bridge.conf:/opt/emqx/etc/influx-bridge.conf"
@@ -50,11 +50,11 @@ services:
 
   emqx_2:
     container_name: emqx_2
-    image: emqx/emqx-enterprise:${EMQX_IMAGE_TAG}
+    image: emqx/emqx-enterprise:${OPENQTT_IMAGE_TAG}
     hostname: emqx_1.emqx.influx.io
     environment:
-      EMQX_LOG__CONSOLE_HANDLER__LEVEL: warning
-      EMQX_NODE_NAME: "emqx@emqx_2.emqx.influx.io"
+      OPENQTT_LOG__CONSOLE_HANDLER__LEVEL: warning
+      OPENQTT_NODE_NAME: "emqx@emqx_2.emqx.influx.io"
     ports:
       - "1884:1883"
       - "18084:18083"

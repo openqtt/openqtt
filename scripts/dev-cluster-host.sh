@@ -32,7 +32,7 @@ fi
 CMD="$1"
 shift || true
 
-export EMQX_NODE__COOKIE=test
+export OPENQTT_NODE__COOKIE=test
 PROFILE=${PROFILE:-emqx}
 BOOT_SCRIPT="./_build/${PROFILE}/rel/openqtt/bin/openqtt"
 NODES=2
@@ -91,10 +91,10 @@ SEEDS="$(IFS=,; echo "${SEEDS_ARRAY[*]}")"
 
 if [ "$CMD" = "stop" ]; then
     for id in "${REPLICANT_IDS[@]}"; do
-        env EMQX_NODE_NAME="replicant${id}@127.0.0.$id" "$BOOT_SCRIPT" stop || true
+        env OPENQTT_NODE_NAME="replicant${id}@127.0.0.$id" "$BOOT_SCRIPT" stop || true
     done
     for id in "${CORE_IDS[@]}"; do
-        env EMQX_NODE_NAME="core${id}@127.0.0.$id" "$BOOT_SCRIPT" stop || true
+        env OPENQTT_NODE_NAME="core${id}@127.0.0.$id" "$BOOT_SCRIPT" stop || true
     done
     exit 0
 fi
@@ -109,19 +109,19 @@ start_cmd() {
     mkdir -p "${nodehome}/data" "${nodehome}/log"
     cat <<-EOF
 env DEBUG="${DEBUG:-0}" \
-EMQX_NODE_NAME="$nodename@$ip" \
-EMQX_CLUSTER__STATIC__SEEDS="$SEEDS" \
-EMQX_CLUSTER__DISCOVERY_STRATEGY=static \
-EMQX_NODE__ROLE="$role" \
-EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL="${EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL:-debug}" \
-EMQX_LOG__FILE_HANDLERS__DEFAULT__FILE="${nodehome}/log/emqx.log" \
-EMQX_LOG_DIR="${nodehome}/log" \
-EMQX_NODE__DATA_DIR="${nodehome}/data" \
-EMQX_LISTENERS__TCP__DEFAULT__BIND="$ip:1883" \
-EMQX_LISTENERS__SSL__DEFAULT__BIND="$ip:8883" \
-EMQX_LISTENERS__WS__DEFAULT__BIND="$ip:8083" \
-EMQX_LISTENERS__WSS__DEFAULT__BIND="$ip:8084" \
-EMQX_DASHBOARD__LISTENERS__HTTP__BIND="$ip:18083" \
+OPENQTT_NODE_NAME="$nodename@$ip" \
+OPENQTT_CLUSTER__STATIC__SEEDS="$SEEDS" \
+OPENQTT_CLUSTER__DISCOVERY_STRATEGY=static \
+OPENQTT_NODE__ROLE="$role" \
+OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL="${OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL:-debug}" \
+OPENQTT_LOG__FILE_HANDLERS__DEFAULT__FILE="${nodehome}/log/emqx.log" \
+OPENQTT_LOG_DIR="${nodehome}/log" \
+OPENQTT_NODE__DATA_DIR="${nodehome}/data" \
+OPENQTT_LISTENERS__TCP__DEFAULT__BIND="$ip:1883" \
+OPENQTT_LISTENERS__SSL__DEFAULT__BIND="$ip:8883" \
+OPENQTT_LISTENERS__WS__DEFAULT__BIND="$ip:8083" \
+OPENQTT_LISTENERS__WSS__DEFAULT__BIND="$ip:8084" \
+OPENQTT_DASHBOARD__LISTENERS__HTTP__BIND="$ip:18083" \
 "$BOOT_SCRIPT" start
 EOF
 }

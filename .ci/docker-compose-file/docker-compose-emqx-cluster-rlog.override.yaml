@@ -13,12 +13,12 @@ services:
     container_name: node1.emqx.io
     restart: on-failure
     environment:
-      - "EMQX_HOST=node1.emqx.io"
-      - "EMQX_NODE__DB_BACKEND=rlog"
-      - "EMQX_NODE__DB_ROLE=core"
-      - "EMQX_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io]"
-      - "EMQX_LISTENERS__TCP__DEFAULT__PROXY_PROTOCOL=false"
-      - "EMQX_LISTENERS__WS__DEFAULT__PROXY_PROTOCOL=false"
+      - "OPENQTT_HOST=node1.emqx.io"
+      - "OPENQTT_NODE__DB_BACKEND=rlog"
+      - "OPENQTT_NODE__DB_ROLE=core"
+      - "OPENQTT_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io]"
+      - "OPENQTT_LISTENERS__TCP__DEFAULT__PROXY_PROTOCOL=false"
+      - "OPENQTT_LISTENERS__WS__DEFAULT__PROXY_PROTOCOL=false"
 
   emqx2:
     <<: *default-emqx
@@ -27,10 +27,10 @@ services:
       - emqx1
     restart: on-failure
     environment:
-      - "EMQX_HOST=node2.emqx.io"
-      - "EMQX_NODE__DB_BACKEND=rlog"
-      - "EMQX_NODE__DB_ROLE=replicant"
-      - "EMQX_CLUSTER__CORE_NODES=emqx@node1.emqx.io"
-      - "EMQX_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io]"
-      - "EMQX_LISTENERS__TCP__DEFAULT__PROXY_PROTOCOL=false"
-      - "EMQX_LISTENERS__WS__DEFAULT__PROXY_PROTOCOL=false"
+      - "OPENQTT_HOST=node2.emqx.io"
+      - "OPENQTT_NODE__DB_BACKEND=rlog"
+      - "OPENQTT_NODE__DB_ROLE=replicant"
+      - "OPENQTT_CLUSTER__CORE_NODES=emqx@node1.emqx.io"
+      - "OPENQTT_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io]"
+      - "OPENQTT_LISTENERS__TCP__DEFAULT__PROXY_PROTOCOL=false"
+      - "OPENQTT_LISTENERS__WS__DEFAULT__PROXY_PROTOCOL=false"

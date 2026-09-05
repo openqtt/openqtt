@@ -10,7 +10,7 @@ PKG_VSN="${PKG_VSN:-$(./pkg-vsn.sh "$PROFILE")}"
 
 case "$DISTRO" in
     ubuntu20*)
-        EMQX_DOCKERFILE="Dockerfile.ubuntu20.04.runner"
+        OPENQTT_DOCKERFILE="Dockerfile.ubuntu20.04.runner"
         ;;
     *)
         echo "sorry, no support for $DISTRO yet"
@@ -26,4 +26,4 @@ fi
 #export DOCKER_BUILDKIT=1
 docker build --build-arg PROFILE="${PROFILE}" \
     -t "emqx/emqx:${PKG_VSN}-${DISTRO}" \
-    -f "$EMQX_DOCKERFILE" .
+    -f "$OPENQTT_DOCKERFILE" .

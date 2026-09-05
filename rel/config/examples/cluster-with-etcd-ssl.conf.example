@@ -22,13 +22,13 @@ cluster {
 
       ssl_options {
           ## Trusted PEM format CA certificates bundle file
-          cacertfile = "${EMQX_ETC_DIR}/certs/etcd-cacert.pem"
+          cacertfile = "${OPENQTT_ETC_DIR}/certs/etcd-cacert.pem"
 
           ## PEM format certificates chain file
-          certfile = "${EMQX_ETC_DIR}/certs/etcd-client-cert.pem"
+          certfile = "${OPENQTT_ETC_DIR}/certs/etcd-client-cert.pem"
 
           ## PEM format private key file
-          keyfile = "${EMQX_ETC_DIR}/certs/etcd-client-key.pem"
+          keyfile = "${OPENQTT_ETC_DIR}/certs/etcd-client-key.pem"
 
           ## Enable or disable peer verification
           verify = verify_none ## use verify_peer to enable

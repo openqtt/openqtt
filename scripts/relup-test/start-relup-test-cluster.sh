@@ -39,9 +39,9 @@ docker network create "$NET"
 
 docker run -d -t --name "$NODE1" \
   --net "$NET" \
-  -e EMQX_LOG__CONSOLE_HANDLER__LEVEL=warning \
-  -e EMQX_NODE_NAME="emqx@$NODE1" \
-  -e EMQX_NODE_COOKIE="$COOKIE" \
+  -e OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=warning \
+  -e OPENQTT_NODE_NAME="emqx@$NODE1" \
+  -e OPENQTT_NODE_COOKIE="$COOKIE" \
   -p 18083:18083 \
   -v "$PKG:/emqx.tar.gz" \
   -v "$(pwd)/scripts/relup-test/run-pkg.sh:/run-pkg.sh" \
@@ -49,9 +49,9 @@ docker run -d -t --name "$NODE1" \
 
 docker run -d -t --name "$NODE2" \
   --net "$NET" \
-  -e EMQX_LOG__CONSOLE_HANDLER__LEVEL=warning \
-  -e EMQX_NODE_NAME="emqx@$NODE2" \
-  -e EMQX_NODE_COOKIE="$COOKIE" \
+  -e OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=warning \
+  -e OPENQTT_NODE_NAME="emqx@$NODE2" \
+  -e OPENQTT_NODE_COOKIE="$COOKIE" \
   -p 18084:18083 \
   -v "$PKG:/emqx.tar.gz" \
   -v "$(pwd)/scripts/relup-test/run-pkg.sh:/run-pkg.sh" \

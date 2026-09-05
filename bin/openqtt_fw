@@ -24,7 +24,7 @@ Usage:
 chain_name_tcp_syn_rate() {
     local dev=$1
     local port=$2
-    echo "EMQX_TCP_${dev}_${port}"
+    echo "OPENQTT_TCP_${dev}_${port}"
 }
 
 add_tcp_syn_rate() {

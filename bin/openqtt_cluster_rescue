@@ -76,7 +76,7 @@ Usage:
     $Script lie-node-down RemoteNode
 
 Tips:
-    - Override local node name with envvar: \$EMQX_NODE__NAME
+    - Override local node name with envvar: \$OPENQTT_NODE__NAME
     "
 }
 

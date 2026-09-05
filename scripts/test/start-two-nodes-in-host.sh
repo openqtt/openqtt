@@ -109,29 +109,29 @@ start_cmd() {
     mkdir -p "${nodehome}/data" "${nodehome}/log"
     cat <<-EOF
 env DEBUG="${DEBUG:-0}" \
-EMQX_NODE_NAME="emqx${index}@\$IP${index}" \
-EMQX_CLUSTER__STATIC__SEEDS="$SEEDS" \
-EMQX_CLUSTER__DISCOVERY_STRATEGY=static \
-EMQX_NODE__ROLE="\$ROLE${index}" \
-EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL="${EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL:-debug}" \
-EMQX_LOG__FILE_HANDLERS__DEFAULT__FILE="${nodehome}/log/emqx.log" \
-EMQX_NODE__COOKIE="${EMQX_NODE__COOKIE:-cookie1}" \
-EMQX_LOG_DIR="${nodehome}/log" \
-EMQX_NODE__DATA_DIR="${nodehome}/data" \
-EMQX_LISTENERS__TCP__DEFAULT__BIND="\$IP${index}:1883" \
-EMQX_LISTENERS__SSL__DEFAULT__BIND="\$IP${index}:8883" \
-EMQX_LISTENERS__WS__DEFAULT__BIND="\$IP${index}:8083" \
-EMQX_LISTENERS__WSS__DEFAULT__BIND="\$IP${index}:8084" \
-EMQX_DASHBOARD__LISTENERS__HTTP__BIND="\$IP${index}:18083" \
+OPENQTT_NODE_NAME="emqx${index}@\$IP${index}" \
+OPENQTT_CLUSTER__STATIC__SEEDS="$SEEDS" \
+OPENQTT_CLUSTER__DISCOVERY_STRATEGY=static \
+OPENQTT_NODE__ROLE="\$ROLE${index}" \
+OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL="${OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL:-debug}" \
+OPENQTT_LOG__FILE_HANDLERS__DEFAULT__FILE="${nodehome}/log/emqx.log" \
+OPENQTT_NODE__COOKIE="${OPENQTT_NODE__COOKIE:-cookie1}" \
+OPENQTT_LOG_DIR="${nodehome}/log" \
+OPENQTT_NODE__DATA_DIR="${nodehome}/data" \
+OPENQTT_LISTENERS__TCP__DEFAULT__BIND="\$IP${index}:1883" \
+OPENQTT_LISTENERS__SSL__DEFAULT__BIND="\$IP${index}:8883" \
+OPENQTT_LISTENERS__WS__DEFAULT__BIND="\$IP${index}:8083" \
+OPENQTT_LISTENERS__WSS__DEFAULT__BIND="\$IP${index}:8084" \
+OPENQTT_DASHBOARD__LISTENERS__HTTP__BIND="\$IP${index}:18083" \
 "$BOOT_SCRIPT" start
 EOF
 }
 
 echo "Stopping $NODE1"
-env EMQX_NODE_NAME="$NODE1" "$BOOT1" stop || true
+env OPENQTT_NODE_NAME="$NODE1" "$BOOT1" stop || true
 
 echo "Stopping $NODE2"
-env EMQX_NODE_NAME="$NODE2" "$BOOT2" stop || true
+env OPENQTT_NODE_NAME="$NODE2" "$BOOT2" stop || true
 
 start_one_node() {
     local index="$1"

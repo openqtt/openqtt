@@ -21,8 +21,8 @@ ARG PROFILE=emqx
 ARG IS_ELIXIR=no
 ARG DEBUG
 
-ENV EMQX_RELUP=false
-ENV EMQX_REL_FORM='docker'
+ENV OPENQTT_RELUP=false
+ENV OPENQTT_REL_FORM='docker'
 # English descriptions are generated from this tree. The Chinese translation is
 # a build-time download from a moving branch of emqx/emqx-i18n, which makes two
 # builds of one commit differ; a release build fetches nothing it does not pin.
@@ -40,7 +40,7 @@ RUN mkdir -p /emqx-rel/emqx && \
         export REBAR_GIT_CACHE_DIR='/emqx/.cache' && \
         export REBAR_GIT_CACHE_REF_AUTOFILL=0; \
       fi && \
-      export EMQX_REL_PATH="/emqx/_build/${PROFILE}/rel/emqx" && \
+      export OPENQTT_REL_PATH="/emqx/_build/${PROFILE}/rel/emqx" && \
       git config --global --add safe.directory '*' && \
       make ${PROFILE}-tgz && \
       tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/emqx; \

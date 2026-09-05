@@ -11,7 +11,7 @@ Type=simple
 Environment=HOME=/var/lib/emqx
 
 # log to file by default (if no log handler config)
-Environment=EMQX_DEFAULT_LOG_HANDLER=file
+Environment=OPENQTT_DEFAULT_LOG_HANDLER=file
 
 # Start 'foreground' but not 'start' (daemon) mode.
 # Because systemd monitor/restarts 'simple' services

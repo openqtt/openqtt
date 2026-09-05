@@ -366,7 +366,7 @@ build_info() ->
     ].
 
 relform() ->
-    case os:getenv("EMQX_REL_FORM") of
+    case os:getenv("OPENQTT_REL_FORM") of
         false -> "tgz";
         Other -> Other
     end.

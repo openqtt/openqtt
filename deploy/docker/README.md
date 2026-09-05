@@ -52,27 +52,27 @@ All EMQX Configuration in [`etc/emqx.conf`](https://github.com/emqx/emqx/blob/ma
 
 Example:
 
-	EMQX_DASHBOARD__DEFAULT_PASSWORD       <--> dashboard.default_password
-	EMQX_NODE__COOKIE                      <--> node.cookie
-	EMQX_LISTENERS__SSL__default__ENABLE   <--> listeners.ssl.default.enable
+	OPENQTT_DASHBOARD__DEFAULT_PASSWORD       <--> dashboard.default_password
+	OPENQTT_NODE__COOKIE                      <--> node.cookie
+	OPENQTT_LISTENERS__SSL__default__ENABLE   <--> listeners.ssl.default.enable
 
 Note: The lowercase use of 'default' is not a typo. It is used to demonstrate that lowercase environment variables are equivalent.
 
--	Prefix `EMQX_` is removed
+-	Prefix `OPENQTT_` is removed
 -	All upper case letters are replaced with lower case letters
 -	`__` is replaced with `.`
 
 For example, set MQTT TCP port to 1883
 
 ```console
-$ docker run -d --name emqx -e EMQX_DASHBOARD__DEFAULT_PASSWORD=mysecret -p 18083:18083 -p 1883:1883 emqx/emqx:latest
+$ docker run -d --name emqx -e OPENQTT_DASHBOARD__DEFAULT_PASSWORD=mysecret -p 18083:18083 -p 1883:1883 emqx/emqx:latest
 ```
 
 Please read more about EMQX configuration in the [official documentation](https://docs.emqx.com/en/emqx/latest/configuration/configuration.html)
 
 #### EMQX node name configuration
 
-Environment variable `EMQX_NODE__NAME` allows you to specify an EMQX node name, which defaults to `<container_name>@<container_ip>`.
+Environment variable `OPENQTT_NODE__NAME` allows you to specify an EMQX node name, which defaults to `<container_name>@<container_ip>`.
 
 If not specified, EMQX determines its node name based on the running environment or other environment variables used for node discovery.
 
@@ -91,9 +91,9 @@ Let's create a static node list cluster from docker-compose.
     emqx1:
       image: emqx/emqx:latest
       environment:
-      - "EMQX_NODE__NAME=emqx@node1.emqx.io"
-      - "EMQX_CLUSTER__DISCOVERY_STRATEGY=static"
-      - "EMQX_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io, emqx@node2.emqx.io]"
+      - "OPENQTT_NODE__NAME=emqx@node1.emqx.io"
+      - "OPENQTT_CLUSTER__DISCOVERY_STRATEGY=static"
+      - "OPENQTT_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io, emqx@node2.emqx.io]"
       networks:
         emqx-bridge:
           aliases:
@@ -102,9 +102,9 @@ Let's create a static node list cluster from docker-compose.
     emqx2:
       image: emqx/emqx:latest
       environment:
-      - "EMQX_NODE__NAME=emqx@node2.emqx.io"
-      - "EMQX_CLUSTER__DISCOVERY_STRATEGY=static"
-      - "EMQX_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io, emqx@node2.emqx.io]"
+      - "OPENQTT_NODE__NAME=emqx@node2.emqx.io"
+      - "OPENQTT_CLUSTER__DISCOVERY_STRATEGY=static"
+      - "OPENQTT_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io, emqx@node2.emqx.io]"
       networks:
         emqx-bridge:
           aliases:
@@ -136,7 +136,7 @@ If you want to persist the EMQX docker container, you need to keep the following
 -	`/opt/emqx/data`
 -	`/opt/emqx/log`
 
-Since data in these folders are partially stored under the `/opt/emqx/data/mnesia/${node_name}`, the user also needs to reuse the same node name to see the previous state. To make this work, one needs to set the host part of `EMQX_NODE__NAME` to something static that does not change when you restart or recreate the container. It could be container name, hostname or loopback IP address `127.0.0.1` if you only have one node.
+Since data in these folders are partially stored under the `/opt/emqx/data/mnesia/${node_name}`, the user also needs to reuse the same node name to see the previous state. To make this work, one needs to set the host part of `OPENQTT_NODE__NAME` to something static that does not change when you restart or recreate the container. It could be container name, hostname or loopback IP address `127.0.0.1` if you only have one node.
 
 In if you use docker-compose, the configuration would look something like this:
 
@@ -152,7 +152,7 @@ services:
     image: emqx/emqx:latest
     restart: always
     environment:
-      EMQX_NODE__NAME: foo_emqx@127.0.0.1
+      OPENQTT_NODE__NAME: foo_emqx@127.0.0.1
     volumes:
       - vol-emqx-data:/opt/emqx/data
       - vol-emqx-log:/opt/emqx/log

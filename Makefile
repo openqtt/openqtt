@@ -8,8 +8,8 @@ BUILD = $(CURDIR)/build
 SCRIPTS = $(CURDIR)/scripts
 include env.sh
 
-export EMQX_RELUP ?= true
-export EMQX_REL_FORM ?= tgz
+export OPENQTT_RELUP ?= true
+export OPENQTT_REL_FORM ?= tgz
 export QUICER_TLS_VER ?= sys
 
 -include default-profile.mk
@@ -228,7 +228,7 @@ $(REL_PROFILES:%=%-rel) $(PKG_PROFILES:%=%-rel): $(COMMON_DEPS)
 .PHONY: $(REL_PROFILES:%=%-relup-downloads)
 define download-relup-packages
 $1-relup-downloads:
-	@if [ "$${EMQX_RELUP}" = "true" ]; then $(SCRIPTS)/relup-build/download-base-packages.sh $1; fi
+	@if [ "$${OPENQTT_RELUP}" = "true" ]; then $(SCRIPTS)/relup-build/download-base-packages.sh $1; fi
 endef
 ALL_ZIPS = $(REL_PROFILES)
 $(foreach zt,$(ALL_ZIPS),$(eval $(call download-relup-packages,$(zt))))

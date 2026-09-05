@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## If EMQX_CT_SUITES or SUITES is provided, it prints the variable.
+## If OPENQTT_CT_SUITES or SUITES is provided, it prints the variable.
 ## Otherwise this script tries to find all test/*_SUITE.erl files of then given app,
 ## file names are separated by comma for rebar3 ct's `--suite` option
 
@@ -28,11 +28,11 @@ complete_path() {
 
     echo "$filename"
 }
-## EMQX_CT_SUITES or SUITES is useful in ad-hoc runs
-EMQX_CT_SUITES="${EMQX_CT_SUITES:-${SUITES:-}}"
-if [ -n "${EMQX_CT_SUITES:-}" ]; then
+## OPENQTT_CT_SUITES or SUITES is useful in ad-hoc runs
+OPENQTT_CT_SUITES="${OPENQTT_CT_SUITES:-${SUITES:-}}"
+if [ -n "${OPENQTT_CT_SUITES:-}" ]; then
     OUTPUT=""
-    IFS=',' read -ra FILE_ARRAY <<< "$EMQX_CT_SUITES"
+    IFS=',' read -ra FILE_ARRAY <<< "$OPENQTT_CT_SUITES"
     for file in "${FILE_ARRAY[@]}"; do
         path=$(complete_path "$file")
         if [ ! -f "$path" ]; then

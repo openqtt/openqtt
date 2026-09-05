@@ -45,15 +45,15 @@ OPTIONS:
   -c|--compile:      Force recompile, otherwise starts with the already built libs
                      in '_build/\$PROFILE/lib/'.
   -e|--ekka-epmd:    Force to use ekka_epmd.
-  -n|--name:         Node name, defaults to \$EMQX_NODE__NAME or the \$EMQX_NODE_NAME env.
+  -n|--name:         Node name, defaults to \$OPENQTT_NODE__NAME or the \$OPENQTT_NODE_NAME env.
   -s|--shortnames:   Use shortnames for erlang node name (ie. use -sname parameter).
 
 ENVIRONMENT VARIABLES:
 
   PROFILE:           Overridden by '-p|--profile' option, defaults to 'emqx'.
-  EMQX_NODE_NAME:    Overridden by '-n|--name' or '-r|--remsh' option.
+  OPENQTT_NODE_NAME:    Overridden by '-n|--name' or '-r|--remsh' option.
                      The node name of the EMQX node. Default to emqx@127.0.0.1'.
-  EMQX_NODE_COOKIE:  Erlang cookie, defaults to ~/.erlang.cookie
+  OPENQTT_NODE_COOKIE:  Erlang cookie, defaults to ~/.erlang.cookie
 
 EOF
 }
@@ -62,29 +62,29 @@ if [ -n "${DEBUG:-}" ]; then
     set -x
 fi
 
-export HOCON_ENV_OVERRIDE_PREFIX='EMQX_'
-case "${EMQX_DEFAULT_LOG_HANDLER:-console}" in
+export HOCON_ENV_OVERRIDE_PREFIX='OPENQTT_'
+case "${OPENQTT_DEFAULT_LOG_HANDLER:-console}" in
     console|default)
-        export EMQX_LOG__FILE__DEFAULT__ENABLE='false'
-        export EMQX_LOG__CONSOLE__ENABLE='true'
+        export OPENQTT_LOG__FILE__DEFAULT__ENABLE='false'
+        export OPENQTT_LOG__CONSOLE__ENABLE='true'
         ;;
     file)
-        export EMQX_LOG__FILE__DEFAULT__ENABLE='true'
-        export EMQX_LOG__CONSOLE__ENABLE='false'
+        export OPENQTT_LOG__FILE__DEFAULT__ENABLE='true'
+        export OPENQTT_LOG__CONSOLE__ENABLE='false'
         ;;
     both)
-        export EMQX_LOG__CONSOLE__ENABLE='true'
-        export EMQX_LOG__FILE__ENABLE='true'
+        export OPENQTT_LOG__CONSOLE__ENABLE='true'
+        export OPENQTT_LOG__FILE__ENABLE='true'
         ;;
     *)
         ;;
 esac
 
 SYSTEM="$(./scripts/get-distro.sh)"
-if [ -n "${EMQX_NODE_NAME:-}" ]; then
-    export EMQX_NODE__NAME="${EMQX_NODE_NAME}"
+if [ -n "${OPENQTT_NODE_NAME:-}" ]; then
+    export OPENQTT_NODE__NAME="${OPENQTT_NODE_NAME}"
 fi
-EMQX_NODE_NAME="${EMQX_NODE__NAME:-emqx@127.0.0.1}"
+OPENQTT_NODE_NAME="${OPENQTT_NODE__NAME:-emqx@127.0.0.1}"
 PROFILE="${PROFILE:-emqx}"
 FORCE_COMPILE=0
 # Do not start using ekka epmd by default, so your IDE can connect to it
@@ -124,7 +124,7 @@ while [ "$#" -gt 0 ]; do
             exit 0
             ;;
         -n|--name)
-            EMQX_NODE_NAME="$2"
+            OPENQTT_NODE_NAME="$2"
             shift 1
             ;;
         -p|--profile)
@@ -186,14 +186,14 @@ case "${PROFILE}" in
 esac
 
 BASE_DIR="_build/dev-run/$PROFILE"
-export EMQX_ETC_DIR="$BASE_DIR/etc"
-export EMQX_DATA_DIR="$BASE_DIR/data"
-export EMQX_LOG_DIR="$BASE_DIR/log"
-export EMQX_PLUGINS__INSTALL_DIR="${EMQX_PLUGINS__INSTALL_DIR:-$BASE_DIR/plugins}"
-CONFIGS_DIR="$EMQX_DATA_DIR/configs"
+export OPENQTT_ETC_DIR="$BASE_DIR/etc"
+export OPENQTT_DATA_DIR="$BASE_DIR/data"
+export OPENQTT_LOG_DIR="$BASE_DIR/log"
+export OPENQTT_PLUGINS__INSTALL_DIR="${OPENQTT_PLUGINS__INSTALL_DIR:-$BASE_DIR/plugins}"
+CONFIGS_DIR="$OPENQTT_DATA_DIR/configs"
 # Use your cookie so your IDE can connect to it.
-COOKIE="${EMQX_NODE__COOKIE:-${EMQX_NODE_COOKIE:-$(cat ~/.erlang.cookie 2>/dev/null || echo 'emqxsecretcookie')}}"
-mkdir -p "$EMQX_ETC_DIR" "$EMQX_DATA_DIR/patches" "$EMQX_DATA_DIR/plugins" "$EMQX_DATA_DIR/certs" "$EMQX_LOG_DIR" "$CONFIGS_DIR"
+COOKIE="${OPENQTT_NODE__COOKIE:-${OPENQTT_NODE_COOKIE:-$(cat ~/.erlang.cookie 2>/dev/null || echo 'emqxsecretcookie')}}"
+mkdir -p "$OPENQTT_ETC_DIR" "$OPENQTT_DATA_DIR/patches" "$OPENQTT_DATA_DIR/plugins" "$OPENQTT_DATA_DIR/certs" "$OPENQTT_LOG_DIR" "$CONFIGS_DIR"
 if [ $EKKA_EPMD -eq 1 ]; then
     EPMD_ARGS='-start_epmd false -epmd_module ekka_epmd'
 else
@@ -265,12 +265,12 @@ mustache() {
 ## the merge action is done before the profile is compiled
 render_hocon_conf() {
     input="apps/emqx_conf/etc/emqx.conf.all"
-    output="$EMQX_ETC_DIR/emqx.conf"
+    output="$OPENQTT_ETC_DIR/emqx.conf"
     cp "$input" "$output"
     mustache emqx_default_erlang_cookie "$COOKIE" "$output"
-    mustache platform_data_dir "${EMQX_DATA_DIR}" "$output"
-    mustache platform_log_dir "${EMQX_LOG_DIR}" "$output"
-    mustache platform_etc_dir "${EMQX_ETC_DIR}" "$output"
+    mustache platform_data_dir "${OPENQTT_DATA_DIR}" "$output"
+    mustache platform_log_dir "${OPENQTT_LOG_DIR}" "$output"
+    mustache platform_etc_dir "${OPENQTT_ETC_DIR}" "$output"
 }
 
 ## Make comma separated quoted strings
@@ -296,8 +296,8 @@ call_hocon() {
           mnesia_hook:module_info(module)
         catch _:_->
           io:format(standard_error, \"Force setting DB backend to 'mnesia', and 'role' to 'core'~n\", []),
-          os:putenv(\"EMQX_NODE__DB_BACKEND\", \"mnesia\"),
-          os:putenv(\"EMQX_NODE__DB_ROLE\", \"core\")
+          os:putenv(\"OPENQTT_NODE__DB_BACKEND\", \"mnesia\"),
+          os:putenv(\"OPENQTT_NODE__DB_ROLE\", \"core\")
         end,
         {Time, ok} = timer:tc(fun() -> ok = hocon_cli:main([$args]) end),
         io:format(user, \"Took ~pms to generate config~n\", [Time div 1000]),
@@ -318,15 +318,15 @@ generate_app_conf() {
     ##   - etc/base.hocon
     ##   - $DATA_DIR/cluster.hocon (if exists)
     ##   - etc/emqx.conf
-    ##   - environment variables starts with EMQX_ e.g. EMQX_NODE__ROLE
+    ##   - environment variables starts with OPENQTT_ e.g. OPENQTT_NODE__ROLE
     ##
     ## NOTE: it's a known issue that cluster.hocon may change right after the node boots up
     ##       because it has to sync cluster.hocon from other nodes.
     call_hocon -v -t "$NOW_TIME" -s "$SCHEMA_MOD" \
-        -c "$EMQX_ETC_DIR"/base.hocon \
-        -c "$EMQX_DATA_DIR"/configs/cluster.hocon \
-        -c "$EMQX_ETC_DIR"/emqx.conf \
-        -d "$EMQX_DATA_DIR"/configs generate
+        -c "$OPENQTT_ETC_DIR"/base.hocon \
+        -c "$OPENQTT_DATA_DIR"/configs/cluster.hocon \
+        -c "$OPENQTT_ETC_DIR"/emqx.conf \
+        -d "$OPENQTT_DATA_DIR"/configs generate
 
     ## filenames are per-hocon convention
     CONF_FILE="$CONFIGS_DIR/app.$NOW_TIME.config"
@@ -338,15 +338,15 @@ append_args_file() {
     ## ensure a new line at the end
     echo '' >> "$ARGS_FILE"
     cat <<EOF >> "$ARGS_FILE"
-$ERL_NAME_ARG $EMQX_NODE_NAME
--mnesia dir '"$EMQX_DATA_DIR/mnesia/$EMQX_NODE_NAME"'
+$ERL_NAME_ARG $OPENQTT_NODE_NAME
+-mnesia dir '"$OPENQTT_DATA_DIR/mnesia/$OPENQTT_NODE_NAME"'
 -stdlib restricted_shell emqx_restricted_shell
 +spp true
 +A 4
 +IOt 4
 +SDio 8
 -shutdown_time 30000
--pa '$EMQX_DATA_DIR/patches'
+-pa '$OPENQTT_DATA_DIR/patches'
 -cache_boot_paths false
 -mnesia dump_log_write_threshold 5000
 -mnesia dump_log_time_threshold 60000
@@ -356,9 +356,9 @@ EOF
 
 # copy cert files and acl.conf to etc
 copy_other_conf_files() {
-    cp -r apps/emqx/etc/certs "$EMQX_ETC_DIR"/
-    cp -r apps/emqx_conf/etc/base.hocon "$EMQX_ETC_DIR"/
-    cp apps/emqx_auth/etc/acl.conf "$EMQX_ETC_DIR"/
+    cp -r apps/emqx/etc/certs "$OPENQTT_ETC_DIR"/
+    cp -r apps/emqx_conf/etc/base.hocon "$OPENQTT_ETC_DIR"/
+    cp apps/emqx_auth/etc/acl.conf "$OPENQTT_ETC_DIR"/
 }
 
 is_current_profile_app() {
@@ -441,7 +441,7 @@ boot() {
 
         # shellcheck disable=SC2086
         env APPS="$APPS" iex \
-          -$ERL_NAME_ARG "$EMQX_NODE_NAME" \
+          -$ERL_NAME_ARG "$OPENQTT_NODE_NAME" \
           --erl "$EPMD_ARGS_ELIXIR" \
           --erl "$USER_MOD_ARG" \
           --erl '-proto_dist ekka' \
@@ -457,7 +457,7 @@ boot() {
         "
 
         # shellcheck disable=SC2086
-        erl $ERL_NAME_ARG "$EMQX_NODE_NAME" \
+        erl $ERL_NAME_ARG "$OPENQTT_NODE_NAME" \
             $EPMD_ARGS \
             -proto_dist ekka \
             -args_file "$ARGS_FILE" \
@@ -474,7 +474,7 @@ gen_tmp_node_name() {
     if [ $SHORTNAMES -eq  1 ]; then
         echo "remsh${rnd}"
     else
-        echo "remsh${rnd}-${EMQX_NODE_NAME}"
+        echo "remsh${rnd}-${OPENQTT_NODE_NAME}"
     fi
 }
 
@@ -485,7 +485,7 @@ remsh() {
     erl $ERL_NAME_ARG "$tmpnode" \
         -hidden \
         -setcookie "$COOKIE" \
-        -remsh "$EMQX_NODE_NAME" \
+        -remsh "$OPENQTT_NODE_NAME" \
         $EPMD_ARGS
 }
 
@@ -507,7 +507,7 @@ ctl() {
     local args rpc_code output result
     args="$(make_erlang_args "${PASSTHROUGH_ARGS[@]}")"
     rpc_code="
-        case rpc:call('$EMQX_NODE_NAME', emqx_ctl, run_command, [[$args]]) of
+        case rpc:call('$OPENQTT_NODE_NAME', emqx_ctl, run_command, [[$args]]) of
           ok ->
             init:stop(0);
           true ->

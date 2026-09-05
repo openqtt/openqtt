@@ -21,13 +21,13 @@ listeners.ssl.my_ssl_listener_name {
     }
     ssl_options {
         ## Trusted PEM format CA certificates bundle file
-        cacertfile = "${EMQX_ETC_DIR}/certs/cacert.pem"
+        cacertfile = "${OPENQTT_ETC_DIR}/certs/cacert.pem"
 
         ## PEM format certificates chain file
-        certfile = "${EMQX_ETC_DIR}/certs/cert.pem"
+        certfile = "${OPENQTT_ETC_DIR}/certs/cert.pem"
 
         ## PEM format private key file
-        keyfile = "${EMQX_ETC_DIR}/certs/key.pem"
+        keyfile = "${OPENQTT_ETC_DIR}/certs/key.pem"
 
         ## Enable or disable peer verification
         verify = verify_none  ## use verify_peer to enable
@@ -70,7 +70,7 @@ listeners.ssl.my_ssl_listener_name {
         ocsp {
              enable_ocsp_stapling = false
              responder_url = "http://ocsp.example.com"
-             issuer_pem = "${EMQX_ETC_DIR}/certs/ocsp-issuer-cert.pem"
+             issuer_pem = "${OPENQTT_ETC_DIR}/certs/ocsp-issuer-cert.pem"
              refresh_http_timeout = 15s
              refresh_interval = 5m
         }

@@ -28,10 +28,10 @@ cleanup() {
 }
 
 show_help() {
-    echo "Usage: $0 [options] EMQX_IMAGE1 [EMQX_IAMGE2]"
+    echo "Usage: $0 [options] OPENQTT_IMAGE1 [OPENQTT_IAMGE2]"
     echo ""
-    echo "Specifiy which docker image to run with EMQX_IMAGE1"
-    echo "EMQX_IMAGE2 is the same as EMQX_IMAGE1 if not set"
+    echo "Specifiy which docker image to run with OPENQTT_IMAGE1"
+    echo "OPENQTT_IMAGE2 is the same as OPENQTT_IMAGE1 if not set"
     echo ""
     echo "Options:"
     echo "  -h, --help: Show this help message and exit."
@@ -105,30 +105,30 @@ fi
 
 docker run -d -t --restart=always --name "$NODE1" \
   --net "$NET" \
-  -e EMQX_LOG__CONSOLE_HANDLER__LEVEL=debug \
-  -e EMQX_NODE_NAME="emqx@$NODE1" \
-  -e EMQX_NODE_COOKIE="$COOKIE" \
-  -e EMQX_CLUSTER__PROTO_DIST="${PROTO_DIST}" \
-  -e EMQX_RPC__LISTEN_ADDRESS="${RPC_ADDRESS}" \
-  -e EMQX_RPC__IPV6_ONLY="true" \
-  -e EMQX_listeners__ssl__default__enable=false \
-  -e EMQX_listeners__wss__default__enable=false \
-  -e EMQX_listeners__tcp__default__proxy_protocol=true \
-  -e EMQX_listeners__ws__default__proxy_protocol=true \
+  -e OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=debug \
+  -e OPENQTT_NODE_NAME="emqx@$NODE1" \
+  -e OPENQTT_NODE_COOKIE="$COOKIE" \
+  -e OPENQTT_CLUSTER__PROTO_DIST="${PROTO_DIST}" \
+  -e OPENQTT_RPC__LISTEN_ADDRESS="${RPC_ADDRESS}" \
+  -e OPENQTT_RPC__IPV6_ONLY="true" \
+  -e OPENQTT_listeners__ssl__default__enable=false \
+  -e OPENQTT_listeners__wss__default__enable=false \
+  -e OPENQTT_listeners__tcp__default__proxy_protocol=true \
+  -e OPENQTT_listeners__ws__default__proxy_protocol=true \
   "$IMAGE1"
 
 docker run -d -t --restart=always --name "$NODE2" \
   --net "$NET" \
-  -e EMQX_LOG__CONSOLE_HANDLER__LEVEL=debug \
-  -e EMQX_NODE_NAME="emqx@$NODE2" \
-  -e EMQX_NODE_COOKIE="$COOKIE" \
-  -e EMQX_CLUSTER__PROTO_DIST="${PROTO_DIST}" \
-  -e EMQX_RPC__LISTEN_ADDRESS="${RPC_ADDRESS}" \
-  -e EMQX_RPC__IPV6_ONLY="true" \
-  -e EMQX_listeners__ssl__default__enable=false \
-  -e EMQX_listeners__wss__default__enable=false \
-  -e EMQX_listeners__tcp__default__proxy_protocol=true \
-  -e EMQX_listeners__ws__default__proxy_protocol=true \
+  -e OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=debug \
+  -e OPENQTT_NODE_NAME="emqx@$NODE2" \
+  -e OPENQTT_NODE_COOKIE="$COOKIE" \
+  -e OPENQTT_CLUSTER__PROTO_DIST="${PROTO_DIST}" \
+  -e OPENQTT_RPC__LISTEN_ADDRESS="${RPC_ADDRESS}" \
+  -e OPENQTT_RPC__IPV6_ONLY="true" \
+  -e OPENQTT_listeners__ssl__default__enable=false \
+  -e OPENQTT_listeners__wss__default__enable=false \
+  -e OPENQTT_listeners__tcp__default__proxy_protocol=true \
+  -e OPENQTT_listeners__ws__default__proxy_protocol=true \
   "$IMAGE2"
 
 mkdir -p tmp

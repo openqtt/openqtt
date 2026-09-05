@@ -9,8 +9,8 @@ set +e
 # shellcheck disable=SC3028 disable=SC3054
 SCRIPT_DIR="$( dirname -- "$( readlink -f -- "$0"; )"; )"
 
-EMQX_TEST_DB_BACKEND=$1
-if [ "$EMQX_TEST_DB_BACKEND" = "rlog" ]
+OPENQTT_TEST_DB_BACKEND=$1
+if [ "$OPENQTT_TEST_DB_BACKEND" = "rlog" ]
 then
   # TODO: target only replica to avoid replication races
   # see: https://github.com/emqx/emqx/issues/6094
