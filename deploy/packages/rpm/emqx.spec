@@ -78,7 +78,7 @@ chown -R %{_user}:%{_group} %{_lib_home}
 # Only on uninstall, not upgrades
 if [ $1 = 0 ]; then
     systemctl disable %{_name}.service
-    rm -f %{_bindir}/emqx
+    rm -f %{_bindir}/openqtt
     rm -f %{_bindir}/openqtt_ctl
 fi
 exit 0

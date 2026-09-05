@@ -107,13 +107,13 @@ start_emqx_v4() {
         --ip "$IP" \
         --dns "$IP0" \
         -p "$DASHBOARD_PORT:18083" \
-        -e OPENQTT_NODE_NAME="${APP_NAME}@${IP}" \
-        -e OPENQTT_LOG__LEVEL=debug \
-        -e OPENQTT_NODE_COOKIE="$COOKIE" \
-        -e OPENQTT_cluster__discovery='dns' \
-        -e OPENQTT_cluster__dns__name="$DOMAIN" \
-        -e OPENQTT_cluster__dns__app="${APP_NAME}" \
-        -e OPENQTT_cluster__dns__record_type="a" \
+        -e EMQX_NODE_NAME="${APP_NAME}@${IP}" \
+        -e EMQX_LOG__LEVEL=debug \
+        -e EMQX_NODE_COOKIE="$COOKIE" \
+        -e EMQX_cluster__discovery='dns' \
+        -e EMQX_cluster__dns__name="$DOMAIN" \
+        -e EMQX_cluster__dns__app="${APP_NAME}" \
+        -e EMQX_cluster__dns__record_type="a" \
         "$IMAGE"
 }
 

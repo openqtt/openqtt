@@ -982,7 +982,7 @@ fields("log_file_handler") ->
                 string(),
                 #{
                     desc => ?DESC("log_file_handler_file"),
-                    default => <<"${EMQX_LOG_DIR}/emqx.log">>,
+                    default => <<"${OPENQTT_LOG_DIR}/emqx.log">>,
                     aliases => [file, to],
                     importance => ?IMPORTANCE_HIGH,
                     converter => fun log_file_path_converter/2
@@ -1574,7 +1574,7 @@ fix_bad_log_path(Path) ->
     %% defer validation to ensure_unicode_path
     Path.
 
-%% Substitute the log dir with environment variable EMQX_LOG_DIR
+%% Substitute the log dir with environment variable OPENQTT_LOG_DIR
 %% when possible
 maybe_subst_log_dir("${" ++ _ = Dir, Name) ->
     %% the original path is already using environment variable
@@ -1586,7 +1586,7 @@ maybe_subst_log_dir(Dir, Name) ->
         true ->
             %% the path is the same as the environment variable
             %% substitute it with the environment variable
-            filename:join(["${EMQX_LOG_DIR}", Name]);
+            filename:join(["${OPENQTT_LOG_DIR}", Name]);
         false ->
             case filelib:is_dir(Dir) of
                 true ->
@@ -1595,7 +1595,7 @@ maybe_subst_log_dir(Dir, Name) ->
                 false when IsEnvSet ->
                     %% the path does not exist, but the environment variable is set
                     %% substitute it with the environment variable
-                    filename:join(["${EMQX_LOG_DIR}", Name]);
+                    filename:join(["${OPENQTT_LOG_DIR}", Name]);
                 false ->
                     %% the path does not exist, and the environment variable is not set
                     %% keep it

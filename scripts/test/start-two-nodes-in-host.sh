@@ -33,7 +33,7 @@ BUILT_BOOT='./_build/emqx/rel/openqtt/bin/openqtt'
 if [ -f "$BUILT_BOOT" ]; then
     DEFAULT_BOOT="$BUILT_BOOT"
 else
-    DEFAULT_BOOT="$(which emqx || true)"
+    DEFAULT_BOOT="$(which openqtt || true)"
 fi
 DATADIR="$(pwd)/tmp"
 ROLES='core,core'
