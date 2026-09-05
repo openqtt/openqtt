@@ -129,7 +129,9 @@ jobs:
         run: |
           set -euo pipefail
           cat > notes.md <<NOTES
-          OpenQTT $VERSION. EMQX 5.8.9, Apache 2.0, community profile, no dashboard UI.
+          OpenQTT $VERSION. Apache 2.0, EMQX 5.8.9 inside, community profile,
+          no dashboard UI. The binary is \`openqtt\`, broker variables carry the
+          \`OPENQTT_\` prefix, and the image installs to /opt/openqtt.
 
           | Artifact | Reference |
           | --- | --- |

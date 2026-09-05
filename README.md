@@ -26,8 +26,8 @@ those directories by name, so the broker that comes out of this tree is the one
 There is no dashboard web UI. Upstream downloaded it at build time as a prebuilt
 zip from a repository that carries no license, so it cannot be part of an Apache
 distribution. The dashboard application itself is Apache and is untouched: the
-REST API on port 18083 is complete, and `emqx ctl` works. Requests for `/` answer
-404.
+REST API on port 18083 is complete, and `openqtt ctl` works. Requests for `/`
+answer 404.
 
 ## What maintained means here
 
@@ -53,6 +53,42 @@ docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
 The version the broker reports is the EMQX version inside, `5.8.9`. OpenQTT's
 own version is the image tag and the chart version.
 
+## Upgrading from EMQX
+
+This is a clean break. Nothing reads the old names, and nothing warns you: a
+node started with an EMQX environment comes up on its config file's defaults
+instead, which is a different cluster with a different cookie. Update the
+configuration before you upgrade.
+
+| Was | Is |
+| --- | --- |
+| `emqx`, `emqx ctl` | `openqtt`, `openqtt ctl` |
+| `EMQX_*` environment variables | `OPENQTT_*` |
+| `/opt/emqx` in the image | `/opt/openqtt` |
+| chart value `emqxConfig` | `openqttConfig` |
+
+- **The binary.** `bin/emqx` is `bin/openqtt`, and `emqx_ctl`,
+  `emqx_cluster_rescue` and `emqx_fw` follow the same rule. The release is named
+  `openqtt`, so a wrapper that calls the old path finds nothing.
+- **The environment.** The hocon override prefix is `OPENQTT_`. Every variable
+  moves with it: `OPENQTT_NODE__COOKIE`, `OPENQTT_NODE__NAME`,
+  `OPENQTT_CLUSTER__DISCOVERY_STRATEGY`, `OPENQTT_DASHBOARD__DEFAULT_PASSWORD`
+  and the rest. There is no `EMQX_` fallback, so a stale variable is not an
+  error, it is silence.
+- **The container.** The image installs to `/opt/openqtt` and runs as unix user
+  `openqtt`. uid and gid stay 1000, so an existing volume's ownership still
+  matches, but a mount of `/opt/emqx/data` now mounts an empty directory and the
+  node starts with no state.
+- **The chart.** `emqxConfig` is `openqttConfig` and every key under it takes
+  the `OPENQTT_` prefix. Helm does not reject unknown top level values, so a
+  values file that still says `emqxConfig` is ignored rather than refused. The
+  data volume is `openqtt-data`, which changes PVC names: persisted state does
+  not follow the upgrade, so back it up or plan on losing it.
+
+What did not change: the config keys (`node.name`, `listeners.tcp.default.bind`
+and the rest), the REST API and its `/api/v5` paths, `etc/emqx.conf`, the MQTT
+wire behaviour, and the Erlang module and application names.
+
 ## Building it
 
 `deploy/docker/Dockerfile` builds the community profile from this tree using a
@@ -63,9 +99,10 @@ pushing it; a `v*` tag builds, publishes, and creates the release.
 ## Trademarks
 
 EMQX is a trademark of EMQ Technologies Co., Ltd. OpenQTT is not affiliated
-with, sponsored by, or endorsed by EMQ. The name of the binary, the modules and
-the environment variables remain `emqx` because renaming them would change
-nothing about the software and would make upstream fixes harder to apply.
+with, sponsored by, or endorsed by EMQ. The product, the binary and the
+environment variables are named for OpenQTT. The Erlang modules, applications
+and config keys are still `emqx`, because renaming them would change nothing
+about the software and would make upstream fixes harder to apply.
 
 ## License
 
