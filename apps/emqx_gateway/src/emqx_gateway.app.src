@@ -1,7 +1,7 @@
 %% -*- mode: erlang -*-
 {application, emqx_gateway, [
     {description, "The Gateway management application"},
-    {vsn, "0.2.5"},
+    {vsn, "0.2.6"},
     {registered, []},
     {mod, {emqx_gateway_app, []}},
     {applications, [
@@ -16,8 +16,7 @@
         emqx_auth_mysql,
         emqx_auth_postgresql,
         emqx_auth_mongodb,
-        emqx_auth_redis,
-        emqx_auth_ldap
+        emqx_auth_redis
     ]},
     {env, []},
     {modules, []},

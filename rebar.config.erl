@@ -134,6 +134,13 @@ is_community_umbrella_app("apps/emqx_cluster_link") -> false;
 is_community_umbrella_app("apps/emqx_ds_builtin_raft") -> false;
 is_community_umbrella_app("apps/emqx_auth_kerberos") -> false;
 is_community_umbrella_app("apps/emqx_auth_cinfo") -> false;
+%% OpenQTT: upstream has no clause for emqx_auth_ldap, so its own community
+%% profile compiled an app whose directory carries BSL.txt. The authoritative
+%% test for whether an app belongs in an Apache distribution is that file, not
+%% this list. emqx_ldap, the driver, is Apache and stays; the authn/authz
+%% provider built on it is not and is absent. Keep this clause so an upstream
+%% merge cannot quietly pull it back into the community profile.
+is_community_umbrella_app("apps/emqx_auth_ldap") -> false;
 is_community_umbrella_app("apps/emqx_ds_fdb_backend") -> false;
 is_community_umbrella_app(_) -> true.
 

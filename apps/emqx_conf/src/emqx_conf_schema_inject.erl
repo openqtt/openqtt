@@ -58,8 +58,7 @@ authn_mods(ce) ->
         emqx_authn_redis_schema,
         emqx_authn_http_schema,
         emqx_authn_jwt_schema,
-        emqx_authn_scram_mnesia_schema,
-        emqx_authn_ldap_schema
+        emqx_authn_scram_mnesia_schema
     ];
 authn_mods(ee) ->
     authn_mods(ce) ++
@@ -81,8 +80,7 @@ authz_mods() ->
         emqx_authz_redis_schema,
         emqx_authz_mysql_schema,
         emqx_authz_postgresql_schema,
-        emqx_authz_mongodb_schema,
-        emqx_authz_ldap_schema
+        emqx_authz_mongodb_schema
     ].
 
 shared_subs(ee) ->
