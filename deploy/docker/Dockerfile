@@ -30,9 +30,9 @@ ENV DOWNLOAD_I18N_TRANSLATIONS=false
 
 WORKDIR /emqx/
 
-RUN mkdir -p /emqx-rel/emqx && \
+RUN mkdir -p /emqx-rel/openqtt && \
     if [ -f "/${PROFILE}.tar.gz" ]; then \
-      tar zxf "/${PROFILE}.tar.gz" -C /emqx-rel/emqx; \
+      tar zxf "/${PROFILE}.tar.gz" -C /emqx-rel/openqtt; \
     else \
       if [ -f rebar-git-cache.tar ]; then \
         mkdir .cache && \
@@ -40,10 +40,10 @@ RUN mkdir -p /emqx-rel/emqx && \
         export REBAR_GIT_CACHE_DIR='/emqx/.cache' && \
         export REBAR_GIT_CACHE_REF_AUTOFILL=0; \
       fi && \
-      export OPENQTT_REL_PATH="/emqx/_build/${PROFILE}/rel/emqx" && \
+      export OPENQTT_REL_PATH="/emqx/_build/${PROFILE}/rel/openqtt" && \
       git config --global --add safe.directory '*' && \
       make ${PROFILE}-tgz && \
-      tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/emqx; \
+      tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/openqtt; \
     fi
 
 FROM $RUN_FROM
@@ -59,20 +59,20 @@ RUN set -eu; \
     apt-get update; \
     apt-get install -y --no-install-recommends ca-certificates procps curl $(echo "${EXTRA_DEPS}" | tr ',' ' '); \
     rm -rf /var/lib/apt/lists/*; \
-    groupadd -r -g 1000 emqx; \
-    useradd -r -m -u 1000 -g emqx emqx;
+    groupadd -r -g 1000 openqtt; \
+    useradd -r -m -u 1000 -g openqtt openqtt;
 
-COPY --from=builder --chown=emqx:emqx /emqx-rel /opt/
+COPY --from=builder --chown=openqtt:openqtt /emqx-rel /opt/
 
-RUN ln -s /opt/emqx/bin/* /usr/local/bin/
+RUN ln -s /opt/openqtt/bin/* /usr/local/bin/
 
-WORKDIR /opt/emqx
+WORKDIR /opt/openqtt
 
-USER emqx
+USER openqtt
 
-VOLUME ["/opt/emqx/log", "/opt/emqx/data"]
+VOLUME ["/opt/openqtt/log", "/opt/openqtt/data"]
 
-# emqx will occupy these port:
+# openqtt will occupy these port:
 # - 1883 port for MQTT
 # - 8083 for WebSocket/HTTP
 # - 8084 for WSS/HTTPS
@@ -84,4 +84,4 @@ EXPOSE 1883 8083 8084 8883 18083 4370 5369
 
 ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
 
-CMD ["/opt/emqx/bin/emqx", "foreground"]
+CMD ["/opt/openqtt/bin/openqtt", "foreground"]
