@@ -1,0 +1,83 @@
+emqx_bridge_mongodb {
+
+collection.desc:
+"""The collection where data will be stored into"""
+
+collection.label:
+"""Collection to be used"""
+
+desc_config.desc:
+"""Configuration for MongoDB action"""
+
+desc_config.label:
+"""MongoDB Action Configuration"""
+
+desc_name.desc:
+"""Action name."""
+
+desc_name.label:
+"""Action Name"""
+
+desc_type.desc:
+"""The action type."""
+
+desc_type.label:
+"""Action Type"""
+
+enable.desc:
+"""Enable or disable this MongoDB Action"""
+
+enable.label:
+"""Enable or disable"""
+
+mongodb_rs_conf.desc:
+"""MongoDB (Replica Set) configuration"""
+
+mongodb_rs_conf.label:
+"""MongoDB (Replica Set) Configuration"""
+
+mongodb_sharded_conf.desc:
+"""MongoDB (Sharded) configuration"""
+
+mongodb_sharded_conf.label:
+"""MongoDB (Sharded) Configuration"""
+
+mongodb_single_conf.desc:
+"""MongoDB (Standalone) configuration"""
+
+mongodb_single_conf.label:
+"""MongoDB (Standalone) Configuration"""
+
+mongodb_parameters.label:
+"""MongoDB Type Specific Parameters"""
+
+mongodb_parameters.desc:
+"""Set of parameters specific for the given type of this MongoDB connector, `mongo_type` can be one of `single` (Standalone), `sharded` (Sharded) or `rs` (Replica Set)."""
+
+payload_template.desc:
+"""The template for formatting the outgoing messages.  If undefined, rule engine will use JSON format to serialize all visible inputs, such as clientid, topic, payload etc."""
+
+payload_template.label:
+"""Payload template"""
+
+batch_size.desc:
+"""There is no batching support for MongoDB at the moment, so this config field has no effect. Internally the value is overridden to 1."""
+batch_size.label:
+"""Batch Size"""
+
+action_parameters.label:
+"""Action Parameters"""
+action_parameters.desc:
+"""Additional parameters specific to this action type"""
+
+mongodb_action.label:
+"""MongoDB Action"""
+mongodb_action.desc:
+"""Action to interact with a MongoDB connector"""
+
+mqtt_topic.desc:
+"""MQTT topic or topic filter as data source (action input).  If rule action is used as data source, this config should be left empty, otherwise messages will be duplicated in MongoDB."""
+mqtt_topic.label:
+"""Source MQTT Topic"""
+
+}

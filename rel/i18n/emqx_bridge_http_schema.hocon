@@ -1,0 +1,101 @@
+emqx_bridge_http_schema {
+
+config_body.desc:
+"""The body of the HTTP request.<br/>
+If not provided, the body will be a JSON object of all the available fields.<br/>
+There, 'all the available fields' means the context of a MQTT message when
+this webhook is triggered by receiving a MQTT message (the `local_topic` is set),
+or the context of the event when this webhook is triggered by a rule (i.e. this
+webhook is used as an action of a rule).<br/>
+Template with variables is allowed."""
+
+config_body.label:
+"""HTTP Body"""
+
+config_enable_bridge.desc:
+"""Enable or disable this action."""
+
+config_enable_bridge.label:
+"""Enable Or Disable Bridge"""
+
+config_headers.desc:
+"""The headers of the HTTP request.<br/>
+Template with variables is allowed."""
+
+config_headers.label:
+"""HTTP Header"""
+
+config_local_topic.desc:
+"""The MQTT topic filter to be forwarded to the HTTP server. All MQTT 'PUBLISH' messages with the topic
+matching the local_topic will be forwarded.<br/>
+NOTE: If this action is used as the action of a rule (EMQX rule engine), and also local_topic is
+configured, then both the data got from the rule and the MQTT messages that match local_topic
+will be forwarded."""
+
+config_local_topic.label:
+"""Local Topic"""
+
+config_max_retries.desc:
+"""HTTP request max retry times if failed."""
+
+config_max_retries.label:
+"""HTTP Request Max Retries"""
+
+config_method.desc:
+"""The method of the HTTP request. All the available methods are: post, put, get, delete.<br/>
+Template with variables is allowed."""
+
+config_method.label:
+"""HTTP Method"""
+
+config_request_timeout.desc:
+"""HTTP request timeout."""
+
+config_request_timeout.label:
+"""HTTP Request Timeout"""
+
+config_url.desc:
+"""The URL of the HTTP action.<br/>
+Template with variables is allowed in the path, but variables cannot be used in the scheme, host,
+or port part.<br/>
+For example, <code> http://localhost:9901/${topic} </code> is allowed, but
+<code> http://${host}:9901/message </code> or <code> http://localhost:${port}/message </code>
+is not allowed."""
+
+config_url.label:
+"""URL"""
+
+config_path.desc:
+"""The URL path for this Action.<br/>
+This path will be appended to the Connector's <code>url</code> configuration to form the full
+URL address.
+Template with variables is allowed in this option. For example, <code>/room/${room_no}</code>"""
+
+config_path.label:
+"""URL Path"""
+
+config_parameters_opts.desc:
+"""The parameters for HTTP action."""
+
+config_parameters_opts.label:
+"""Parameters"""
+
+desc_config.desc:
+"""Configuration for an HTTP action."""
+
+desc_config.label:
+"""HTTP Action Configuration"""
+
+desc_name.desc:
+"""Action name, used as a human-readable identifier."""
+
+desc_name.label:
+"""Action Name"""
+
+desc_type.desc:
+"""The action type."""
+
+desc_type.label:
+"""Action Type"""
+
+}

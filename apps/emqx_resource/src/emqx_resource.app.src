@@ -1,0 +1,22 @@
+%% -*- mode: erlang -*-
+{application, emqx_resource, [
+    {description, "Manager for all external resources"},
+    {vsn, "0.1.40"},
+    {registered, []},
+    {mod, {emqx_resource_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        gproc,
+        jsx,
+        ecpool,
+        replayq,
+        emqx,
+        telemetry
+    ]},
+    {env, []},
+    {modules, []},
+
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+]}.

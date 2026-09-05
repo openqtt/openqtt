@@ -1,0 +1,23 @@
+## Prometheus
+
+## EMQX's Prometheus scraping endpoint is enabled by default without authentication.
+## You can enable basic authentication by setting enable_basic_auth to true.
+## You can inspect it with a curl command: curl -f "127.0.0.1:18083/api/v5/prometheus/stats"
+
+prometheus {
+  enable_basic_auth = false
+  push_gateway {
+    url = "http://127.0.0.1:9091"
+    headers {Authorization = "Basic YWRtaW46Y2JraG55eWd5QDE="}
+    interval = 15s
+    job_name = "${name}/instance/${name}~${host}"
+  }
+ collectors {
+    mnesia = disabled
+    vm_dist = disabled
+    vm_memory = disabled
+    vm_msacc = disabled
+    vm_statistics = disabled
+    vm_system_info = enabled
+  }
+}

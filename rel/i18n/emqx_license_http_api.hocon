@@ -1,0 +1,21 @@
+emqx_license_http_api {
+
+desc_license_info_api.desc:
+"""Get license info"""
+
+desc_license_info_api.label:
+"""License info"""
+
+desc_license_key_api.desc:
+"""Update a license key"""
+
+desc_license_key_api.label:
+"""Update license"""
+
+desc_license_setting_api.desc:
+"""Update license setting"""
+
+desc_license_setting_api.label:
+"""Update license setting"""
+
+}

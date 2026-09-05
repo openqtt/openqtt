@@ -1,0 +1,8 @@
+emqx_bridge_s3 {
+
+config_connector.label:
+"""S3 Connector Configuration"""
+config_connector.desc:
+"""Configuration for a connector to S3 API compatible storage service."""
+
+}

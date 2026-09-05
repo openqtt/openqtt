@@ -1,0 +1,279 @@
+name: Push Entrypoint
+
+concurrency:
+  group: push-entrypoint-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'e*'
+    branches:
+      - 'master'
+      - 'release-5[0-9]'
+      - 'ci/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        required: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  IS_CI: 'yes'
+
+jobs:
+  init:
+    runs-on: ubuntu-22.04
+    outputs:
+      BUILDER_VSN: ${{ steps.env.outputs.BUILDER_VSN }}
+      OTP_VSN: ${{ steps.env.outputs.OTP_VSN }}
+      ELIXIR_VSN: ${{ steps.env.outputs.ELIXIR_VSN }}
+      BUILDER: ${{ steps.env.outputs.BUILDER }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Set up environment
+        id: env
+        run: |
+          source env.sh
+          echo "BUILDER_VSN=$EMQX_BUILDER_VSN" >> "$GITHUB_OUTPUT"
+          echo "OTP_VSN=$OTP_VSN" >> "$GITHUB_OUTPUT"
+          echo "ELIXIR_VSN=$ELIXIR_VSN" >> "$GITHUB_OUTPUT"
+          echo "BUILDER=$EMQX_BUILDER" >> "$GITHUB_OUTPUT"
+
+  prepare:
+    runs-on: ubuntu-22.04
+    needs: init
+    container: ${{ needs.init.outputs.BUILDER }}
+    outputs:
+      profile: ${{ steps.parse-git-ref.outputs.profile }}
+      release: ${{ steps.parse-git-ref.outputs.release }}
+      ct-matrix: ${{ steps.matrix.outputs.ct-matrix }}
+      ct-host: ${{ steps.matrix.outputs.ct-host }}
+      ct-docker: ${{ steps.matrix.outputs.ct-docker }}
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+      - name: Work around https://github.com/actions/checkout/issues/766
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Detect emqx profile
+        id: parse-git-ref
+        run: |
+          JSON="$(./scripts/parse-git-ref.sh $GITHUB_REF)"
+          PROFILE=$(echo "$JSON" | jq -cr '.profile')
+          RELEASE=$(echo "$JSON" | jq -cr '.release')
+          echo "profile=$PROFILE" | tee -a $GITHUB_OUTPUT
+          echo "release=$RELEASE" | tee -a $GITHUB_OUTPUT
+      - name: Build matrix
+        id: matrix
+        run: |
+          MATRIX="$(./scripts/find-apps.sh --ci)"
+          echo "${MATRIX}" | jq
+          CT_MATRIX="$(echo "${MATRIX}" | jq -c 'map({profile}) | unique')"
+          CT_HOST="$(echo "${MATRIX}"   | jq -c 'map(select(.runner == "host"))')"
+          CT_DOCKER="$(echo "${MATRIX}" | jq -c 'map(select(.runner == "docker"))')"
+          echo "ct-matrix=${CT_MATRIX}" | tee -a $GITHUB_OUTPUT
+          echo "ct-host=${CT_HOST}"     | tee -a $GITHUB_OUTPUT
+          echo "ct-docker=${CT_DOCKER}" | tee -a $GITHUB_OUTPUT
+
+  build_packages:
+    if: needs.prepare.outputs.release == 'true'
+    needs:
+      - init
+      - prepare
+    uses: ./.github/workflows/build_packages.yaml
+    with:
+      profile: ${{ needs.prepare.outputs.profile }}
+      publish: true
+      otp_vsn: ${{ needs.init.outputs.OTP_VSN }}
+      elixir_vsn: ${{ needs.init.outputs.ELIXIR_VSN }}
+      builder_vsn: ${{ needs.init.outputs.BUILDER_VSN }}
+    secrets: inherit
+
+  build_and_push_docker_images:
+    if: needs.prepare.outputs.release == 'true'
+    needs:
+      - init
+      - prepare
+    uses: ./.github/workflows/build_and_push_docker_images.yaml
+    with:
+      profile: ${{ needs.prepare.outputs.profile }}
+      publish: true
+    secrets: inherit
+
+  build_slim_packages:
+    if: needs.prepare.outputs.release != 'true'
+    needs:
+      - init
+      - prepare
+    uses: ./.github/workflows/build_slim_packages.yaml
+
+  compile:
+    runs-on: ${{ endsWith(github.repository, '/emqx') && 'ubuntu-22.04' || 'aws-ubuntu22.04-amd64' }}
+    container: ${{ needs.init.outputs.BUILDER }}
+    needs:
+      - init
+      - prepare
+    strategy:
+      matrix:
+        profile:
+          - emqx
+          - emqx-enterprise
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+      - name: Work around https://github.com/actions/checkout/issues/766
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - id: compile
+        env:
+          PROFILE: ${{ matrix.profile }}
+          ENABLE_COVER_COMPILE: 1
+          IS_RELEASE: ${{ needs.prepare.outputs.release }}
+        run: |
+          if [ "$IS_RELEASE" != true ]; then
+            make ensure-rebar3 test-compile
+          fi
+          make $PROFILE
+          echo "export PROFILE=${PROFILE}" | tee -a env.sh
+          echo "export PKG_VSN=$(./pkg-vsn.sh ${PROFILE})" | tee -a env.sh
+          zip -ryq -x@.github/workflows/.zipignore $PROFILE.zip .
+          make ${PROFILE}-rel
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.profile }}
+          path: ${{ matrix.profile }}.zip
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: "${{ matrix.profile }}-schema-dump"
+          path: |
+            env.sh
+            _build/docgen/${{ matrix.profile }}/*.json
+            _build/docgen/${{ matrix.profile }}/*.hocon
+          retention-days: 7
+
+  performance_test:
+    if: needs.prepare.outputs.release == 'true'
+    needs:
+      - init
+      - prepare
+      - build_packages
+    runs-on: ${{ endsWith(github.repository, '/emqx') && 'ubuntu-22.04' || 'aws-ubuntu22.04-amd64' }}
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger performance test
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh --repo ${{ github.repository }} workflow run performance_test.yaml -f version=${GITHUB_REF_NAME##[v|e]}
+  update_emqx_i18n:
+    if: needs.prepare.outputs.release == 'true'
+    needs:
+      - prepare
+      - compile
+    runs-on: ${{ endsWith(github.repository, '/emqx') && 'ubuntu-22.04' || 'aws-ubuntu22.04-amd64' }}
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.AUTH_APP_ID }}
+          private-key: ${{ secrets.AUTH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Create PR in emqx/emqx-i18n
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh --repo emqx/emqx-i18n workflow run sync-en-doc.yaml --ref v58 -f version=${GITHUB_REF_NAME##[v|e]} -f repository=${GITHUB_REPOSITORY} -f run_id=${GITHUB_RUN_ID}
+
+  run_emqx_app_tests:
+    if: needs.prepare.outputs.release != 'true'
+    needs:
+      - init
+      - prepare
+      - compile
+    uses: ./.github/workflows/run_emqx_app_tests.yaml
+    with:
+      builder: ${{ needs.init.outputs.BUILDER }}
+      before_ref: ${{ github.event.before }}
+      after_ref: ${{ github.sha }}
+      event_ref: ${{ github.event.inputs.ref }}
+
+  run_test_cases:
+    if: needs.prepare.outputs.release != 'true'
+    needs:
+      - init
+      - prepare
+      - compile
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/run_test_cases.yaml
+    with:
+      builder: ${{ needs.init.outputs.BUILDER }}
+      ct-matrix: ${{ needs.prepare.outputs.ct-matrix }}
+      ct-host: ${{ needs.prepare.outputs.ct-host }}
+      ct-docker: ${{ needs.prepare.outputs.ct-docker }}
+    secrets: inherit
+
+  run_conf_tests:
+    if: needs.prepare.outputs.release != 'true'
+    needs:
+      - init
+      - prepare
+      - compile
+    uses: ./.github/workflows/run_conf_tests.yaml
+    with:
+      builder: ${{ needs.init.outputs.BUILDER }}
+
+  static_checks:
+    if: needs.prepare.outputs.release != 'true'
+    needs:
+      - init
+      - prepare
+      - compile
+    uses: ./.github/workflows/static_checks.yaml
+    with:
+      builder: ${{ needs.init.outputs.BUILDER }}
+      ct-matrix: ${{ needs.prepare.outputs.ct-matrix }}
+
+  trigger_regression_testing:
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && contains(join(needs.*.result, ','), 'success') }}
+    needs:
+      - build_packages
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.AUTH_APP_ID }}
+          private-key: ${{ secrets.AUTH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Trigger EMQX Regression Testing Workflow
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          gh --repo emqx/emqx-qa workflow run regression_testing_emqx.yaml \
+            -f froms="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

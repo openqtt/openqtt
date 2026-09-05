@@ -1,0 +1,26 @@
+%% -*- mode: erlang -*-
+{application, emqx_connector, [
+    {description, "EMQX Data Integration Connectors"},
+    {vsn, "0.3.7"},
+    {registered, []},
+    {mod, {emqx_connector_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        ecpool,
+        emqx_resource,
+        eredis,
+        %% eredis_cluster has supervisor should be started before emqx_connector
+        %% otherwise the first start redis_cluster will fail.
+        eredis_cluster,
+        ehttpc,
+        jose,
+        emqx,
+        emqtt
+    ]},
+    {env, []},
+    {modules, []},
+
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+]}.

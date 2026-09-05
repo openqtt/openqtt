@@ -1,0 +1,28 @@
+emqx_bridge_kafka_consumer_schema {
+
+  source_parameters.desc:
+  """Source specific configs."""
+  source_parameters.label:
+  """Source Specific Configs"""
+
+  consumer_source.desc:
+  """Source configs."""
+  consumer_source.label:
+  """Source"""
+
+  config_connector.desc:
+  """Configuration for a Kafka Consumer Client."""
+  config_connector.label:
+  """Kafka Consumer Client Configuration"""
+
+  group_id.desc:
+  """Consumer group identifier to be used for this source.  If omitted, one based off the source name will be automatically generated."""
+  group_id.label:
+  """Custom Consumer Group Id"""
+
+  max_wait_time.desc:
+  """Maximum amount of time that is waited for the Kafka broker to send a fetch response."""
+  max_wait_time.label:
+  """Max Wait Time"""
+
+}

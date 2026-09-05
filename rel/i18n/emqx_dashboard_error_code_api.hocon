@@ -1,0 +1,8 @@
+emqx_dashboard_error_code_api {
+
+error_codes.desc:
+"""API Error Codes"""
+error_codes.label:
+"""API Error Codes"""
+
+}

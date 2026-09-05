@@ -1,0 +1,122 @@
+name: Scheduled build packages
+
+concurrency:
+  group: build-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  schedule:
+    - cron:  '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    if: github.repository_owner == 'emqx'
+    runs-on: ${{ endsWith(github.repository, '/emqx') && 'ubuntu-22.04' || 'aws-ubuntu22.04-amd64' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - ['emqx', 'master']
+          - ['emqx', 'release-58']
+          - ['emqx-enterprise', 'release-58']
+        os:
+          - ubuntu22.04
+          - amzn2023
+
+    env:
+      PROFILE: ${{ matrix.profile[0] }}
+      OS: ${{ matrix.os }}
+      BUILDER_SYSTEM: force_docker
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ matrix.profile[1] }}
+          fetch-depth: 0
+      - name: Set up environment
+        id: env
+        run: |
+          source env.sh
+          BUILDER="ghcr.io/emqx/emqx-builder/${EMQX_BUILDER_VSN}:${ELIXIR_VSN}-${OTP_VSN}-${OS}"
+          echo "BUILDER=$BUILDER" >> "$GITHUB_ENV"
+      - name: build tgz
+        run: |
+          ./scripts/buildx.sh --profile "$PROFILE" --pkgtype tgz --builder "$BUILDER"
+      - name: build pkg
+        run: |
+          ./scripts/buildx.sh --profile "$PROFILE" --pkgtype pkg --builder "$BUILDER"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: ${{ matrix.profile[0] }}-${{ matrix.profile[1] }}-${{ matrix.os }}
+          path: _packages/${{ matrix.profile[0] }}/
+          retention-days: 7
+      - name: Send notification to Slack
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          payload: |
+            {"text": "Scheduled build of ${{ matrix.profile[0] }} package for ${{ matrix.os }} failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}
+
+  mac:
+    runs-on: ${{ matrix.os }}
+    if: github.repository_owner == 'emqx'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - emqx
+        branch:
+          - master
+          - release-58
+        os:
+          - macos-14
+          - macos-15
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+      - name: Set up environment
+        id: env
+        run: |
+          source env.sh
+          echo "OTP_VSN=$OTP_VSN" >> "$GITHUB_OUTPUT"
+          echo "ELIXIR_VSN=$ELIXIR_VSN" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/package-macos
+        with:
+          profile: ${{ matrix.profile }}
+          otp: ${{ steps.env.outputs.OTP_VSN }}
+          elixir: ${{ steps.env.outputs.ELIXIR_VSN }}
+          os: ${{ matrix.os }}
+          apple_id_password: ${{ secrets.APPLE_ID_PASSWORD }}
+          apple_developer_identity: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
+          apple_developer_id_bundle: ${{ matrix.os == 'macos-15' && secrets.APPLE_DEVELOPER_ID_BUNDLE_NEW || secrets.APPLE_DEVELOPER_ID_BUNDLE }}
+          apple_developer_id_bundle_password: ${{ matrix.os == 'macos-15' && secrets.APPLE_DEVELOPER_ID_BUNDLE_PASSWORD_NEW || secrets.APPLE_DEVELOPER_ID_BUNDLE_PASSWORD }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: ${{ matrix.profile }}-${{ matrix.os }}
+          path: _packages/${{ matrix.profile }}/
+          retention-days: 7
+      - name: Send notification to Slack
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          payload: |
+            {"text": "Scheduled build of ${{ matrix.profile }} package for ${{ matrix.os }} failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}

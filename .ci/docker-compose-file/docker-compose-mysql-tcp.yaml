@@ -1,0 +1,24 @@
+version: '3.9'
+
+services:
+  mysql_server:
+    container_name: mysql
+    image: public.ecr.aws/docker/library/mysql:${MYSQL_TAG}
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: public
+      MYSQL_DATABASE: mqtt
+    networks:
+      - emqx_bridge
+    command:
+      - --bind-address=0.0.0.0
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --lower-case-table-names=1
+      - --max-allowed-packet=128M
+      # Severely limit maximum number of prepared statements the server must permit
+      # so that we hit potential resource exhaustion earlier in tests.
+      - --max-prepared-stmt-count=64
+      - --skip-symbolic-links

@@ -1,0 +1,71 @@
+emqx_bridge_http_connector {
+
+body.desc:
+"""HTTP request body."""
+
+body.label:
+"""HTTP Body"""
+
+connect_timeout.desc:
+"""The timeout when connecting to the HTTP server."""
+
+connect_timeout.label:
+"""Connect Timeout"""
+
+enable_pipelining.desc:
+"""The maximum number of HTTP requests that can be sent before an HTTP response is received.
+
+Setting this to 1 is equivalent to turning off HTTP pipelining, and the EMQX must receive a response to the previous HTTP request before sending the next HTTP request."""
+
+enable_pipelining.label:
+"""HTTP Pipelining"""
+
+headers.desc:
+"""List of HTTP headers."""
+
+headers.label:
+"""HTTP Headers"""
+
+max_retries.desc:
+"""Max retry times if error on sending request."""
+
+max_retries.label:
+"""Max Retries"""
+
+method.desc:
+"""HTTP method."""
+
+method.label:
+"""HTTP Method"""
+
+path.desc:
+"""URL path."""
+
+path.label:
+"""URL Path"""
+
+pool_size.desc:
+"""The pool size."""
+
+pool_size.label:
+"""Pool Size"""
+
+pool_type.desc:
+"""The type of the pool. Can be one of `random`, `hash`."""
+
+pool_type.label:
+"""Pool Type"""
+
+request.desc:
+"""Configure HTTP request parameters."""
+
+request.label:
+"""Request"""
+
+request_timeout.desc:
+"""HTTP request timeout."""
+
+request_timeout.label:
+"""Request Timeout"""
+
+}

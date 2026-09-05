@@ -1,0 +1,70 @@
+version: '3.9'
+
+x-default-emqx: &default-emqx
+    image: ${_EMQX_DOCKER_IMAGE_TAG}
+    env_file:
+      - conf.cluster.env
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx_ctl", "status"]
+      interval: 5s
+      timeout: 25s
+      retries: 5
+
+services:
+  haproxy:
+    container_name: haproxy
+    image: public.ecr.aws/docker/library/haproxy:2.4
+    depends_on:
+      - emqx1
+      - emqx2
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ../../apps/emqx/etc/certs/cert.pem:/usr/local/etc/haproxy/certs/cert.pem
+      - ../../apps/emqx/etc/certs/key.pem:/usr/local/etc/haproxy/certs/key.pem
+      - ../../apps/emqx/etc/certs/cacert.pem:/usr/local/etc/haproxy/certs/cacert.pem
+    ports:
+      - "18083:18083"
+#     - "1883:1883"
+#     - "8883:8883"
+#     - "8083:8083"
+#     - "8084:8084"
+    networks:
+      - emqx_bridge
+    working_dir: /usr/local/etc/haproxy
+    command:
+      - bash
+      - -c
+      - |
+        set -x
+        cat /usr/local/etc/haproxy/certs/cert.pem /usr/local/etc/haproxy/certs/key.pem > /var/lib/haproxy/emqx.pem
+        haproxy -f /usr/local/etc/haproxy/haproxy.cfg
+
+  emqx1:
+    <<: *default-emqx
+    container_name: node1.emqx.io
+    environment:
+      - "EMQX_HOST=node1.emqx.io"
+    networks:
+      emqx_bridge:
+        aliases:
+        - node1.emqx.io
+
+  emqx2:
+    <<: *default-emqx
+    container_name: node2.emqx.io
+    environment:
+      - "EMQX_HOST=node2.emqx.io"
+    networks:
+      emqx_bridge:
+        aliases:
+        - node2.emqx.io
+
+networks:
+  emqx_bridge:
+    driver: bridge
+    name: emqx_bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.100.239.0/24
+          gateway: 172.100.239.1

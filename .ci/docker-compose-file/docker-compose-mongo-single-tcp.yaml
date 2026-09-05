@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  mongo_server:
+    container_name: mongo
+    image: public.ecr.aws/docker/library/mongo:${MONGO_TAG}
+    restart: always
+    networks:
+      - emqx_bridge
+    ports:
+      - "27017:27017"
+    env_file:
+      - .env
+      - credentials.env
+    command:
+      --ipv6
+      --bind_ip_all

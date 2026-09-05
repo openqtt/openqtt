@@ -1,0 +1,37 @@
+version: '3.9'
+
+services:
+  mysql_server_tls:
+    container_name: mysql-tls
+    image: public.ecr.aws/docker/library/mysql:${MYSQL_TAG}
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: public
+      MYSQL_DATABASE: mqtt
+      MYSQL_USER: user
+      MYSQL_PASSWORD: public
+    volumes:
+      - ./certs/ca.crt:/etc/certs/ca-cert.pem
+      - ./certs/server.crt:/etc/certs/server-cert.pem
+      - ./certs/server.key:/etc/certs/server-key.pem
+    ports:
+      - "3307:3306"
+    networks:
+      - emqx_bridge
+    command:
+      - --bind-address=0.0.0.0
+      - --port=3306
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --lower-case-table-names=1
+      - --max-allowed-packet=128M
+      # Severely limit maximum number of prepared statements the server must permit
+      # so that we hit potential resource exhaustion earlier in tests.
+      - --max-prepared-stmt-count=64
+      - --ssl-ca=/etc/certs/ca-cert.pem
+      - --ssl-cert=/etc/certs/server-cert.pem
+      - --ssl-key=/etc/certs/server-key.pem
+      - --require-secure-transport=ON
+      - --tls-version=TLSv1.2,TLSv1.3
+      - --ssl-cipher=ECDHE-RSA-AES256-GCM-SHA384
+

@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  ldap_server:
+    container_name: ldap
+    build:
+      context: ../..
+      dockerfile: .ci/docker-compose-file/openldap/Dockerfile
+    ulimits:
+      nofile: 1024
+    image: openldap
+    #ports:
+    #  - "389:389"
+    volumes:
+      - ./certs/ca.crt:/etc/certs/ca.crt
+    restart: always
+    networks:
+      - emqx_bridge

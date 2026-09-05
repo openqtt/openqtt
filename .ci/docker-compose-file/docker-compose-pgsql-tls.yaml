@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  pgsql_server_tls:
+    container_name: pgsql-tls
+    build:
+      context: ./
+      dockerfile: ./pgsql/Dockerfile
+      args:
+        POSTGRES_USER: postgres
+        BUILD_FROM: public.ecr.aws/docker/library/postgres:${PGSQL_TAG}
+    image: emqx_pgsql:${PGSQL_TAG}
+    restart: always
+    environment:
+      POSTGRES_DB: mqtt
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: public
+    ports:
+      - "5433:5432"
+    command:
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/server.key
+      - -c
+      - ssl_ca_file=/var/lib/postgresql/root.crt
+      - -c
+      - hba_file=/var/lib/postgresql/pg_hba.conf
+#      - -c
+#      - ssl_min_protocol_version=TLSv1.2
+    networks:
+      - emqx_bridge

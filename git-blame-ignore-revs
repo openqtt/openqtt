@@ -1,0 +1,43 @@
+# reformat apps/emqx
+91bcf02970bd1fe0dfe06744a24aa8a149ac0052
+244b1237421318e86e25f0157b825f20a6cd859f
+# reformat apps/emqx_modules
+4d3157743e0d3ac7e6c09f108f6e79c820fd9c00
+f2168f5b0d24e8c91a0952373fa181aaded99f38
+# reformat apps/emqx_authn
+aae2d01582b980302f30913522eedf1d9d3d217c
+3022ee081d31b989dcd654a7211ea20c0c68574f
+# reformat apps/emqx_authz
+82559b9b089c6cfadf54b7ce5143156dd403876f
+acb3544d4b112121b5d9414237d2af7860ccc2a3
+# reformat lib-ee/emqx_license
+4f396cceb84d79d5ef540e91c1a8420e8de74a56
+4e3fd9febd0df11f3fe5f221cd2c4362be57c886
+# reformat lib-ee/emqx_ee_conf
+1aa82992616ad848539a533a5cd20ba6f9071e5a
+# reformat apps/emqx_gateway
+3f6d78dda03fd0d8e968a352e134f11a7f16bfe8
+# reformat apps/emqx_exhook
+1a4afabe9fed06bb0038f95c898be69c72b94bf3
+# reformat apps/emqx_retainer
+f1acfece6b79ed69b491da03783a7adaa7627b96
+# reformat apps/emqx_management
+aa7807baebfa5d8678025e43f386bcd9b3259d6a
+bf54f571fb8b27e76ada4ca75137d96ce4211d60
+628f0bf57909f26208d45a02e33a7fbae8443249
+# reformat apps/emqx_slow_subs
+83511f8a4c1570a2c89d9c6c5b6f462520199ed8
+# reformat apps/emqx_machine|emqx_plugin_libs|emqx_statsd
+b4451823350ec46126c49ca915b4b169dd4cf49e
+# reformat apps/emqx_auto_subscribe and apps/emqx_conf
+a4feb3e6e95c18cb531416112e57520c5ba00d40
+# reformat apps/emqx_dashboard
+07444e3da53c408695630bc0f57340f557106942
+# reformat all remaining apps
+02c3f87b316e8370287d5cd46de4f103ffe48433
+# erlfmt all remaining escripts
+72eb34658d31fb38130421949cff262efab51139
+# erlfmt rebar.config files and bin/nodetool
+5e100f52b8a530f4a952a4b20125ec37b38e2906
+# erlfmt files in `erlang-mode`
+336ed1b9223e37adb3336b8edacfd2a9b4238319

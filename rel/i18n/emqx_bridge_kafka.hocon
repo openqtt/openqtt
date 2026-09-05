@@ -1,0 +1,468 @@
+emqx_bridge_kafka {
+
+connect_timeout.desc:
+"""Maximum wait time for TCP connection establishment (including authentication time if enabled)."""
+
+connect_timeout.label:
+"""Connect Timeout"""
+
+min_metadata_refresh_interval.desc:
+"""Minimum time interval the client has to wait before refreshing Kafka broker and topic metadata. Setting too small value may add extra load on Kafka."""
+
+min_metadata_refresh_interval.label:
+"""Min Metadata Refresh Interval"""
+
+kafka_producer.desc:
+"""Kafka Producer configuration."""
+
+kafka_producer.label:
+"""Kafka Producer"""
+
+producer_buffer.desc:
+"""Configure producer message buffer.
+
+Tell Kafka producer how to buffer messages when EMQX has more messages to send than Kafka can keep up, or when Kafka is down."""
+
+producer_buffer.label:
+"""Message Buffer"""
+
+socket_send_buffer.desc:
+"""Fine tune the socket send buffer. The default value is tuned for high throughput."""
+
+socket_send_buffer.label:
+"""Socket Send Buffer Size"""
+
+socket_receive_buffer.desc:
+"""Fine tune the socket receive buffer. The default value is tuned for high throughput."""
+
+socket_receive_buffer.label:
+"""Socket Receive Buffer Size"""
+
+socket_tcp_keepalive.desc:
+"""Enable TCP keepalive.
+The value is three comma separated numbers in the format of 'Idle,Interval,Probes'
+ - Idle: The number of seconds a connection needs to be idle before the server begins to send out keep-alive probes (Linux default 7200).
+ - Interval: The number of seconds between TCP keep-alive probes (Linux default 75).
+ - Probes: The maximum number of TCP keep-alive probes to send before giving up and killing the connection if no response is obtained from the other end (Linux default 9).
+For example "240,30,5" means: TCP keepalive probes are sent after the connection is idle for 240 seconds, and the probes are sent every 30 seconds until a response is received, if it misses 5 consecutive responses, the connection should be closed.
+Default: 'none'"""
+
+socket_tcp_keepalive.label:
+"""TCP keepalive options"""
+
+desc_name.desc:
+"""Action name, used as a human-readable identifier."""
+
+desc_name.label:
+"""Action Name"""
+
+consumer_offset_commit_interval_seconds.desc:
+"""Defines the time interval between two offset commit requests sent for each consumer group."""
+
+consumer_offset_commit_interval_seconds.label:
+"""Offset Commit Interval"""
+
+consumer_max_batch_bytes.desc:
+"""Set how many bytes to pull from Kafka in each fetch request.
+Messages are fetched in batches by the consumer, and if the first record batch in the first non-empty
+partition of the fetch is larger than this value, the record batch will still be returned to ensure
+that the consumer can make progress. As such, this is not an absolute maximum. Set `1` for minimal latency."""
+
+consumer_max_batch_bytes.label:
+"""Fetch Bytes"""
+
+consumer_topic_mapping.desc:
+"""Defines the mapping between Kafka topics and MQTT topics. Must contain at least one item."""
+
+consumer_topic_mapping.label:
+"""Topic Mapping"""
+
+producer_kafka_opts.desc:
+"""Kafka producer configs."""
+
+producer_kafka_opts.label:
+"""Kafka Producer"""
+
+kafka_topic.desc:
+"""Kafka topic name.  Supports templates (e.g.: `t-${payload.t}`)."""
+
+kafka_topic.label:
+"""Kafka Topic Name"""
+
+consumer_kafka_topic.desc:
+"""Kafka topic to consume from."""
+
+consumer_kafka_topic.label:
+"""Kafka Topic"""
+
+auth_username_password.desc:
+"""Username/password based authentication."""
+
+auth_username_password.label:
+"""Username/password Auth"""
+
+auth_sasl_password.desc:
+"""SASL authentication password."""
+
+auth_sasl_password.label:
+"""Password"""
+
+kafka_message_timestamp.desc:
+"""Which timestamp to use. The timestamp is expected to be a millisecond precision Unix epoch which can be in string format, e.g. <code>1661326462115</code> or <code>'1661326462115'</code>. When the desired data field for this template is not found, or if the found data is not a valid integer, the current system timestamp will be used."""
+
+kafka_message_timestamp.label:
+"""Message Timestamp"""
+
+buffer_mode.desc:
+"""Message buffer mode.
+
+<code>memory</code>: Buffer all messages in memory. The messages will be lost in case of EMQX node restart
+<code>disk</code>: Buffer all messages on disk. The messages on disk are able to survive EMQX node restart.
+<code>hybrid</code>: Buffer message in memory first, when up to certain limit (see <code>segment_bytes</code> config for more information), then start offloading messages to disk, Like <code>memory</code> mode, the messages will be lost in case of EMQX node restart."""
+
+buffer_mode.label:
+"""Buffer Mode"""
+
+consumer_mqtt_qos.desc:
+"""MQTT QoS used to publish messages consumed from Kafka."""
+
+consumer_mqtt_qos.label:
+"""QoS"""
+
+consumer_key_encoding_mode.desc:
+"""Defines how the key from the Kafka message is encoded before being forwarded via MQTT.
+<code>none</code> Uses the key from the Kafka message unchanged.  Note: in this case, the key must be a valid UTF-8 string.
+<code>base64</code> Uses base-64 encoding on the received key."""
+
+consumer_key_encoding_mode.label:
+"""Key Encoding Mode"""
+
+auth_gssapi_kerberos.desc:
+"""Use GSSAPI/Kerberos authentication."""
+
+auth_gssapi_kerberos.label:
+"""GSSAPI/Kerberos"""
+
+consumer_mqtt_opts.desc:
+"""Local MQTT message publish."""
+
+consumer_mqtt_opts.label:
+"""MQTT publish"""
+
+auth_kerberos_principal.desc:
+"""SASL GSSAPI authentication Kerberos principal. For example <code>kafka/node1.example.com@EXAMPLE.COM</code>, NOTE: The realm in use has to be configured in /etc/krb5.conf in EMQX nodes."""
+
+auth_kerberos_principal.label:
+"""Kerberos Principal"""
+
+socket_opts.desc:
+"""Extra socket options."""
+
+socket_opts.label:
+"""Socket Options"""
+
+consumer_mqtt_topic.desc:
+"""Local topic to which consumed Kafka messages should be published to."""
+
+consumer_mqtt_topic.label:
+"""MQTT Topic"""
+
+consumer_offset_reset_policy.desc:
+"""Defines from which offset a consumer should start fetching when there is no commit history or when the commit history becomes invalid."""
+
+consumer_offset_reset_policy.label:
+"""Offset Reset Policy"""
+
+partition_count_refresh_interval.desc:
+"""The time interval for Kafka producer to discover increased number of partitions.
+After the number of partitions is increased in Kafka, EMQX will start taking the
+discovered partitions into account when dispatching messages per <code>partition_strategy</code>."""
+
+partition_count_refresh_interval.label:
+"""Partition Count Refresh Interval"""
+
+max_linger_time.desc:
+"""Maximum duration for a per-partition producer to wait for messages in order to collect a batch to buffer.
+The default value `0` means no wait. For non-memory buffer mode, it's advised to configure at least `5ms` for less IOPS."""
+
+max_linger_time.label: "Max Linger Time"
+
+max_linger_bytes.desc:
+"""Maximum number of bytes for a per-partition producer to wait for messages in order to collect a batch to buffer."""
+
+max_linger_bytes.label: "Max Linger Bytes"
+
+max_batch_bytes.desc:
+"""Maximum bytes to collect in a Kafka message batch. Most of the Kafka brokers default to a limit of 1 MB batch size. EMQX's default value is less than 1 MB in order to compensate Kafka message encoding overheads (especially when each individual message is very small). When a single message is over the limit, it is still sent (as a single element batch)."""
+
+max_batch_bytes.label:
+"""Max Batch Bytes"""
+
+required_acks.desc:
+"""The acknowledgement criteria for the partition leader. It determines the level of confirmation required from partition replicas before sending an acknowledgement back to the producer.
+
+<code>all_isr</code>: Require all in-sync replicas to acknowledge.
+<code>leader_only</code>: Require only the partition-leader's acknowledgement.
+<code>none</code>: No need for Kafka to acknowledge at all."""
+
+required_acks.label:
+"""Required Acks"""
+
+kafka_headers.desc:
+"""Provide a placeholder for message headers<br/>
+e.g. <code>${pub_props}</code><br/>
+Note that the value of the placeholder must be either an object:
+<code>{"foo": "bar"}</code>
+or an array of key-value pairs:
+<code>[{"key": "foo", "value": "bar"}]</code>"""
+
+kafka_headers.label:
+"""Message Headers"""
+
+producer_kafka_ext_headers.desc:
+"""Provide more key-value pairs for message headers<br/>
+The key-value pairs here will be combined with the
+value of <code>kafka_headers</code> field before sending producing."""
+
+producer_kafka_ext_headers.label:
+"""Extra Headers"""
+
+producer_kafka_ext_header_key.desc:
+"""Key of the header. Placeholders in format of ${var} are supported."""
+
+producer_kafka_ext_header_key.label:
+"""Extra Headers Key"""
+
+producer_kafka_ext_header_value.desc:
+"""Value of the header. Placeholders in format of ${var} are supported."""
+
+producer_kafka_ext_header_value.label:
+"""Extra Headers Value"""
+
+kafka_header_value_encode_mode.desc:
+"""The encoding mode for headers.
+
+ - `none`: Add only strings are added as header values
+ - `json`: Encode header values as JSON string"""
+
+kafka_header_value_encode_mode.label:
+"""Headers value encode mode"""
+
+metadata_request_timeout.desc:
+"""Maximum wait time when fetching topic metadata."""
+
+metadata_request_timeout.label:
+"""Metadata Request Timeout"""
+
+desc_type.desc:
+"""The Action Type"""
+
+desc_type.label:
+"""Action Type"""
+
+socket_nodelay.desc:
+"""When set to 'true', TCP buffer is sent as soon as possible. Otherwise, the OS kernel may buffer small TCP packets for a while (40 ms by default)."""
+
+socket_nodelay.label:
+"""No Delay"""
+
+authentication.desc:
+"""Authentication configs."""
+
+authentication.label:
+"""Authentication"""
+
+buffer_memory_overload_protection.desc:
+"""Applicable when buffer mode is set to <code>memory</code>
+EMQX will drop old buffered messages under high memory pressure. The high memory threshold is defined in config <code>sysmon.os.sysmem_high_watermark</code>. NOTE: This config only works on Linux."""
+
+buffer_memory_overload_protection.label:
+"""Memory Overload Protection"""
+
+auth_sasl_mechanism.desc:
+"""SASL authentication mechanism."""
+
+auth_sasl_mechanism.label:
+"""Mechanism"""
+
+config_enable.desc:
+"""Enable (true) or disable (false) config."""
+
+config_enable.label:
+"""Enable or Disable"""
+
+consumer_mqtt_payload.desc:
+"""The template for transforming the incoming Kafka message.  By default, it will use JSON format to serialize inputs from the Kafka message.  Such fields are:
+<code>headers</code>: an object containing string key-value pairs.
+<code>key</code>: Kafka message key (uses the chosen key encoding).
+<code>offset</code>: offset for the message.
+<code>topic</code>: Kafka topic.
+<code>ts</code>: message timestamp.
+<code>ts_type</code>: message timestamp type, which is one of <code>create</code>, <code>append</code> or <code>undefined</code>.
+<code>value</code>: Kafka message value (uses the chosen value encoding)."""
+
+consumer_mqtt_payload.label:
+"""MQTT Payload Template"""
+
+consumer_opts.desc:
+"""Local MQTT publish and Kafka consumer configs."""
+
+consumer_opts.label:
+"""MQTT to Kafka"""
+
+kafka_consumer.desc:
+"""Kafka Consumer configuration."""
+
+kafka_consumer.label:
+"""Kafka Consumer"""
+
+desc_config.desc:
+"""Configuration for a Kafka Producer Client."""
+
+desc_config.label:
+"""Kafka Producer Client Configuration"""
+
+consumer_value_encoding_mode.desc:
+"""Defines how the value from the Kafka message is encoded before being forwarded via MQTT.
+<code>none</code> Uses the value from the Kafka message unchanged.  Note: in this case, the value must be a valid UTF-8 string.
+<code>base64</code> Uses base-64 encoding on the received value."""
+
+consumer_value_encoding_mode.label:
+"""Value Encoding Mode"""
+
+buffer_per_partition_limit.desc:
+"""Number of bytes allowed to buffer for each partition. When this limit is exceeded, older messages will be discarded to make room for new messages to be buffered."""
+
+buffer_per_partition_limit.label:
+"""Per-partition Buffer Limit"""
+
+bootstrap_hosts.desc:
+"""A comma separated list of Kafka <code>host:port</code> endpoints to bootstrap the client."""
+
+bootstrap_hosts.label:
+"""Bootstrap Hosts"""
+
+consumer_max_rejoin_attempts.desc:
+"""Maximum number of times allowed for a member to re-join the group. If the consumer group can not reach balance after this configured number of attempts, the consumer group member will restart after a delay."""
+
+consumer_max_rejoin_attempts.label:
+"""Max Rejoin Attempts"""
+
+kafka_message_key.desc:
+"""Template for rendering message key. If the template is rendered into a NULL value (i.e. there is no such data field in Rule Engine context) then <code>NULL</code> (but not empty string) is used."""
+
+kafka_message_key.label:
+"""Message Key"""
+
+kafka_message.desc:
+"""Template for rendering a message."""
+
+kafka_message.label:
+"""Message Template"""
+
+mqtt_topic.desc:
+"""MQTT topic or topic filter as data source (action input).  If rule action is used as data source, this config should be left empty, otherwise messages will be duplicated in Kafka."""
+
+mqtt_topic.label:
+"""Source MQTT Topic"""
+
+kafka_message_value.desc:
+"""Template for rendering Kafka message value. If the template is rendered into a NULL value (i.e. there is no such data field in Rule Engine context) then Kafka's <code>NULL</code> (but not empty string) is used."""
+
+kafka_message_value.label:
+"""Message Value"""
+
+partition_strategy.desc:
+"""Partition strategy is to tell the producer how to dispatch messages to partitions.
+
+<code>random</code>: Randomly pick a partition for each message.
+<code>key_dispatch</code>: Assigns messages to partitions based on a hash of the message key,
+ensuring consistent partition for messages with the same key."""
+
+partition_strategy.label:
+"""Partition Strategy"""
+
+buffer_segment_bytes.desc:
+"""Applicable when buffer mode is set to <code>disk</code> or <code>hybrid</code>.
+This setting specifies the size of each buffer file stored on disk."""
+
+buffer_segment_bytes.label:
+"""Segment File Bytes"""
+
+consumer_kafka_opts.desc:
+"""Kafka consumer configs."""
+
+consumer_kafka_opts.label:
+"""Kafka Consumer"""
+
+partitions_limit.desc:
+"""Limit the number of partitions to produce data for the given topic.
+The special value `all_partitions` is to utilize all partitions for the topic.
+Setting this to a value which is greater than the total number of partitions in has no effect."""
+
+partitions_limit.label:
+"""Max Partitions"""
+
+max_inflight.desc:
+"""The maximum number of message batches that the producer can send to each partition before it must wait for an acknowledgement.
+Setting a higher number can enhance throughput. However, value above 1 may lead to potential message reordering risks."""
+
+max_inflight.label:
+"""Max Inflight"""
+
+auth_sasl_username.desc:
+"""SASL authentication username."""
+
+auth_sasl_username.label:
+"""Username"""
+
+auth_kerberos_keytab_file.desc:
+"""SASL GSSAPI authentication Kerberos keytab file path. NOTE: This file has to be placed in EMQX nodes, and the EMQX service runner user requires read permission."""
+
+auth_kerberos_keytab_file.label:
+"""Kerberos keytab file"""
+
+compression.desc:
+"""Specify the method of compression."""
+
+compression.label:
+"""Compression"""
+
+query_mode.desc:
+"""Query mode. Optional 'sync/async', default 'async'."""
+
+query_mode.label:
+"""Query mode"""
+
+sync_query_timeout.desc:
+"""This parameter defines the timeout limit for synchronous queries. It applies only when the query mode is configured to 'sync'."""
+
+sync_query_timeout.label:
+"""Synchronous Query Timeout"""
+
+kafka_producer_action.desc:
+"""Producer Action"""
+
+kafka_producer_action.label:
+"""Producer Action"""
+
+ssl_client_opts.desc:
+"""TLS/SSL options for client."""
+ssl_client_opts.label:
+"""TLS/SSL options"""
+
+server_name_indication.desc:
+"""Server Name Indication (SNI) setting for TLS handshake.<br/>
+- <code>auto</code>: Allow the client to automatically determine the appropriate SNI.<br/>
+- <code>disable</code>: If you wish to prevent the client from sending the SNI.<br/>
+- Other string values will be sent as-is."""
+
+server_name_indication.label:
+"""SNI"""
+
+producer_health_check_topic.desc:
+"""Topic name used exclusively for more accurate connector health checks."""
+producer_health_check_topic.label:
+"""Connector health check topic"""
+
+}

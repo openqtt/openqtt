@@ -1,0 +1,121 @@
+version: '3.9'
+
+services:
+  zookeeper:
+    image: public.ecr.aws/docker/library/zookeeper:3.6
+    ports:
+      - "2181:2181"
+    container_name: zookeeper
+    hostname: zookeeper
+    networks:
+      emqx_bridge:
+  ssl_cert_gen:
+    # see https://github.com/emqx/docker-images
+    image:  ghcr.io/emqx/certgen:latest
+    container_name: ssl_cert_gen
+    user: "${DOCKER_USER:-root}"
+    volumes:
+      - /tmp/emqx-ci/emqx-shared-secret:/var/lib/secret
+  kafka_1: &kafka
+    image: wurstmeister/kafka:2.13-2.8.1
+    # ports:
+    #   - "9192-9195:9192-9195"
+    container_name: kafka-1.emqx.net
+    hostname: kafka-1.emqx.net
+    depends_on:
+      kdc:
+        condition: service_started
+      zookeeper:
+        condition: service_started
+      ssl_cert_gen:
+        condition: service_completed_successfully
+    environment: &kafka-env
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092,SASL_PLAINTEXT://:9093,SSL://:9094,SASL_SSL://:9095,LOCAL_PLAINTEXT://:9192,LOCAL_SASL_PLAINTEXT://:9193,LOCAL_SSL://:9194,LOCAL_SASL_SSL://:9195,TOXIPROXY_PLAINTEXT://:9292,TOXIPROXY_SASL_PLAINTEXT://:9293,TOXIPROXY_SSL://:9294,TOXIPROXY_SASL_SSL://:9295
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1.emqx.net:9092,SASL_PLAINTEXT://kafka-1.emqx.net:9093,SSL://kafka-1.emqx.net:9094,SASL_SSL://kafka-1.emqx.net:9095,LOCAL_PLAINTEXT://localhost:9192,LOCAL_SASL_PLAINTEXT://localhost:9193,LOCAL_SSL://localhost:9194,LOCAL_SASL_SSL://localhost:9195,TOXIPROXY_PLAINTEXT://toxiproxy.emqx.net:9292,TOXIPROXY_SASL_PLAINTEXT://toxiproxy.emqx.net:9293,TOXIPROXY_SSL://toxiproxy.emqx.net:9294,TOXIPROXY_SASL_SSL://toxiproxy.emqx.net:9295
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL,LOCAL_PLAINTEXT:PLAINTEXT,LOCAL_SASL_PLAINTEXT:SASL_PLAINTEXT,LOCAL_SSL:SSL,LOCAL_SASL_SSL:SASL_SSL,TOXIPROXY_PLAINTEXT:PLAINTEXT,TOXIPROXY_SASL_PLAINTEXT:SASL_PLAINTEXT,TOXIPROXY_SSL:SSL,TOXIPROXY_SASL_SSL:SASL_SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN,SCRAM-SHA-256,SCRAM-SHA-512,GSSAPI
+      KAFKA_SASL_KERBEROS_SERVICE_NAME: kafka
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/jaas.conf"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+      KAFKA_CREATE_TOPICS_NG: test-topic-one-partition:1:1,test-topic-two-partitions:2:1,test-topic-three-partitions:3:1,
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.SimpleAclAuthorizer
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /var/lib/secret/kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: password
+      KAFKA_SSL_KEYSTORE_LOCATION: /var/lib/secret/kafka.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: password
+      KAFKA_SSL_KEY_PASSWORD: password
+    networks:
+      emqx_bridge:
+    volumes:
+      - /tmp/emqx-ci/emqx-shared-secret:/var/lib/secret-ro:ro
+      - ./kafka/jaas.conf:/etc/kafka/jaas.conf
+      - ./kafka/kafka-entrypoint.sh:/bin/kafka-entrypoint.sh
+      - ./kerberos/krb5.conf:/etc/kdc/krb5.conf
+      - ./kerberos/krb5.conf:/etc/krb5.conf
+    command: kafka-entrypoint.sh
+
+  kafka_2:
+    <<: *kafka
+    container_name: kafka-2.emqx.net
+    hostname: kafka-2.emqx.net
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 2
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2.emqx.net:9092,SASL_PLAINTEXT://kafka-2.emqx.net:9093,SSL://kafka-2.emqx.net:9094,SASL_SSL://kafka-2.emqx.net:9095,LOCAL_PLAINTEXT://localhost:19192,LOCAL_SASL_PLAINTEXT://localhost:19193,LOCAL_SSL://localhost:19194,LOCAL_SASL_SSL://localhost:19195,TOXIPROXY_PLAINTEXT://toxiproxy.emqx.net:19292,TOXIPROXY_SASL_PLAINTEXT://toxiproxy.emqx.net:19293,TOXIPROXY_SSL://toxiproxy.emqx.net:19294,TOXIPROXY_SASL_SSL://toxiproxy.emqx.net:19295
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    volumes:
+      - /tmp/emqx-ci/emqx-shared-secret:/var/lib/secret-ro:ro
+      - ./kafka/jaas2.conf:/etc/kafka/jaas.conf
+      - ./kafka/kafka-entrypoint.sh:/bin/kafka-entrypoint.sh
+      - ./kerberos/krb5.conf:/etc/kdc/krb5.conf
+      - ./kerberos/krb5.conf:/etc/krb5.conf
+
+  kafka_setup_acls:
+    image: wurstmeister/kafka:2.13-2.8.1
+    container_name: kafka_setup_acls
+    depends_on:
+      kafka_1:
+        condition: service_started
+      kafka_2:
+        condition: service_started
+    networks:
+      emqx_bridge:
+    restart: on-failure:3
+    command:
+      - bash
+      - "-c"
+      - |
+        cd /opt/kafka
+
+        bin/kafka-acls.sh --bootstrap-server kafka-1.emqx.net:9092 \
+            --add \
+            --deny-principal User:limiteduser \
+            --group ____emqx_consumer_probe
+
+        bin/kafka-acls.sh --bootstrap-server kafka-1.emqx.net:9092 \
+            --add \
+            --deny-principal User:limiteduser \
+            --topic limited-topic
+
+        bin/kafka-acls.sh --bootstrap-server kafka-1.emqx.net:9092 \
+            --add \
+            --allow-principal "User:*" \
+            --group "*"
+
+  kafka_setup_acls_done:
+    image: wurstmeister/kafka:2.13-2.8.1
+    container_name: kafka_setup_acls_done
+    depends_on:
+      kafka_setup_acls:
+        condition: service_completed_successfully
+    networks:
+      emqx_bridge:
+    command:
+      - bash
+      - "-c"
+      - tail -f /dev/null

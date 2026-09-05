@@ -1,0 +1,43 @@
+services:
+  erlang:
+    hostname: erlang.emqx.net
+    container_name: erlang
+    image: ${DOCKER_CT_RUNNER_IMAGE:-ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-ubuntu22.04}
+    env_file:
+      - credentials.env
+      - conf.env
+    environment:
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_RUN_ID: ${GITHUB_RUN_ID:-}
+      GITHUB_SHA: ${GITHUB_SHA:-}
+      GITHUB_RUN_NUMBER: ${GITHUB_RUN_NUMBER:-}
+      GITHUB_EVENT_NAME: ${GITHUB_EVENT_NAME:-}
+      GITHUB_REF: ${GITHUB_REF:-}
+    networks:
+      - emqx_bridge
+    ports:
+      - 28083:18083
+      - 2883:1883
+    volumes:
+      - ../..:/emqx
+      - /tmp/emqx-ci/emqx-shared-secret:/var/lib/secret
+      - ./kerberos/krb5.conf:/etc/kdc/krb5.conf
+      - ./kerberos/krb5.conf:/etc/krb5.conf
+      # - ./odbc/odbcinst.ini:/etc/odbcinst.ini
+    working_dir: /emqx
+    tty: true
+    user: "${DOCKER_USER:-root}"
+
+networks:
+  emqx_bridge:
+    driver: bridge
+    name: emqx_bridge
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.100.239.0/24
+          gateway: 172.100.239.1
+        - subnet: 2001:3200:3200::/64
+          gateway: 2001:3200:3200::1

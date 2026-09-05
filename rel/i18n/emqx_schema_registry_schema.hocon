@@ -1,0 +1,106 @@
+emqx_schema_registry_schema {
+
+avro_type.desc:
+"""[Apache Avro](https://avro.apache.org/) serialization format."""
+
+avro_type.label:
+"""Apache Avro"""
+
+protobuf_type.desc:
+"""[Protocol Buffers](https://protobuf.dev/) serialization format."""
+
+protobuf_type.label:
+"""Protocol Buffers"""
+
+json_type.desc: """~
+    Supports JSON Schema
+    [Draft 03](http://tools.ietf.org/html/draft-zyp-json-schema-03)
+    [Draft 04](http://tools.ietf.org/html/draft-zyp-json-schema-04) and
+    [Draft 06](https://datatracker.ietf.org/doc/html/draft-wright-json-schema-00)."""
+
+json_type.label: "JSON Schema"
+
+schema_description.desc:
+"""A description for this schema."""
+
+schema_description.label:
+"""Schema description"""
+
+schema_name.desc:
+"""A name for the schema that will serve as its identifier."""
+
+schema_name.label:
+"""Schema name"""
+
+schema_registry_root.desc:
+"""Schema registry configurations."""
+
+schema_registry_root.label:
+"""Schema registry"""
+
+schema_registry_schemas.desc:
+"""Registered schemas."""
+
+schema_registry_schemas.label:
+"""Registered schemas"""
+
+schema_source.desc:
+"""Source text for the schema."""
+
+schema_source.label:
+"""Schema source"""
+
+schema_type_avro.desc:
+"""Must be `avro` for Avro schema."""
+
+schema_type_avro.label:
+"""Avro Schema"""
+
+schema_type_protobuf.desc:
+"""Must be `protobuf` for protobuf schema."""
+
+schema_type_protobuf.label:
+"""Protobuf Schema"""
+
+schema_type_json.desc:
+"""Must be `json` for JSON schema."""
+
+schema_type_json.label:
+"""JSON Schema"""
+
+confluent_schema_registry.label:
+"""Confluent Schema Registry"""
+confluent_schema_registry.desc:
+"""Confluent External Schema Registry configuration."""
+
+schema_registry_external_type.label:
+"""External Schema Registry Type"""
+schema_registry_external_type.desc:
+"""External Schema Registry Type"""
+
+confluent_schema_registry_url.label:
+"""Registry URL"""
+confluent_schema_registry_url.desc:
+"""URL endpoint for external registry."""
+
+confluent_schema_registry_auth.label:
+"""Authentication"""
+confluent_schema_registry_auth.desc:
+"""Authentication options for accessing external registry."""
+
+confluent_schema_registry_auth_basic.label:
+"""Basic Auth"""
+confluent_schema_registry_auth_basic.desc:
+"""Use basic authentication method for accessing external registry."""
+
+confluent_schema_registry_auth_basic_username.label:
+"""Username"""
+confluent_schema_registry_auth_basic_username.desc:
+"""Username for basic authentication method."""
+
+confluent_schema_registry_auth_basic_password.label:
+"""Password"""
+confluent_schema_registry_auth_basic_password.desc:
+"""Password for basic authentication method."""
+
+}

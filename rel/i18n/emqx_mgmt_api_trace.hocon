@@ -1,0 +1,123 @@
+emqx_mgmt_api_trace {
+
+list_all.desc:
+"""List all trace"""
+list_all.label:
+"""List all trace"""
+
+create_new.desc:
+"""Create new trace"""
+create_new.label:
+"""Create new trace"""
+
+clear_all.desc:
+"""Clear all traces"""
+clear_all.label:
+"""Clear all traces"""
+
+delete_trace.desc:
+"""Delete specified trace"""
+delete_trace.label:
+"""Delete specified trace"""
+
+stop_trace.desc:
+"""Stop trace by name"""
+stop_trace.label:
+"""Stop trace by name"""
+
+download_log_by_name.desc:
+"""Download trace log by name"""
+download_log_by_name.label:
+"""Download trace log by name"""
+
+trace_zip_file.desc:
+"""A trace zip file"""
+trace_zip_file.label:
+"""A trace zip file"""
+
+get_trace_file_metadata.desc:
+"""get trace log file's metadata, such as size, last update time"""
+get_trace_file_metadata.label:
+"""get trace log file's metadata"""
+
+view_trace_log.desc:
+"""view trace log"""
+view_trace_log.label:
+"""view trace log"""
+
+file_size.desc:
+"""file size"""
+file_size.label:
+"""file size"""
+
+file_mtime.desc:
+"""The last time this file is modified."""
+file_mtime.label:
+"""file mtime"""
+
+trace_name.desc:
+"""Unique name of the trace. Only ASCII letters in a-z, A-Z, 0-9 and underscore '_' are allowed."""
+trace_name.label:
+"""Unique name of the trace"""
+
+filter_type.desc:
+"""Filter type"""
+filter_type.label:
+"""Filter type"""
+
+support_wildcard.desc:
+"""Specify the topic or topic filter if the trace 'type' is 'topic'."""
+support_wildcard.label:
+"""MQTT Topic"""
+
+mqtt_clientid.desc:
+"""Specify the MQTT clientid if the trace 'type' is 'clientid'."""
+mqtt_clientid.label:
+"""MQTT clientid"""
+
+client_ip_addess.desc:
+"""Specify the client's IP address if the trace type is 'ip_address'."""
+client_ip_addess.label:
+"""Client IP Address"""
+
+ruleid.desc:
+"""Specify the Rule ID if the trace type is 'ruleid'."""
+ruleid.label:
+"""Rule ID"""
+
+trace_status.desc:
+"""trace status"""
+trace_status.label:
+"""trace status"""
+
+time_format.desc:
+"""rfc3339 timestamp or epoch second"""
+time_format.label:
+"""rfc3339 timestamp or epoch second"""
+
+trace_log_size.desc:
+"""trace log size"""
+trace_log_size.label:
+"""trace log size"""
+
+node_name.desc:
+"""Node name"""
+node_name.label:
+"""Node name"""
+
+max_response_bytes.desc:
+"""Maximum number of bytes to send in response"""
+max_response_bytes.label:
+"""Maximum response bytes"""
+
+current_trace_offset.desc:
+"""Offset from the current trace position."""
+current_trace_offset.label:
+"""Offset from the current trace position."""
+
+trace_log_formatter.desc:
+"""The formatter that will be used to format the trace log entries. Set this to text to format the log entries as plain text (default). Set it to json to format each log entry as a JSON object."""
+trace_log_formatter.label:
+"""Trace Log Entry Formatter"""
+
+}

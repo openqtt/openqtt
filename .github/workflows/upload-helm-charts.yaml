@@ -1,0 +1,56 @@
+name: Upload helm charts
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Detect profile
+        id: profile
+        run: |
+          if git describe --tags --match '[v|e]*' --exact; then
+            REF=$(git describe --tags --match '[v|e]*' --exact)
+          else
+            echo "Only release tags matching '[v|e]*' are supported"
+            exit 1
+          fi
+          case "$REF" in
+            v*)
+              echo "profile=emqx" >> $GITHUB_OUTPUT
+              echo "version=$(./pkg-vsn.sh emqx)" >> $GITHUB_OUTPUT
+              ;;
+            e*)
+              echo "profile=emqx-enterprise" >> $GITHUB_OUTPUT
+              echo "version=$(./pkg-vsn.sh emqx-enterprise)" >> $GITHUB_OUTPUT
+              ;;
+          esac
+      - uses: emqx/push-helm-action@5ca37070f42cf874fc843a0e0c7c10ac76de5255 # v1.1
+        if: github.event_name == 'release' && !github.event.release.prerelease
+        with:
+          charts_dir: "${{ github.workspace }}/deploy/charts/${{ steps.profile.outputs.profile }}"
+          version: ${{ steps.profile.outputs.version }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: "us-west-2"
+          aws_bucket_name: "repos-emqx-io"

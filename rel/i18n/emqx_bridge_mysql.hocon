@@ -1,0 +1,53 @@
+emqx_bridge_mysql {
+
+config_enable.desc:
+"""Enable or disable this action"""
+
+config_enable.label:
+"""Enable Or Disable Action"""
+
+desc_config.desc:
+"""Configuration for a MySQL action."""
+
+desc_config.label:
+"""MySQL Action Configuration"""
+
+desc_name.desc:
+"""Action name, used as a human-readable identifier of the action."""
+
+desc_name.label:
+"""Action Name"""
+
+desc_type.desc:
+"""The action type"""
+
+desc_type.label:
+"""Action Type"""
+
+local_topic.desc:
+"""The MQTT topic filter to be forwarded to MySQL. All MQTT 'PUBLISH' messages with the topic
+matching the local_topic will be forwarded.<br/>
+NOTE: If this action is used as the action of a rule (EMQX rule engine), and also local_topic is
+configured, then both the data got from the rule and the MQTT messages that match local_topic
+will be forwarded."""
+
+local_topic.label:
+"""Local Topic"""
+
+sql_template.desc:
+"""SQL Template"""
+
+sql_template.label:
+"""SQL Template"""
+
+action_parameters.label:
+"""Action Parameters"""
+action_parameters.desc:
+"""Additional parameters specific to this action type"""
+
+mysql_action.label:
+"""MySQL Action"""
+mysql_action.desc:
+"""Action to interact with a MySQL connector"""
+
+}

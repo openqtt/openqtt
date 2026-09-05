@@ -1,0 +1,28 @@
+emqx_dashboard_monitor_api {
+
+list_monitor.desc:
+"""List monitor (statistics) data for the whole cluster."""
+list_monitor.label:
+"""List cluster stats data"""
+
+clear_monitor.desc:
+"""Clear monitor (statistics) data for the whole cluster."""
+clear_monitor.label:
+"""Clear cluster stats data"""
+
+list_monitor_node.desc:
+"""List the monitor (statistics) data on the specified node."""
+list_monitor_node.label:
+"""List node's stats data"""
+
+current_stats.desc:
+"""Current monitor (statistics) data, e.g. number of connections and connection rate in the whole cluster."""
+current_stats.label:
+"""Cluster runtime stats"""
+
+current_stats_node.desc:
+"""Node monitor (statistics) data, e.g. number of connections and connection rate on the specified node."""
+current_stats_node.label:
+"""Node runtime stats"""
+
+}

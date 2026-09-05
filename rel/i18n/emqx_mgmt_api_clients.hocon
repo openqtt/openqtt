@@ -1,0 +1,136 @@
+emqx_mgmt_api_clients {
+
+list_clients.desc:
+"""List clients"""
+list_clients.label:
+"""List clients"""
+
+kickout_clients.desc:
+"""Kick out a batch of client by client IDs"""
+kickout_clients.label:
+"""Kick out a batch of client by client IDs"""
+
+clients_info_from_id.desc:
+"""Get clients info by client ID"""
+clients_info_from_id.label:
+"""Get clients info by client ID"""
+
+kick_client_id.desc:
+"""Kick out client by client ID"""
+kick_client_id.label:
+"""Kick out client by client ID"""
+
+get_authz_cache.desc:
+"""Get client authz cache in the cluster."""
+get_authz_cache.label:
+"""Get client authz cache in the cluster."""
+
+clean_authz_cache.desc:
+"""Clean client authz cache in the cluster."""
+clean_authz_cache.label:
+"""Clean client authz cache in the cluster."""
+
+get_client_subs.desc:
+"""Get client subscriptions"""
+get_client_subs.label:
+"""Get client subscriptions"""
+
+get_client_mqueue_msgs.desc:
+"""Get client mqueue messages"""
+get_client_mqueue_msgs.label:
+"""Get client mqueue messages"""
+
+get_client_inflight_msgs.desc:
+"""Get client in-flight messages"""
+get_client_inflight_msgs.label:
+"""Get client in-flight messages"""
+
+mqueue_msgs_list.desc:
+"""Client's mqueue messages list.
+Messages are ordered according to their priority and queue (FIFO) order: from higher priority to lower priority.
+By default, all messages in Mqueue have the same priority of 0."""
+mqueue_msgs_list.label:
+"""Client's mqueue messages"""
+
+inflight_msgs_list.desc:
+"""Client's in-flight messages list.
+Messages are sorted by time at which they were inserted to the In-flight storage (from older to newer messages)."""
+inflight_msgs_list.label:
+"""Client's in-flight messages"""
+
+msg_id.desc:
+"""Message ID."""
+msg_id.label:
+"""Message ID"""
+
+msg_topic.desc:
+"""Message topic."""
+msg_topic.label:
+"""Message Topic"""
+
+msg_qos.desc:
+"""Message QoS."""
+msg_qos.label:
+"""Message QoS"""
+
+msg_publish_at.desc:
+"""Message publish time, a millisecond precision Unix epoch timestamp."""
+msg_publish_at.label:
+"""Message Publish Time"""
+
+msg_from_clientid.desc:
+"""Message publisher's client ID."""
+msg_from_clientid.desc:
+"""Message publisher's Client ID"""
+
+msg_from_username.desc:
+"""Message publisher's username."""
+msg_from_username.label:
+"""Message Publisher's Username"""
+
+msg_inserted_at.desc:
+"""A nanosecond precision Unix epoch timestamp at which a message was inserted to In-flight / Mqueue."""
+msg_inserted_at.label:
+"""Message Insertion Time"""
+
+msg_mqueue_priority.desc:
+"""Message Mqueue Priority."""
+msg_mqueue_priority.label:
+"""Message Mqueue Priority"""
+
+subscribe.desc:
+"""Subscribe"""
+subscribe.label:
+"""Subscribe"""
+
+subscribe_g.desc:
+"""Subscribe bulk"""
+subscribe_g.label:
+"""Subscribe bulk"""
+
+unsubscribe.desc:
+"""Unsubscribe"""
+unsubscribe.label:
+"""Unsubscribe"""
+
+unsubscribe_g.desc:
+"""Unsubscribe bulk"""
+unsubscribe_g.label:
+"""Unsubscribe bulk"""
+
+set_keepalive_seconds.desc:
+"""Set the online client keepalive by seconds"""
+set_keepalive_seconds.label:
+"""Set the online client keepalive by seconds"""
+
+get_sessions_count.desc:
+"""Get the total number of sessions in the cluster.
+By default, it includes only those sessions that have not expired.
+If the `broker.session_history_retain` config is set to a duration greater than 0s,
+this count will also include sessions that expired within the specified retain time.
+By specifying the `since` parameter, it can return the number of sessions that have expired within the specified time."""
+
+get_sessions_count.label:
+"""Count number of sessions"""
+
+}

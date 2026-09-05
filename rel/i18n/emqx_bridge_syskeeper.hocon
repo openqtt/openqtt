@@ -1,0 +1,56 @@
+emqx_bridge_syskeeper {
+
+config_enable.desc:
+"""Enable or disable this action."""
+
+config_enable.label:
+"""Enable Or Disable Action"""
+
+desc_config.desc:
+"""Configuration for a Syskeeper action."""
+
+desc_config.label:
+"""Syskeeper Action Configuration"""
+
+desc_name.desc:
+"""Action name."""
+
+desc_name.label:
+"""Action Name"""
+
+desc_type.desc:
+"""The action type."""
+
+desc_type.label:
+"""Action Type"""
+
+template.desc:
+"""Template"""
+
+template.label:
+"""Template"""
+
+target_topic.desc:
+"""The topic for the forwarded message"""
+
+target_topic.label:
+"""Target Topic"""
+
+target_qos.desc:
+"""The QoS for the forwarded message. To preserve the original QoS of the forwarded message, the value can be omitted."""
+
+target_qos.label:
+"""Target QoS"""
+
+parameters.desc:
+"""Syskeeper action parameters"""
+
+parameters.label:
+"""Parameters"""
+
+mqtt_topic.desc:
+"""MQTT topic or topic filter as data source (action input).  If rule action is used as data source, this config should be left empty, otherwise messages will be duplicated in Syskeeper."""
+
+mqtt_topic.label:
+"""Source MQTT Topic"""
+}

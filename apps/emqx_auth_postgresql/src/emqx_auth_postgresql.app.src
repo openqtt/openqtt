@@ -1,0 +1,19 @@
+%% -*- mode: erlang -*-
+{application, emqx_auth_postgresql, [
+    {description, "EMQX PostgreSQL Authentication and Authorization"},
+    {vsn, "0.3.1"},
+    {registered, []},
+    {mod, {emqx_auth_postgresql_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        emqx,
+        emqx_auth,
+        emqx_postgresql
+    ]},
+    {env, []},
+    {modules, []},
+
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+]}.

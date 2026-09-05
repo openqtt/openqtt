@@ -1,0 +1,61 @@
+emqx_audit_api {
+
+audit_get.desc:
+"""Get audit logs with filtering parameters. This feature enables users to efficiently
+access the desired audit trail data and facilitates auditing, compliance,
+troubleshooting, and security analysis."""
+
+audit_get.label:
+"List audit logs"
+
+filter_node.desc:
+"Filter logs by the node name where the logs were generated."
+
+filter_from.desc:
+"""Filter logs by source type. Possible values are:
+
+- `dashboard`: Dashboard request logs.
+- `rest_api`: API KEY request logs.
+- `cli`: The emqx command line logs.
+- `erlang_console`: The emqx remote_console run function logs."""
+
+filter_source.desc:
+"""Filter logs by source. Possible values are:
+
+- The login username to filter logs generated from Dashboard for this specific user.
+- The API Key to filter logs generated from the REST API for this specific API key.
+- An empty string to filter logs generated from CLI or Erlang console."""
+
+filter_source_ip.desc:
+"Filter logs by source IP when logs, applicable for logs generated from Dashboard or REST API operations."
+
+filter_operation_id.desc:
+"Filter logs by swagger's operation_id, applicable for logs generated from Dashboard or REST API operations."
+
+filter_operation_type.desc:
+"Filter logs by operation type."
+
+filter_operation_result.desc:
+"Filter logs by operation result."
+
+filter_http_status_code.desc:
+"""Filter The HTTP API logs by response code, applicable for logs generated from Dashboard or REST API operations."""
+
+filter_http_method.desc:
+"""Filter The HTTP API logs by method, applicable for logs generated from Dashboard or REST API operations."""
+
+filter_gte_duration_ms.desc:
+"""Filter logs by age duration, selecting those created no earlier than then given duration time ago."""
+
+filter_lte_duration_ms.desc:
+"""Filter logs by age duration, selecting those created no later than then given duration time ago."""
+
+filter_gte_created_at.desc:
+"""Filter logs by creation time, selecting logs created no earlier than the given timestamp.
+The timestamp can be provided either in rfc3339 string format or as a millisecond epoch timestamp."""
+
+filter_lte_created_at.desc:
+"""Filter logs by creation time, selecting logs created no later than the given timestamp.
+The timestamp can be provided either in rfc3339 string format or as a millisecond epoch timestamp."""
+
+}

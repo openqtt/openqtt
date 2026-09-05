@@ -1,0 +1,72 @@
+emqx_retainer_schema {
+
+backend.desc:
+"""Settings for the database storing the retained messages."""
+
+batch_deliver_limiter.desc:
+"""The rate limiter name for retained messages' delivery.
+Limiter helps to avoid delivering too many messages to the client at once, which may cause the client to block or crash, or drop messages due to exceeding the size of the message queue.
+The names of the available rate limiters are taken from the existing rate limiters under `limiter.batch`.
+If this field is empty, limiter is not used."""
+
+batch_deliver_number.desc:
+"""The number of retained messages can be delivered per batch."""
+
+batch_read_number.desc:
+"""Size of the batch when reading messages from storage. 0 means no limit."""
+
+enable.desc:
+"""Enable retainer feature"""
+
+flow_control.desc:
+"""Flow control."""
+
+max_payload_size.desc:
+"""The maximum size of retained messages allowed to be stored. EMQX will refuse to store retained messages larger than this size and output an Error log with the keyword 'retain_failed_for_payload_size_exceeded_limit'.
+
+0 means unlimited retained message size."""
+
+max_retained_messages.desc:
+"""Maximum number of retained messages. 0 means no limit."""
+
+mnesia_config_storage_type.desc:
+"""Specifies whether the messages are stored in RAM or persisted on disc."""
+
+mnesia_config_type.desc:
+"""Backend type."""
+
+mnesia_enable.desc:
+"""Enable built-in Mnesia backend."""
+
+msg_clear_interval.desc:
+"""The time interval for checking and clearing expired retained messages. This can prevent expired retained messages from being stored for a long time.
+
+If `msg_clear_interval` is set to 0, that is, expired retained messages are not actively checked regularly, EMQX will only check and delete expired retained messages when preparing for delivery."""
+
+msg_clear_limit.desc:
+"""The maximum number of expired messages cleared at once each `msg_clear_interval`. Settings reasonable limit can prevent the clearing process from running for too long and consume too much resources."""
+
+msg_expiry_interval.desc:
+"""Expired retained messages will not be delivered again, and a setting of 0 means that retained messages will never expire.
+
+However, if the `Message-Expiry-Interval` property is specified in the MQTT message, the value of that property prevails."""
+
+stop_publish_clear_msg.desc:
+"""When the retained flag of the `PUBLISH` message is set and Payload is empty,
+whether to continue to publish the message.
+See:
+http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718038"""
+
+delivery_rate.desc:
+"""The maximum rate of delivering retained messages"""
+
+max_publish_rate.desc:
+"""The maximum rate of publishing retained messages. Messages that are published over the limit are delivered but not stored as retained."""
+
+msg_expiry_interval_override.desc:
+"""If set, this value will take precedence over any `Message-Expiry-Interval` property specified in retained MQTT messages, allowing messages to expire earlier if necessary.  This override only applies to the garbage collection process: it does not affect the expiry time of messages being written nor that of already written messages while iterating over them.  Therefore, messages that are candidate for garbage collection when overridden may still be visible when subscribing to retained topics."""
+
+allow_never_expire.desc:
+"""If true, retained messages set to never expire (i.e., whose `Message-Expiry-Interval = 0`) are not affected by the expiry time override.  This configuration only takes effect when `msg_expiry_interval_override` is set."""
+
+}

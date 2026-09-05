@@ -1,0 +1,124 @@
+emqx_bridge_iotdb {
+
+config_enable.desc:
+"""Enable or disable this bridge"""
+
+config_enable.label:
+"""Enable Or Disable Bridge"""
+
+config_authentication.desc:
+"""Authentication configuration"""
+
+config_authentication.label:
+"""Authentication"""
+
+auth_basic.desc:
+"""Parameters for basic authentication."""
+
+auth_basic.label:
+"""Basic auth params"""
+
+config_auth_basic_username.desc:
+"""The username as configured at the IoTDB REST interface"""
+
+config_auth_basic_username.label:
+  """HTTP Basic Auth Username"""
+
+config_auth_basic_password.desc:
+"""The password as configured at the IoTDB REST interface"""
+
+config_auth_basic_password.label:
+"""HTTP Basic Auth Password"""
+
+config_base_url.desc:
+"""The base URL of the external IoTDB service's REST interface."""
+config_base_url.label:
+"""IoTDB REST Service Base URL"""
+
+config_is_aligned.desc:
+"""Whether to align the timeseries"""
+
+config_is_aligned.label:
+"""Align Timeseries"""
+
+config_device_id.desc:
+"""The IoTDB device ID this data should be inserted for.
+If left empty, the MQTT message payload must contain a `device_id` field,
+or EMQX's rule-engine SQL must produce a `device_id` field."""
+config_device_id.label:
+"""Device ID"""
+
+config_iotdb_version.desc:
+"""The version of the IoTDB system to connect to."""
+config_iotdb_version.label:
+"""IoTDB Version"""
+
+config_max_retries.desc:
+"""HTTP request max retry times if failed."""
+
+config_max_retries.label:
+"""HTTP Request Max Retries"""
+
+desc_config.desc:
+"""Configuration for Apache IoTDB bridge."""
+
+desc_config.label:
+"""IoTDB Bridge Configuration"""
+
+desc_name.desc:
+"""Action name, a human-readable identifier."""
+
+desc_name.label:
+"""Action Name"""
+
+config_parameters_timestamp.desc:
+"""Timestamp. Placeholders in format of ${var} is supported, can be:
+
+- now: use the current time in milliseconds
+- now_ms: same as above
+- now_us: use the current time in microseconds
+- now_ns: use the current time in nanoseconds
+- any integer: use the value directly as the timestamp
+- Placeholder: use the value from the payload as the timestamp"""
+
+config_parameters_timestamp.label:
+"""Timestamp"""
+
+config_parameters_measurement.desc:
+"""Measurement. Placeholders in format of ${var} is supported"""
+
+config_parameters_measurement.label:
+"""Measurement"""
+
+config_parameters_data_type.desc:
+"""Data Type, can be:
+
+- text
+- boolean
+- int32
+- int64
+- float
+- double"""
+
+config_parameters_data_type.label:
+"""Data type"""
+
+config_parameters_value.desc:
+"""Value. Placeholders in format of ${var} is supported"""
+
+config_parameters_value.label:
+"""Value"""
+
+action_parameters_data.desc:
+"""IoTDB action parameter data"""
+
+action_parameters_data.label:
+"""Parameter Data"""
+
+action_parameters.desc:
+"""IoTDB action parameters"""
+
+action_parameters.label:
+"""Parameters"""
+
+}

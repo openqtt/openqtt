@@ -1,0 +1,69 @@
+name: 'Create MacOS package'
+description: 'Build MacOS package for emqx or emqx-enterprise'
+inputs:
+  profile: # emqx, emqx-enterprise
+    required: true
+  otp:
+    required: true
+  elixir:
+    required: true
+  os:
+    required: false
+    default: 'macos-15'
+  apple_id_password:
+    required: false
+  apple_developer_identity:
+    required: false
+  apple_developer_id_bundle:
+    required: false
+  apple_developer_id_bundle_password:
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: emqx/macos-erlang@f744c98139c0db83a10619587d4bae4fc49765a8 # v1.0.0
+      with:
+        otp-version: ${{ inputs.otp }}
+        install-elixir: true
+        elixir-version: ${{ inputs.elixir }}
+    - name: build
+      shell: bash
+      env:
+        PROFILE: ${{ inputs.profile }}
+        OTP_VERSION: ${{ inputs.otp }}
+        APPLE_SIGN_BINARIES: 1
+        APPLE_ID: developers@emqx.io
+        APPLE_TEAM_ID: 26N6HYJLZA
+        APPLE_ID_PASSWORD: ${{ inputs.apple_id_password }}
+        APPLE_DEVELOPER_IDENTITY: ${{ inputs.apple_developer_identity }}
+        APPLE_DEVELOPER_ID_BUNDLE: ${{ inputs.apple_developer_id_bundle }}
+        APPLE_DEVELOPER_ID_BUNDLE_PASSWORD: ${{ inputs.apple_developer_id_bundle_password }}
+        QUICER_TLS_VER: openssl3
+      run: |
+        erl -s init stop
+        elixir -e "System.version() |> IO.puts()"
+        # needed by greptimedb-ingester-erlnif
+        brew install protobuf
+        make ensure-rebar3
+        mkdir -p $HOME/bin
+        cp rebar3 $HOME/bin/rebar3
+        export PATH="$HOME/bin:$PATH"
+        # needed in latest macos-15 runner
+        export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        # needed because https://github.com/emqx/mnesia_rocksdb/blame/a791148c3f195a87260dfa7ee3e8735a3461c378/rebar.config.script#L4 may overwrite it
+        export ERLANG_ROCKSDB_OPTS='-DWITH_BUNDLE_LZ4=ON -DWITH_BUNDLE_SNAPPY=ON'
+        make $PROFILE-tgz
+    - name: test ${{ inputs.profile }}
+      shell: bash
+      run: |
+        pkg_name=$(find _packages/${{ inputs.profile }} -mindepth 1 -maxdepth 1 -iname \*.zip)
+        mkdir emqx
+        unzip -d emqx $pkg_name > /dev/null
+        set -e
+        ./emqx/bin/emqx start
+        ./scripts/test/emqx-smoke-test.sh 127.0.0.1 18083
+        ./emqx/bin/emqx ping
+        ./emqx/bin/emqx help
+        ./emqx/bin/emqx ctl status
+        ./emqx/bin/emqx stop

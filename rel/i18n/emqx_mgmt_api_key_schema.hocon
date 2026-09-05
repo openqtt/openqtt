@@ -1,0 +1,21 @@
+emqx_mgmt_api_key_schema {
+
+api_key.desc:
+"""API Key, can be used to request API other than the management API key and the Dashboard user management API"""
+
+api_key.label:
+"""API Key"""
+
+bootstrap_file.desc:
+"""The bootstrap file provides API keys for EMQX.
+EMQX will load these keys on startup to authorize API requests.
+It contains colon-separated values in the format: `api_key:api_secret:role`.
+Each line specifies an API key and its associated secret, and the role of this key.
+The 'role' part should be the pre-defined access scope group name,
+for example, `administrator` or `viewer`.
+The 'role' is introduced in 5.4, to be backward compatible, if it is missing, the key is implicitly granted `administrator` role."""
+
+bootstrap_file.label:
+"""Initialize api_key file."""
+
+}
