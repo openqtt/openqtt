@@ -87,7 +87,12 @@ case "${PROFILE}" in
         ;;
     *)
         RELEASE_EDITION="EMQX_RELEASE_CE"
-        GIT_TAG_PREFIX="v"
+        # OpenQTT: upstream tagged community releases `v5.8.9`; this repository
+        # tags its own releases `v1.0.0` and marks the import point `emqx-v5.8.9`.
+        # Only the latter is a statement about the EMQX version inside, so only
+        # it may be compared against emqx_release.hrl below. A `v1.x` tag on HEAD
+        # is an OpenQTT release, not a claim that EMQX is 1.x.
+        GIT_TAG_PREFIX="emqx-v"
         ;;
 esac
 
@@ -102,7 +107,7 @@ fi
 git_exact_vsn() {
     local tag
     tag="$(git describe --tags --match "${GIT_TAG_PREFIX}*" --exact 2>/dev/null)"
-    echo "${tag#[v|e]}"
+    echo "${tag#"${GIT_TAG_PREFIX}"}"
 }
 
 GIT_EXACT_VSN="$(git_exact_vsn)"
