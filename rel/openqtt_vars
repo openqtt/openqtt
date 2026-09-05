@@ -20,7 +20,7 @@ IS_ENTERPRISE="{{ is_enterprise }}"
 ## Do not change EMQX_DEFAULT_ERLANG_COOKIE.
 ## Configure EMQX_NODE_COOKIE instead
 EMQX_DEFAULT_ERLANG_COOKIE='{{ emqx_default_erlang_cookie }}'
-REL_NAME="emqx"
+REL_NAME="openqtt"
 export EMQX_DESCRIPTION='{{ emqx_description }}'
 
 ## updated vars here

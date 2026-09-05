@@ -7,7 +7,7 @@ cd -P -- "$(dirname -- "$0")/../.."
 source ./env.sh
 
 PROFILE="${PROFILE:-emqx}"
-EMQX_ROOT="${EMQX_ROOT:-_build/$PROFILE/rel/emqx}"
+EMQX_ROOT="${EMQX_ROOT:-_build/$PROFILE/rel/openqtt}"
 EMQX_WAIT_FOR_START="${EMQX_WAIT_FOR_START:-30}"
 export EMQX_WAIT_FOR_START
 
@@ -17,7 +17,7 @@ function check_dashboard_https_ssl_options_depth() {
   else
     EXPECT_DEPTH=10
   fi
-  DEPTH=$("$EMQX_ROOT"/bin/emqx eval "emqx:get_config([dashboard,listeners,https,ssl_options,depth],10)")
+  DEPTH=$("$EMQX_ROOT"/bin/openqtt eval "emqx:get_config([dashboard,listeners,https,ssl_options,depth],10)")
   if [[ "$DEPTH" != "$EXPECT_DEPTH" ]]; then
     echo "Bad Https depth $DEPTH, expect $EXPECT_DEPTH"
     exit 1
@@ -26,9 +26,9 @@ function check_dashboard_https_ssl_options_depth() {
 
 start_emqx_with_conf() {
     echo "Starting $PROFILE with $1"
-    "$EMQX_ROOT"/bin/emqx start
+    "$EMQX_ROOT"/bin/openqtt start
     check_dashboard_https_ssl_options_depth "$1"
-    "$EMQX_ROOT"/bin/emqx stop
+    "$EMQX_ROOT"/bin/openqtt stop
 }
 
 PKG_VSN=${PKG_VSN:-$(./pkg-vsn.sh "$PROFILE")}

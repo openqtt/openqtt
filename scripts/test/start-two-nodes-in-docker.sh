@@ -235,7 +235,7 @@ wait_for_emqx() {
     container="$1"
     wait_limit="$2"
     wait_sec=0
-    while ! docker exec "$container" emqx ctl status; do
+    while ! docker exec "$container" openqtt ctl status; do
         wait_sec=$(( wait_sec + 1 ))
         if [ $wait_sec -gt "$wait_limit" ]; then
             echo "timeout wait for EMQX"
@@ -273,4 +273,4 @@ wait_for_haproxy 10
 
 echo
 
-docker exec $NODE1 emqx ctl cluster join "emqx@$NODE2"
+docker exec $NODE1 openqtt ctl cluster join "emqx@$NODE2"

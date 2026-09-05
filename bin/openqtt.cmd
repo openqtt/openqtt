@@ -16,7 +16,7 @@
 :: * usage - display available commands
 
 :: Set variables that describe the release
-@set rel_name=emqx
+@set rel_name=openqtt
 @set rel_vsn={{ release_version }}
 @set REL_VSN=%rel_vsn%
 @set erts_vsn={{ erts_vsn }}
@@ -163,12 +163,12 @@
 @call :generate_app_config
 :: Install the service
 @set args="-boot %boot_file_name% %generated_config_args% -mnesia dir '%mnesia_dir%'"
-@set description=EMQX node %node_name% in %rootdir%
+@set description=OpenQTT node %node_name% in %rootdir%
 @if "" == "%2" (
   %erlsrv% add %service_name% %node_type% "%node_name%" -on restart -c "%description%" ^
-           -i "emqx" -w "%rootdir%" -m %erl_exe% -args %args% ^
+           -i "openqtt" -w "%rootdir%" -m %erl_exe% -args %args% ^
            -st "init:stop()."
-  sc config emqx start=delayed-auto
+  sc config openqtt start=delayed-auto
 )
 @goto :eof
 

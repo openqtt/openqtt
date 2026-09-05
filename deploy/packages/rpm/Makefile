@@ -10,8 +10,8 @@ RPM_VSN := $(subst -,_,$(PKG_VSN))
 
 EMQX_NAME=$(subst -pkg,,$(EMQX_BUILD))
 
-TAR_PKG_DIR ?= _build/$(EMQX_BUILD)/rel/emqx
-TAR_PKG     := $(EMQX_REL)/$(TAR_PKG_DIR)/emqx-$(PKG_VSN).tar.gz
+TAR_PKG_DIR ?= _build/$(EMQX_BUILD)/rel/openqtt
+TAR_PKG     := $(EMQX_REL)/$(TAR_PKG_DIR)/openqtt-$(PKG_VSN).tar.gz
 SOURCE_PKG  := emqx-$(RPM_VSN).$(shell uname -m)
 TARGET_PKG  := $(EMQX_NAME)-$(shell $(EMQX_REL)/pkg-vsn.sh $(EMQX_NAME) --long)
 

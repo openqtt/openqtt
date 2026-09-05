@@ -2,7 +2,7 @@ x-default-emqx: &default-emqx
     env_file:
       - conf.cluster.env
     healthcheck:
-      test: ["CMD", "/opt/emqx/bin/emqx_ctl", "status"]
+      test: ["CMD", "/opt/openqtt/bin/openqtt_ctl", "status"]
       interval: 5s
       timeout: 25s
       retries: 5

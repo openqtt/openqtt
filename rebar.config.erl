@@ -340,7 +340,7 @@ relx(Vsn, RelType, PkgType, Edition) ->
         {generate_start_script, false},
         {sys_config, false},
         {vm_args, false},
-        {release, {emqx, Vsn}, relx_apps(RelType, Edition)},
+        {release, {openqtt, Vsn}, relx_apps(RelType, Edition)},
         {tar_hooks, [
             "scripts/rel/cleanup-release-package.sh"
         ]},
@@ -372,7 +372,7 @@ relform() ->
     end.
 
 emqx_description(_, ce) ->
-    "EMQX";
+    "OpenQTT";
 emqx_description(_, ee) ->
     case get_emqx_flavor() of
         official -> "EMQX Enterprise";
@@ -493,23 +493,23 @@ relx_overlay(ReleaseType, Edition) ->
         {mkdir, "data/configs"},
         {mkdir, "data/patches"},
         {mkdir, "data/scripts"},
-        {template, "rel/emqx_vars", "releases/emqx_vars"},
+        {template, "rel/openqtt_vars", "releases/openqtt_vars"},
         {template, "rel/BUILD_INFO", "releases/{{release_version}}/BUILD_INFO"},
-        {copy, "bin/emqx", "bin/emqx"},
-        {copy, "bin/emqx_ctl", "bin/emqx_ctl"},
-        {copy, "bin/emqx_cluster_rescue", "bin/emqx_cluster_rescue"},
-        {copy, "bin/emqx_fw", "bin/emqx_fw"},
+        {copy, "bin/openqtt", "bin/openqtt"},
+        {copy, "bin/openqtt_ctl", "bin/openqtt_ctl"},
+        {copy, "bin/openqtt_cluster_rescue", "bin/openqtt_cluster_rescue"},
+        {copy, "bin/openqtt_fw", "bin/openqtt_fw"},
         {copy, "bin/node_dump", "bin/node_dump"},
         {copy, "bin/install_upgrade.escript", "bin/install_upgrade.escript"},
-        {copy, "bin/emqx", "bin/emqx-{{release_version}}"},
-        {copy, "bin/emqx_ctl", "bin/emqx_ctl-{{release_version}}"},
+        {copy, "bin/openqtt", "bin/openqtt-{{release_version}}"},
+        {copy, "bin/openqtt_ctl", "bin/openqtt_ctl-{{release_version}}"},
         {copy, "bin/install_upgrade.escript", "bin/install_upgrade.escript-{{release_version}}"},
         {copy, "apps/emqx_gateway_lwm2m/lwm2m_xml", "etc/lwm2m_xml"},
         {copy, "apps/emqx_auth/etc/acl.conf", "etc/acl.conf"},
         {copy, "apps/emqx_auth/etc/auth-built-in-db-bootstrap.csv",
             "etc/auth-built-in-db-bootstrap.csv"},
-        {template, "bin/emqx.cmd", "bin/emqx.cmd"},
-        {template, "bin/emqx_ctl.cmd", "bin/emqx_ctl.cmd"},
+        {template, "bin/openqtt.cmd", "bin/openqtt.cmd"},
+        {template, "bin/openqtt_ctl.cmd", "bin/openqtt_ctl.cmd"},
         {copy, "bin/nodetool", "bin/nodetool"},
         {copy, "bin/nodetool", "bin/nodetool-{{release_version}}"}
     ] ++ etc_overlay(ReleaseType, Edition).

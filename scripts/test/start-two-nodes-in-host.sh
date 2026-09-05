@@ -19,7 +19,7 @@ help() {
     echo "Start a 2-node cluster in one host, node names are emqx1@127.0.1 and emqx2@127.0.0.2"
     echo ""
     echo "-h|--help: To display this usage info."
-    echo "-b|--boots: Optional, default is ./_build/emqx/rel/emqx/bin/emqx"
+    echo "-b|--boots: Optional, default is ./_build/emqx/rel/openqtt/bin/openqtt"
     echo "            If it is not found in _build dir, the 'which emqx' command output is used"
     echo "            Supports multiple commands, one for each node, separate with a comma."
     echo "-r|--roles: Optional, node (db) roles, comma separate."
@@ -29,7 +29,7 @@ help() {
     echo "            Default is './tmp'"
 }
 
-BUILT_BOOT='./_build/emqx/rel/emqx/bin/emqx'
+BUILT_BOOT='./_build/emqx/rel/openqtt/bin/openqtt'
 if [ -f "$BUILT_BOOT" ]; then
     DEFAULT_BOOT="$BUILT_BOOT"
 else

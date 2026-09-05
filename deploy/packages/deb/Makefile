@@ -5,8 +5,8 @@ BUILT := $(SRCDIR)/BUILT
 
 EMQX_NAME=$(subst -pkg,,$(EMQX_BUILD))
 
-TAR_PKG_DIR ?= _build/$(EMQX_BUILD)/rel/emqx
-TAR_PKG     := $(EMQX_REL)/$(TAR_PKG_DIR)/emqx-$(PKG_VSN).tar.gz
+TAR_PKG_DIR ?= _build/$(EMQX_BUILD)/rel/openqtt
+TAR_PKG     := $(EMQX_REL)/$(TAR_PKG_DIR)/openqtt-$(PKG_VSN).tar.gz
 SOURCE_PKG  := $(EMQX_NAME)_$(PKG_VSN)_$(shell dpkg --print-architecture)
 TARGET_PKG  := $(EMQX_NAME)-$(shell $(EMQX_REL)/pkg-vsn.sh $(EMQX_NAME) --long)
 

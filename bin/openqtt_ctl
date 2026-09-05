@@ -3,4 +3,4 @@
 # ex: ts=4 sw=4 et
 
 THIS_DIR="$(cd "$(dirname "$(readlink "$0" || echo "$0")")" || true; pwd -P)"
-exec "$THIS_DIR/emqx" ctl "$@"
+exec "$THIS_DIR/openqtt" ctl "$@"

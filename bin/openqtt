@@ -58,43 +58,43 @@ usage() {
 
     case "$command" in
     start)
-        echo "Start EMQX service in daemon mode"
+        echo "Start OpenQTT service in daemon mode"
         ;;
     stop)
-        echo "Stop the running EMQX program"
+        echo "Stop the running OpenQTT program"
         ;;
     console)
-        echo "Boot up EMQX service in an interactive Erlang or Elixir shell"
+        echo "Boot up OpenQTT service in an interactive Erlang or Elixir shell"
         echo "This command needs a tty"
         ;;
     console_clean)
-        echo "This command does NOT boot up the EMQX service"
+        echo "This command does NOT boot up the OpenQTT service"
         echo "It only starts an interactive Erlang or Elixir console with all the"
-        echo "EMQX code available"
+        echo "OpenQTT code available"
         ;;
     foreground)
-        echo "Start EMQX in foreground mode without an interactive shell"
+        echo "Start OpenQTT in foreground mode without an interactive shell"
         ;;
     pid)
-        echo "Print out EMQX process identifier"
+        echo "Print out OpenQTT process identifier"
         ;;
     ping)
-        echo "Check if the EMQX node is up and running"
+        echo "Check if the OpenQTT node is up and running"
         echo "This command exit with 0 silently if node is running"
         ;;
     escript)
-        echo "Execute a escript using the Erlang runtime from EMQX package installation"
+        echo "Execute a escript using the Erlang runtime from OpenQTT package installation"
         echo "For example $progname escript /path/to/my/escript my_arg1 my_arg2"
         ;;
     attach)
-        echo "This command is applicable when EMQX is started in daemon mode."
-        echo "It attaches the current shell to EMQX's control console"
+        echo "This command is applicable when OpenQTT is started in daemon mode."
+        echo "It attaches the current shell to OpenQTT's control console"
         echo "through a named pipe."
         logwarn "try to use the safer alternative, remote_console command."
         ;;
     remote_console)
         echo "Start an interactive shell running an Erlang or Elixir node which "
-        echo "hidden-connects to the running EMQX node".
+        echo "hidden-connects to the running OpenQTT node".
         echo "This command is mostly used for troubleshooting."
         ;;
     ertspath)
@@ -102,28 +102,28 @@ usage() {
         ;;
     rpc)
         echo "Usage: $progname rpc MODULE FUNCTION [ARGS, ...]"
-        echo "Connect to the EMQX node and make an Erlang RPC"
+        echo "Connect to the OpenQTT node and make an Erlang RPC"
         echo "This command blocks for at most 60 seconds."
         echo "It exits with non-zero code in case of any RPC failure"
         echo "including connection error and runtime exception"
         ;;
     rpcterms)
         echo "Usage: $progname rpcterms MODULE FUNCTION [ARGS, ...]"
-        echo "Connect to the EMQX node and make an Erlang RPC"
+        echo "Connect to the OpenQTT node and make an Erlang RPC"
         echo "The result of the RPC call is pretty-printed as an "
         echo "Erlang term"
         ;;
     root_dir)
-        echo "Print EMQX installation root dir"
+        echo "Print OpenQTT installation root dir"
         ;;
     eval)
-        echo "Evaluate an Erlang expression in the EMQX node."
+        echo "Evaluate an Erlang expression in the OpenQTT node."
         ;;
     eval-ex)
-        echo "Evaluate an Elixir expression in the EMQX node. Only applies to Elixir node"
+        echo "Evaluate an Elixir expression in the OpenQTT node. Only applies to Elixir node"
         ;;
     versions)
-        echo "List installed EMQX release versions and their status"
+        echo "List installed OpenQTT release versions and their status"
         ;;
     unpack)
         echo "Usage: $progname unpack [VERSION]"
@@ -168,16 +168,16 @@ usage() {
         echo "                      don't make it permanent"
         ;;
     check_config)
-        echo "Checks the EMQX config without generating any files"
+        echo "Checks the OpenQTT config without generating any files"
         ;;
     *)
         echo "Usage: $progname COMMAND [help]"
         echo ''
         echo "Commonly used COMMANDs:"
-        echo "  start:      Start EMQX in daemon mode"
-        echo "  console:    Start EMQX in an interactive Erlang or Elixir shell"
-        echo "  foreground: Start EMQX in foreground mode without an interactive shell"
-        echo "  stop:       Stop the running EMQX node"
+        echo "  start:      Start OpenQTT in daemon mode"
+        echo "  console:    Start OpenQTT in an interactive Erlang or Elixir shell"
+        echo "  foreground: Start OpenQTT in foreground mode without an interactive shell"
+        echo "  stop:       Stop the running OpenQTT node"
         echo "  ctl:        Administration commands, execute '$progname ctl help' for more details"
         echo ''
         echo "More:"
@@ -193,8 +193,8 @@ usage() {
     esac
 }
 
-# We need to find real directory with emqx files on all platforms
-# even when bin/emqx is symlinked on several levels
+# We need to find real directory with openqtt files on all platforms
+# even when bin/openqtt is symlinked on several levels
 # - readlink -f works perfectly, but `-f` flag has completely different meaning in BSD version,
 #   so we can't use it universally.
 # - `stat -f%R` on MacOS does exactly what `readlink -f` does on Linux, but we can't use it
@@ -260,15 +260,15 @@ if [ -f "$RELUP_PATH/version" ]; then
     export BASE_RUNNER_ROOT_DIR
     ## only print for boot commands to avoid messing the CLI outputs
     if [ "$IS_BOOT_COMMAND" = 'yes' ]; then
-        loginfo "Loading emqx from hot-upgrade dir: $RELUP_PATH"
+        loginfo "Loading openqtt from hot-upgrade dir: $RELUP_PATH"
     fi
-    exec "$RELUP_PATH/$TARGET_VSN"/bin/emqx "$@"
+    exec "$RELUP_PATH/$TARGET_VSN"/bin/openqtt "$@"
 fi
 
 # shellcheck disable=SC1090,SC1091
-. "$RUNNER_ROOT_DIR"/releases/emqx_vars
+. "$RUNNER_ROOT_DIR"/releases/openqtt_vars
 
-# defined in emqx_vars
+# defined in openqtt_vars
 export RUNNER_ROOT_DIR
 export EMQX_ETC_DIR
 export REL_VSN
@@ -574,7 +574,7 @@ else
         if [ "$RUNNING_NODES_COUNT" -gt 1 ]; then
             if [ -z "${EMQX_NODE__NAME:-}" ]; then
                 tmp_nodenames=$(echo -e "$PS_LINE" | $GREP -oE "\s-s?name.*" | awk '{print $2}' | tr '\n' ' ')
-                logerr "More than one EMQX node found running (root dir: ${RUNNER_ROOT_DIR})"
+                logerr "More than one OpenQTT node found running (root dir: ${RUNNER_ROOT_DIR})"
                 logerr "Running nodes: $tmp_nodenames"
                 logerr "Make sure environment variable EMQX_NODE__NAME is set to indicate for which node this command is intended."
                 exit 1
@@ -615,7 +615,7 @@ if [ "$EKKA_PROTO_DIST_MOD" = 'inet_tls' ] || [ "$EKKA_PROTO_DIST_MOD" = 'inet6_
                 logerr "Got space in: $SSL_DIST_OPTFILE"
                 logerr "No space is allowed for Erlang distribution over SSL option file path."
                 logerr "Configure it from environment variable EMQX_SSL_DIST_OPTFILE."
-                logerr "Or make sure emqx root path '$RUNNER_ROOT_DIR' has no space"
+                logerr "Or make sure openqtt root path '$RUNNER_ROOT_DIR' has no space"
                 exit 1
                 ;;
             *)
@@ -661,7 +661,7 @@ current_script_version() {
   curr_script=$(basename "${BASH_SOURCE[0]}")
   suffix=${curr_script#*-}
   if [[ "${suffix}" == "${curr_script}" ]]; then
-    # there's no suffix, so we're running the default `emqx` script;
+    # there's no suffix, so we're running the default `openqtt` script;
     # we'll have to trust the REL_VSN variable
     echo "$REL_VSN"
   else
@@ -725,9 +725,9 @@ locate_package() {
   vsn="$1"
 
   if [[ "${IS_ENTERPRISE}" == "yes" ]]; then
-    package_pattern="$RUNNER_ROOT_DIR/releases/emqx-enterprise-$vsn-*.tar.gz"
+    package_pattern="$RUNNER_ROOT_DIR/releases/openqtt-enterprise-$vsn-*.tar.gz"
   else
-    package_pattern="$RUNNER_ROOT_DIR/releases/emqx-$vsn-*.tar.gz"
+    package_pattern="$RUNNER_ROOT_DIR/releases/openqtt-$vsn-*.tar.gz"
   fi
 
   # shellcheck disable=SC2207,SC2086
@@ -748,20 +748,20 @@ ensure_newest_script_is_extracted() {
   local newest_vsn="$1"
   local package_path tmpdir
 
-  if does_script_version_exist "emqx" "$newest_vsn" \
+  if does_script_version_exist "openqtt" "$newest_vsn" \
      && does_script_version_exist "install_upgrade.escript" "$newest_vsn"; then
     return
   else
     package_path="$(locate_package "$newest_vsn")"
-    tmpdir="$(mktemp -dp /tmp emqx.XXXXXXXXXXX)"
+    tmpdir="$(mktemp -dp /tmp openqtt.XXXXXXXXXXX)"
 
     extract_from_package \
       "$package_path" \
       "$tmpdir" \
-      "bin/emqx-$newest_vsn" \
+      "bin/openqtt-$newest_vsn" \
       "bin/install_upgrade.escript-$newest_vsn"
 
-    cp "$tmpdir/bin/emqx-$newest_vsn" \
+    cp "$tmpdir/bin/openqtt-$newest_vsn" \
        "$tmpdir/bin/install_upgrade.escript-$newest_vsn" \
        "$RUNNER_ROOT_DIR/bin/"
 
@@ -1073,7 +1073,7 @@ pipe_shutdown() {
     fi
 }
 
-## Call nodetool to stop EMQX
+## Call nodetool to stop OpenQTT
 nodetool_shutdown() {
     # Wait for the node to completely stop...
     PID="$(relx_get_pid)"
@@ -1202,7 +1202,7 @@ case "${COMMAND}" in
         ensure_newest_script_is_extracted "$newest_vsn"
         # if we are not the newest script, run the same command from it
         if ! am_i_the_newest_script "$newest_vsn"; then
-          script_path="$(versioned_script_path emqx "$newest_vsn")"
+          script_path="$(versioned_script_path openqtt "$newest_vsn")"
           exec "$script_path" "$COMMAND" "$@"
         fi
 
@@ -1371,7 +1371,7 @@ case "${COMMAND}" in
               --erl "+S 2" \
               --rpc-eval "$NAME" "$@"
         else
-            echo "EMQX node is not an Elixir node"
+            echo "OpenQTT node is not an Elixir node"
             usage "$COMMAND"
             exit 1
         fi

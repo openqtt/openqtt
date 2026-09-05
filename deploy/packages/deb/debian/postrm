@@ -47,11 +47,11 @@ case "$1" in
         if getent group emqx >/dev/null; then
                 delgroup --quiet --system --only-if-empty emqx || true
         fi
-        if [ -f /usr/bin/emqx ]; then
-                rm /usr/bin/emqx
+        if [ -f /usr/bin/openqtt ]; then
+                rm /usr/bin/openqtt
         fi
-        if [ -f /usr/bin/emqx_ctl ]; then
-                rm /usr/bin/emqx_ctl
+        if [ -f /usr/bin/openqtt_ctl ]; then
+                rm /usr/bin/openqtt_ctl
         fi
         if [ -d /usr/lib/emqx ]; then
                 rm -r /usr/lib/emqx
@@ -64,8 +64,8 @@ case "$1" in
     ;;
 
     remove)
-        rm /usr/bin/emqx
-        rm /usr/bin/emqx_ctl
+        rm /usr/bin/openqtt
+        rm /usr/bin/openqtt_ctl
     ;;
 
     upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)

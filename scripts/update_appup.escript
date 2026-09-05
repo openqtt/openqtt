@@ -45,7 +45,7 @@ default_options() ->
     #{
         clone_url => find_upstream_repo("origin"),
         make_command => "make emqx-rel",
-        beams_dir => "_build/emqx/rel/emqx/lib/",
+        beams_dir => "_build/emqx/rel/openqtt/lib/",
         check => false,
         prev_tag => undefined,
         src_dirs => "{src,apps}/**/",

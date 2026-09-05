@@ -66,8 +66,8 @@ fi
 
 %post
 if [ $1 = 1 ]; then
-    ln -s %{_lib_home}/bin/emqx %{_bindir}/emqx
-    ln -s %{_lib_home}/bin/emqx_ctl %{_bindir}/emqx_ctl
+    ln -s %{_lib_home}/bin/openqtt %{_bindir}/openqtt
+    ln -s %{_lib_home}/bin/openqtt_ctl %{_bindir}/openqtt_ctl
 fi
 %{_post_addition}
 systemctl enable %{_name}.service
@@ -79,7 +79,7 @@ chown -R %{_user}:%{_group} %{_lib_home}
 if [ $1 = 0 ]; then
     systemctl disable %{_name}.service
     rm -f %{_bindir}/emqx
-    rm -f %{_bindir}/emqx_ctl
+    rm -f %{_bindir}/openqtt_ctl
 fi
 exit 0
 

@@ -34,7 +34,7 @@ COMMANDS:
   remsh:  Attach to running node's remote console.
           Target node name is to be specified with -n|--name,
           otherwise defaults to 'emqx@127.0.0.1'.
-  ctl:    Equivalent to 'emqx ctl'.
+  ctl:    Equivalent to 'openqtt ctl'.
           ctl command arguments should be passed after '--'
           e.g. $0 ctl -- help
   eval:   Evaluate an Erlang expression
