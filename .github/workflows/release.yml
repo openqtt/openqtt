@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC="ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13"
-          DST="ghcr.io/scadable-iot/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13"
+          DST="ghcr.io/openqtt/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13"
           if docker manifest inspect "$DST" >/dev/null 2>&1; then
             echo "mirror present: $DST"
           else
@@ -79,8 +79,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/scadable-iot/openqtt:${{ needs.version.outputs.version }}
-            ghcr.io/scadable-iot/openqtt:sha-${{ github.sha }}
+            ghcr.io/openqtt/openqtt:${{ needs.version.outputs.version }}
+            ghcr.io/openqtt/openqtt:sha-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
@@ -96,13 +96,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/charts/openqtt
+      - run: helm lint deploy/charts/openqtt --set nodeCookie=ci-not-a-real-cookie
       - run: helm package deploy/charts/openqtt --destination dist
       - id: push
         run: |
           set -euo pipefail
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
-          OUT="$(helm push "dist/openqtt-${{ needs.version.outputs.version }}.tgz" oci://ghcr.io/scadable-iot/charts 2>&1)"
+          OUT="$(helm push "dist/openqtt-${{ needs.version.outputs.version }}.tgz" oci://ghcr.io/openqtt/charts 2>&1)"
           echo "$OUT"
           echo "digest=$(echo "$OUT" | sed -n 's/^Digest: //p')" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
@@ -133,9 +133,9 @@ jobs:
 
           | Artifact | Reference |
           | --- | --- |
-          | Image | \`ghcr.io/scadable-iot/openqtt:$VERSION\` |
+          | Image | \`ghcr.io/openqtt/openqtt:$VERSION\` |
           | Image digest | \`$IMAGE_DIGEST\` |
-          | Chart | \`oci://ghcr.io/scadable-iot/charts/openqtt:$VERSION\` |
+          | Chart | \`oci://ghcr.io/openqtt/charts/openqtt:$VERSION\` |
           | Chart digest | \`$CHART_DIGEST\` |
 
           Deploy the image by digest. The packaged chart is attached below.

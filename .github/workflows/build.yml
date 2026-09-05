@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   # THE BUILDER IS A MIRROR OF UPSTREAM'S. deploy/docker/Dockerfile builds from
-  # ghcr.io/scadable-iot/emqx-builder rather than from EMQ's registry, so a
+  # ghcr.io/openqtt/emqx-builder rather than from EMQ's registry, so a
   # build never depends on EMQ keeping an image published. This job makes sure
   # the mirror exists before anything tries to pull it; it is a no-op once it does.
   mirror-builder:
@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC="ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13"
-          DST="ghcr.io/scadable-iot/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13"
+          DST="ghcr.io/openqtt/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13"
           if docker manifest inspect "$DST" >/dev/null 2>&1; then
             echo "mirror present: $DST"
           else
@@ -72,5 +72,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/charts/openqtt
-      - run: helm template openqtt deploy/charts/openqtt --set persistence.enabled=true >/dev/null
+      # The chart fails closed without a node cookie, so CI supplies a throwaway
+      # one. This value is a test fixture and never reaches a published artifact.
+      - run: helm lint deploy/charts/openqtt --set nodeCookie=ci-not-a-real-cookie
+      - run: helm template openqtt deploy/charts/openqtt --set nodeCookie=ci-not-a-real-cookie --set persistence.enabled=true >/dev/null
+      - name: The chart must refuse an unset cookie and a cookie in emqxConfig
+        run: |
+          set -euo pipefail
+          if helm template openqtt deploy/charts/openqtt >/dev/null 2>&1; then
+            echo "chart rendered without nodeCookie; the fail-closed guard is gone" >&2
+            exit 1
+          fi
+          if helm template openqtt deploy/charts/openqtt \
+              --set nodeCookie=x --set emqxConfig.EMQX_NODE__COOKIE=x >/dev/null 2>&1; then
+            echo "chart let a cookie into the ConfigMap" >&2
+            exit 1
+          fi
+          echo "both guards hold"
