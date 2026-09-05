@@ -52,7 +52,7 @@ def test_profile_must_be_set():
 def test_emqx_boot_with_invalid_node_name(emqx_bin_path):
     """Test that emqx boot fails with invalid node name."""
     env = os.environ.copy()
-    env["EMQX_NODE_NAME"] = "invliadename#"
+    env["OPENQTT_NODE_NAME"] = "invliadename#"
 
     result = subprocess.run(
         [str(emqx_bin_path), "console"],

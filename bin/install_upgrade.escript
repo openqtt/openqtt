@@ -388,7 +388,7 @@ permafy(TargetNode, RelName, Vsn) ->
     ],
     %% update the vars
     UpdatedVars = io_lib:format("REL_VSN=\"~s\"~nERTS_VSN=\"~s\"~n", [Vsn, erts_vsn()]),
-    file:write_file(filename:absname(filename:join(["releases", "emqx_vars"])), UpdatedVars, [
+    file:write_file(filename:absname(filename:join(["releases", "openqtt_vars"])), UpdatedVars, [
         append
     ]).
 

@@ -9,7 +9,7 @@ cd -P -- "$(dirname -- "$0")/.."
 IMAGE="${1:-}"
 
 if [ -z "$IMAGE" ]; then
-    echo "Usage: $0 <EMQX_IMAGE_TAG>"
+    echo "Usage: $0 <OPENQTT_IMAGE_TAG>"
     echo "e.g. $0 docker.io/emqx/emqx:5.0.8"
     exit 1
 fi
@@ -74,27 +74,27 @@ start_emqx_v5() {
         --ip "$IP" \
         --dns "$IP0" \
         -p "$DASHBOARD_PORT:18083" \
-        -e EMQX_NODE_NAME="emqx@${IP}" \
-        -e EMQX_LOG__CONSOLE_HANDLER__LEVEL=debug \
-        -e EMQX_NODE_COOKIE="$COOKIE" \
-        -e EMQX_cluster__discovery_strategy='dns' \
-        -e EMQX_cluster__dns__name="$DOMAIN" \
-        -e EMQX_cluster__dns__record_type="a" \
+        -e OPENQTT_NODE_NAME="emqx@${IP}" \
+        -e OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=debug \
+        -e OPENQTT_NODE_COOKIE="$COOKIE" \
+        -e OPENQTT_cluster__discovery_strategy='dns' \
+        -e OPENQTT_cluster__dns__name="$DOMAIN" \
+        -e OPENQTT_cluster__dns__record_type="a" \
         "$IMAGE"
 }
 
 ## EMQX v4 has different configuration schema:
-# EMQX_NODE_NAME="emqx@${IP}":
+# OPENQTT_NODE_NAME="emqx@${IP}":
 #   This is necessary because 4.x docker entrypoint
 #   by default uses docker container ID as node name
 #   (the part before @ of e.g. emqx@172.18.0.101)
-# EMQX_cluster__dns__app
+# OPENQTT_cluster__dns__app
 #   This must be the same as node name in 4.x
-# EMQX_cluster__discovery
-#   This in 5.0 is EMQX_cluster__discovery_strategy
-# EMQX_cluster__dns__name
+# OPENQTT_cluster__discovery
+#   This in 5.0 is OPENQTT_cluster__discovery_strategy
+# OPENQTT_cluster__dns__name
 #   The DNS domain to lookup for peer nodes
-# EMQX_cluster__dns__record_type
+# OPENQTT_cluster__dns__record_type
 #   The DNS record type. (only 'a' type is tested)
 start_emqx_v4() {
     NAME="$1"

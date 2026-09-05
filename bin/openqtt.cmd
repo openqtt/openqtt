@@ -16,7 +16,7 @@
 :: * usage - display available commands
 
 :: Set variables that describe the release
-@set rel_name=emqx
+@set rel_name=openqtt
 @set rel_vsn={{ release_version }}
 @set REL_VSN=%rel_vsn%
 @set erts_vsn={{ erts_vsn }}
@@ -45,8 +45,8 @@
 @set "rel_dir=%rel_root_dir%\releases\%rel_vsn%"
 @set "RUNNER_ROOT_DIR=%rel_root_dir%"
 :: hard code etc dir
-@set "EMQX_ETC_DIR=%rel_root_dir%\etc"
-@set "EMQX_LOG_DIR=%rel_root_dir%\log"
+@set "OPENQTT_ETC_DIR=%rel_root_dir%\etc"
+@set "OPENQTT_LOG_DIR=%rel_root_dir%\log"
 @set "etc_dir=%rel_root_dir%\etc"
 @set "lib_dir=%rel_root_dir%\lib"
 @set "emqx_conf=%etc_dir%\emqx.conf"
@@ -61,12 +61,12 @@
 @set "werl=%bindir%\werl.exe"
 @set "erl_exe=%bindir%\erl.exe"
 @set "nodetool=%rel_root_dir%\bin\nodetool"
-@set HOCON_ENV_OVERRIDE_PREFIX=EMQX_
+@set HOCON_ENV_OVERRIDE_PREFIX=OPENQTT_
 @set node_type=-name
 @set schema_mod=emqx_conf_schema
 :: no advanced DB backend for Windows
-@set EMQX_NODE__DB_BACKEND=mnesia
-@set EMQX_NODE__DB_ROLE=core
+@set OPENQTT_NODE__DB_BACKEND=mnesia
+@set OPENQTT_NODE__DB_ROLE=core
 
 :: Write the erl.ini file to set up paths relative to this script
 @call :write_ini
@@ -163,12 +163,12 @@
 @call :generate_app_config
 :: Install the service
 @set args="-boot %boot_file_name% %generated_config_args% -mnesia dir '%mnesia_dir%'"
-@set description=EMQX node %node_name% in %rootdir%
+@set description=OpenQTT node %node_name% in %rootdir%
 @if "" == "%2" (
   %erlsrv% add %service_name% %node_type% "%node_name%" -on restart -c "%description%" ^
-           -i "emqx" -w "%rootdir%" -m %erl_exe% -args %args% ^
+           -i "openqtt" -w "%rootdir%" -m %erl_exe% -args %args% ^
            -st "init:stop()."
-  sc config emqx start=delayed-auto
+  sc config openqtt start=delayed-auto
 )
 @goto :eof
 
@@ -199,8 +199,8 @@ cd /d "%rel_root_dir%"
 
 :: Start a console
 :console
-@set "EMQX_LOG__CONSOLE_HANDLER__ENABLE=true"
-@set "EMQX_LOG__FILE_HANDLERS__DEFAULT__ENABLE=false"
+@set "OPENQTT_LOG__CONSOLE_HANDLER__ENABLE=true"
+@set "OPENQTT_LOG__FILE_HANDLERS__DEFAULT__ENABLE=false"
 @call :create_mnesia_dir
 @call :generate_app_config
 @set args=%generated_config_args% -mnesia dir '%mnesia_dir%'

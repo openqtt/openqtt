@@ -7,10 +7,10 @@ MAKE_TARGET="${1:-}"
 
 case "${MAKE_TARGET}" in
     emqx-enterprise-*)
-        EMQX_NAME='emqx-enterprise'
+        OPENQTT_NAME='emqx-enterprise'
         ;;
     emqx-*)
-        EMQX_NAME='emqx'
+        OPENQTT_NAME='emqx'
         ;;
     *)
         echo "Usage $0 <PKG_TARGET>"
@@ -43,8 +43,8 @@ esac
 export DEBUG=1
 export CODE_PATH=${CODE_PATH:-"/emqx"}
 export SCRIPTS="${CODE_PATH}/scripts"
-export EMQX_NAME
-export PACKAGE_PATH="${CODE_PATH}/_packages/${EMQX_NAME}"
+export OPENQTT_NAME
+export PACKAGE_PATH="${CODE_PATH}/_packages/${OPENQTT_NAME}"
 export RELUP_PACKAGE_PATH="${CODE_PATH}/_upgrade_base"
 export PAHO_MQTT_TESTING_PATH="${PAHO_MQTT_TESTING_PATH:-/paho-mqtt-testing}"
 
@@ -62,9 +62,9 @@ else
             ;;
     esac
 fi
-PACKAGE_VERSION="$("$CODE_PATH"/pkg-vsn.sh "${EMQX_NAME}")"
-PACKAGE_VERSION_LONG="$("$CODE_PATH"/pkg-vsn.sh "${EMQX_NAME}" --long --elixir "${IS_ELIXIR}")"
-PACKAGE_NAME="${EMQX_NAME}-${PACKAGE_VERSION_LONG}"
+PACKAGE_VERSION="$("$CODE_PATH"/pkg-vsn.sh "${OPENQTT_NAME}")"
+PACKAGE_VERSION_LONG="$("$CODE_PATH"/pkg-vsn.sh "${OPENQTT_NAME}" --long --elixir "${IS_ELIXIR}")"
+PACKAGE_NAME="${OPENQTT_NAME}-${PACKAGE_VERSION_LONG}"
 PACKAGE_FILE_NAME="${PACKAGE_FILE_NAME:-${PACKAGE_NAME}.${PKG_SUFFIX}}"
 
 PACKAGE_FILE="${PACKAGE_PATH}/${PACKAGE_FILE_NAME}"
@@ -101,31 +101,31 @@ emqx_test(){
         "tar.gz")
             mkdir -p "${PACKAGE_PATH}/emqx"
             tar -C "${PACKAGE_PATH}/emqx" -zxf "${PACKAGE_PATH}/${packagename}"
-            export EMQX_ZONES__DEFAULT__MQTT__SERVER_KEEPALIVE=60
-            export EMQX_MQTT__MAX_TOPIC_ALIAS=10
-            export EMQX_LOG__CONSOLE_HANDLER__LEVEL=debug
-            export EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL=debug
+            export OPENQTT_ZONES__DEFAULT__MQTT__SERVER_KEEPALIVE=60
+            export OPENQTT_MQTT__MAX_TOPIC_ALIAS=10
+            export OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=debug
+            export OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL=debug
             # if [[ $(arch) == *arm* || $(arch) == aarch64 ]]; then
-            #     export EMQX_LISTENERS__QUIC__DEFAULT__ENABLED=false
+            #     export OPENQTT_LISTENERS__QUIC__DEFAULT__ENABLED=false
             # fi
             # sed -i '/emqx_telemetry/d' "${PACKAGE_PATH}"/emqx/data/loaded_plugins
 
-            run_test "${PACKAGE_PATH}/emqx/bin" "${PACKAGE_PATH}/emqx/log" "${PACKAGE_PATH}/emqx/releases/emqx_vars"
+            run_test "${PACKAGE_PATH}/emqx/bin" "${PACKAGE_PATH}/emqx/log" "${PACKAGE_PATH}/emqx/releases/openqtt_vars"
 
             rm -rf "${PACKAGE_PATH}"/emqx
         ;;
         "deb")
             dpkg -i "${PACKAGE_PATH}/${packagename}"
-            if [ "$(dpkg -l | grep ${EMQX_NAME} | awk '{print $1}')" != "ii" ]
+            if [ "$(dpkg -l | grep ${OPENQTT_NAME} | awk '{print $1}')" != "ii" ]
             then
                 echo "package install error"
                 exit 1
             fi
 
-            run_test "/usr/bin" "/var/log/emqx" "$(dpkg -L ${EMQX_NAME} | grep emqx_vars)"
+            run_test "/usr/bin" "/var/log/emqx" "$(dpkg -L ${OPENQTT_NAME} | grep openqtt_vars)"
 
-            dpkg -r "${EMQX_NAME}"
-            if [ "$(dpkg -l | grep ${EMQX_NAME} | awk '{print $1}')" != "rc" ]
+            dpkg -r "${OPENQTT_NAME}"
+            if [ "$(dpkg -l | grep ${OPENQTT_NAME} | awk '{print $1}')" != "rc" ]
             then
                 echo "package remove error"
                 exit 1
@@ -133,20 +133,20 @@ emqx_test(){
 
             echo "try to install again and purge while the service is running"
             dpkg -i "${PACKAGE_PATH}/${packagename}"
-            if [ "$(dpkg -l | grep ${EMQX_NAME} | awk '{print $1}')" != "ii" ]
+            if [ "$(dpkg -l | grep ${OPENQTT_NAME} | awk '{print $1}')" != "ii" ]
             then
                 echo "package install error"
                 exit 1
             fi
-            if ! /usr/bin/emqx start
+            if ! /usr/bin/openqtt start
             then
                 echo "ERROR: failed_to_start_emqx"
                 cat /var/log/emqx/erlang.log.1 || true
                 cat /var/log/emqx/emqx.log.1 || true
                 exit 1
             fi
-            /usr/bin/emqx ping
-            dpkg -P "${EMQX_NAME}"
+            /usr/bin/openqtt ping
+            dpkg -P "${OPENQTT_NAME}"
             if dpkg -l |grep -q emqx
             then
                 echo "package uninstall error"
@@ -174,15 +174,15 @@ emqx_test(){
                exit 1
             fi
             alternatives --list | grep python && alternatives --set python /usr/bin/python3
-            if ! rpm -q "${EMQX_NAME}" | grep -q "${EMQX_NAME}"; then
+            if ! rpm -q "${OPENQTT_NAME}" | grep -q "${OPENQTT_NAME}"; then
                 echo "package install error"
                 exit 1
             fi
 
-            run_test "/usr/bin" "/var/log/emqx" "$(rpm -ql ${EMQX_NAME} | grep emqx_vars)"
+            run_test "/usr/bin" "/var/log/emqx" "$(rpm -ql ${OPENQTT_NAME} | grep openqtt_vars)"
 
-            rpm -e "${EMQX_NAME}"
-            if [ "$(rpm -q ${EMQX_NAME})" != "package ${EMQX_NAME} is not installed" ];then
+            rpm -e "${OPENQTT_NAME}"
+            if [ "$(rpm -q ${OPENQTT_NAME})" != "package ${OPENQTT_NAME} is not installed" ];then
                 echo "package uninstall error"
                 exit 1
             fi
@@ -193,35 +193,35 @@ emqx_test(){
 run_test(){
     local bin_dir="$1"
     local log_dir="$2"
-    local emqx_env_vars="$3"
+    local openqtt_env_vars="$3"
     # sed -i '/emqx_telemetry/d' /var/lib/emqx/loaded_plugins
 
-    if [ -f "$emqx_env_vars" ];
+    if [ -f "$openqtt_env_vars" ];
     then
-        tee -a "$emqx_env_vars" <<EOF
-export EMQX_ZONES__DEFAULT__MQTT__SERVER_KEEPALIVE=60
-export EMQX_MQTT__MAX_TOPIC_ALIAS=10
-export EMQX_LOG__CONSOLE_HANDLER__LEVEL=debug
-export EMQX_LOG__FILE_HANDLERS__DEFAULT__LEVEL=debug
+        tee -a "$openqtt_env_vars" <<EOF
+export OPENQTT_ZONES__DEFAULT__MQTT__SERVER_KEEPALIVE=60
+export OPENQTT_MQTT__MAX_TOPIC_ALIAS=10
+export OPENQTT_LOG__CONSOLE_HANDLER__LEVEL=debug
+export OPENQTT_LOG__FILE_HANDLERS__DEFAULT__LEVEL=debug
 EOF
         ## for ARM, due to CI env issue, skip start of quic listener for the moment
-        # [[ $(arch) == *arm* || $(arch) == aarch64 ]] && tee -a "$emqx_env_vars" <<EOF
-# export EMQX_LISTENERS__QUIC__DEFAULT__ENABLED=false
+        # [[ $(arch) == *arm* || $(arch) == aarch64 ]] && tee -a "$openqtt_env_vars" <<EOF
+# export OPENQTT_LISTENERS__QUIC__DEFAULT__ENABLED=false
 # EOF
     else
-        echo "Error: cannot locate emqx_vars"
+        echo "Error: cannot locate openqtt_vars"
         exit 1
     fi
-    if ! "${bin_dir}/emqx" 'start' 'help'; then
+    if ! "${bin_dir}/openqtt" 'start' 'help'; then
         echo "ERROR: failed_to_call_help_command"
         exit 1
     fi
-    if ! "${bin_dir}/emqx" 'help'; then
+    if ! "${bin_dir}/openqtt" 'help'; then
         echo "ERROR: failed_to_call_help_command"
         exit 1
     fi
     echo "running ${packagename} start"
-    if ! "${bin_dir}/emqx" 'start'; then
+    if ! "${bin_dir}/openqtt" 'start'; then
         echo "ERROR: failed_to_start_emqx"
         cat "${log_dir}/erlang.log.1" || true
         cat "${log_dir}/emqx.log.1" || true
@@ -229,9 +229,9 @@ EOF
     fi
     "$SCRIPTS/test/emqx-smoke-test.sh" 127.0.0.1 18083
     pytest -v "${PAHO_MQTT_TESTING_PATH}"/interoperability/test_client/V5/test_connect.py::test_basic
-    "${bin_dir}/emqx" ping
+    "${bin_dir}/openqtt" ping
     echo "running ${packagename} stop"
-    if ! "${bin_dir}/emqx" 'stop'; then
+    if ! "${bin_dir}/openqtt" 'stop'; then
         echo "ERROR: failed_to_stop_emqx_with_the_stop_command"
         cat "${log_dir}/erlang.log.1" || true
         cat "${log_dir}/emqx.log.1" || true
@@ -246,23 +246,23 @@ relup_test(){
     fi
     cd "${RELUP_PACKAGE_PATH}"
     local pattern
-    pattern="$EMQX_NAME-$("$CODE_PATH"/pkg-vsn.sh "${EMQX_NAME}" --long --vsn_matcher)"
+    pattern="$OPENQTT_NAME-$("$CODE_PATH"/pkg-vsn.sh "${OPENQTT_NAME}" --long --vsn_matcher)"
     while read -r pkg; do
         packagename=$(basename "${pkg}")
         mkdir -p emqx
         tar -C emqx -zxf "$packagename"
-        if ! ./emqx/bin/emqx start; then
+        if ! ./emqx/bin/openqtt start; then
             cat emqx/log/erlang.log.1 || true
             cat emqx/log/emqx.log.1 || true
             exit 1
         fi
-        ./emqx/bin/emqx_ctl status
-        ./emqx/bin/emqx versions
+        ./emqx/bin/openqtt_ctl status
+        ./emqx/bin/openqtt versions
         cp "${PACKAGE_PATH}/${PACKAGE_NAME}.tar.gz" ./emqx/releases/
-        ./emqx/bin/emqx install "${PACKAGE_VERSION}"
-        [ "$(./emqx/bin/emqx versions | grep permanent | awk '{print $2}')" = "${PACKAGE_VERSION}" ] || exit 1
-        ./emqx/bin/emqx_ctl status
-        ./emqx/bin/emqx stop
+        ./emqx/bin/openqtt install "${PACKAGE_VERSION}"
+        [ "$(./emqx/bin/openqtt versions | grep permanent | awk '{print $2}')" = "${PACKAGE_VERSION}" ] || exit 1
+        ./emqx/bin/openqtt_ctl status
+        ./emqx/bin/openqtt stop
         rm -rf emqx
     done < <(find . -maxdepth 1 -name "${pattern}.tar.gz")
 }

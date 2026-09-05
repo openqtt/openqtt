@@ -731,9 +731,9 @@ start_peer(Name, Opts) when is_map(Opts) ->
         fun() ->
             ct:pal("~p: node data dir: ~s", [Node, NodeDataDir]),
             Envs = [
-                {"HOCON_ENV_OVERRIDE_PREFIX", "EMQX_"},
-                {"EMQX_NODE__COOKIE", Cookie},
-                {"EMQX_NODE__DATA_DIR", NodeDataDir}
+                {"HOCON_ENV_OVERRIDE_PREFIX", "OPENQTT_"},
+                {"OPENQTT_NODE__COOKIE", Cookie},
+                {"OPENQTT_NODE__DATA_DIR", NodeDataDir}
             ],
             emqx_cth_peer:start(Node, erl_flags(), Envs)
         end,

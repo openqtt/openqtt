@@ -7,9 +7,9 @@ cd -P -- "$(dirname -- "$0")/../.."
 source ./env.sh
 
 PROFILE="${PROFILE:-emqx}"
-EMQX_ROOT="${EMQX_ROOT:-_build/$PROFILE/rel/emqx}"
-EMQX_WAIT_FOR_START="${EMQX_WAIT_FOR_START:-30}"
-export EMQX_WAIT_FOR_START
+OPENQTT_ROOT="${OPENQTT_ROOT:-_build/$PROFILE/rel/openqtt}"
+OPENQTT_WAIT_FOR_START="${OPENQTT_WAIT_FOR_START:-30}"
+export OPENQTT_WAIT_FOR_START
 
 function check_dashboard_https_ssl_options_depth() {
   if [[ $1 =~ v5\.0\.25 ]]; then
@@ -17,7 +17,7 @@ function check_dashboard_https_ssl_options_depth() {
   else
     EXPECT_DEPTH=10
   fi
-  DEPTH=$("$EMQX_ROOT"/bin/emqx eval "emqx:get_config([dashboard,listeners,https,ssl_options,depth],10)")
+  DEPTH=$("$OPENQTT_ROOT"/bin/openqtt eval "emqx:get_config([dashboard,listeners,https,ssl_options,depth],10)")
   if [[ "$DEPTH" != "$EXPECT_DEPTH" ]]; then
     echo "Bad Https depth $DEPTH, expect $EXPECT_DEPTH"
     exit 1
@@ -26,9 +26,9 @@ function check_dashboard_https_ssl_options_depth() {
 
 start_emqx_with_conf() {
     echo "Starting $PROFILE with $1"
-    "$EMQX_ROOT"/bin/emqx start
+    "$OPENQTT_ROOT"/bin/openqtt start
     check_dashboard_https_ssl_options_depth "$1"
-    "$EMQX_ROOT"/bin/emqx stop
+    "$OPENQTT_ROOT"/bin/openqtt stop
 }
 
 PKG_VSN=${PKG_VSN:-$(./pkg-vsn.sh "$PROFILE")}
@@ -42,13 +42,13 @@ fi
 
 FILES=$(ls ./scripts/conf-test/old-confs/"${PREFIX}${MAJOR_VSN}"*)
 
-cp "$EMQX_ROOT"/etc/emqx.conf "$EMQX_ROOT"/etc/emqx.conf.bak
+cp "$OPENQTT_ROOT"/etc/emqx.conf "$OPENQTT_ROOT"/etc/emqx.conf.bak
 cleanup() {
-    cp "$EMQX_ROOT"/etc/emqx.conf.bak "$EMQX_ROOT"/etc/emqx.conf
+    cp "$OPENQTT_ROOT"/etc/emqx.conf.bak "$OPENQTT_ROOT"/etc/emqx.conf
 }
 trap cleanup EXIT
 
 for file in $FILES; do
-    cp "$file" "$EMQX_ROOT"/etc/emqx.conf
+    cp "$file" "$OPENQTT_ROOT"/etc/emqx.conf
     start_emqx_with_conf "$file"
 done

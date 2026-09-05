@@ -3505,9 +3505,9 @@ resolve_env(Name) ->
 
 -ifdef(TEST).
 %% when running tests, we need to mock the env variables
-special_env("EMQX_ETC_DIR") ->
+special_env("OPENQTT_ETC_DIR") ->
     {ok, filename:join([code:lib_dir(emqx), etc])};
-special_env("EMQX_LOG_DIR") ->
+special_env("OPENQTT_LOG_DIR") ->
     {ok, "log"};
 special_env(_Name) ->
     %% only in tests
@@ -3575,7 +3575,7 @@ ensure_default_listener(Map, ListenerType) ->
 cert_file(_File, client) ->
     undefined;
 cert_file(File, server) ->
-    unicode:characters_to_binary(filename:join(["${EMQX_ETC_DIR}", "certs", File])).
+    unicode:characters_to_binary(filename:join(["${OPENQTT_ETC_DIR}", "certs", File])).
 
 mqtt_converter(#{<<"keepalive_multiplier">> := Multi} = Mqtt, _Opts) ->
     case round(Multi * 100) =:= round(?DEFAULT_MULTIPLIER * 100) of

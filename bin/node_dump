@@ -7,14 +7,14 @@ echo "Running node dump in ${RUNNER_ROOT_DIR}"
 BASE_RUNNER_ROOT_DIR="${BASE_RUNNER_ROOT_DIR:-$RUNNER_ROOT_DIR}"
 
 # shellcheck disable=SC1090,SC1091
-. "$RUNNER_ROOT_DIR"/releases/emqx_vars
+. "$RUNNER_ROOT_DIR"/releases/openqtt_vars
 
 cd "${RUNNER_ROOT_DIR}"
 
-DUMP="$EMQX_LOG_DIR/node_dump_$(date +"%Y%m%d_%H%M%S").tar.gz"
-CONF_DUMP="$EMQX_LOG_DIR/conf.dump"
-LICENSE_INFO="$EMQX_LOG_DIR/license_info.txt"
-SYSINFO="$EMQX_LOG_DIR/sysinfo.txt"
+DUMP="$OPENQTT_LOG_DIR/node_dump_$(date +"%Y%m%d_%H%M%S").tar.gz"
+CONF_DUMP="$OPENQTT_LOG_DIR/conf.dump"
+LICENSE_INFO="$OPENQTT_LOG_DIR/license_info.txt"
+SYSINFO="$OPENQTT_LOG_DIR/sysinfo.txt"
 
 LOG_MAX_AGE_DAYS=3
 
@@ -27,7 +27,7 @@ collect() {
 }
 
 show_help() {
-    echo "Collect information about the EMQX node
+    echo "Collect information about the OpenQTT node
 
 USAGE:
 
@@ -49,33 +49,33 @@ done
 
 # Collect system info:
 {
-    collect "$RUNNER_BIN_DIR"/emqx_ctl broker
-    collect "$RUNNER_BIN_DIR"/emqx eval "'emqx_node_dump:sys_info()'"
+    collect "$RUNNER_BIN_DIR"/openqtt_ctl broker
+    collect "$RUNNER_BIN_DIR"/openqtt eval "'emqx_node_dump:sys_info()'"
 
     collect uname -a
     collect uptime
     collect free
     collect netstat -tnl
 
-    collect "$RUNNER_BIN_DIR"/emqx_ctl plugins list
+    collect "$RUNNER_BIN_DIR"/openqtt_ctl plugins list
 
-    collect "$RUNNER_BIN_DIR"/emqx_ctl vm all
-    collect "$RUNNER_BIN_DIR"/emqx_ctl listeners
+    collect "$RUNNER_BIN_DIR"/openqtt_ctl vm all
+    collect "$RUNNER_BIN_DIR"/openqtt_ctl listeners
 } > "${SYSINFO}"
 
 # Collect information about the configuration:
 {
-    collect "$RUNNER_BIN_DIR"/emqx eval "'emqx_node_dump:app_env_dump()'"
+    collect "$RUNNER_BIN_DIR"/openqtt eval "'emqx_node_dump:app_env_dump()'"
 } > "${CONF_DUMP}"
 
 # Collect license info:
 {
-    collect "$RUNNER_BIN_DIR"/emqx_ctl license info
+    collect "$RUNNER_BIN_DIR"/openqtt_ctl license info
 } > "${LICENSE_INFO}"
 
 # Pack files
 {
-    find "$EMQX_LOG_DIR" -mtime -"${LOG_MAX_AGE_DAYS}" \( -name '*.log.*' -or -name 'run_erl.log*' \)
+    find "$OPENQTT_LOG_DIR" -mtime -"${LOG_MAX_AGE_DAYS}" \( -name '*.log.*' -or -name 'run_erl.log*' \)
     echo "${SYSINFO}"
     echo "${CONF_DUMP}"
     echo "${LICENSE_INFO}"

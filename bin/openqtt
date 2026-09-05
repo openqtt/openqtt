@@ -58,43 +58,43 @@ usage() {
 
     case "$command" in
     start)
-        echo "Start EMQX service in daemon mode"
+        echo "Start OpenQTT service in daemon mode"
         ;;
     stop)
-        echo "Stop the running EMQX program"
+        echo "Stop the running OpenQTT program"
         ;;
     console)
-        echo "Boot up EMQX service in an interactive Erlang or Elixir shell"
+        echo "Boot up OpenQTT service in an interactive Erlang or Elixir shell"
         echo "This command needs a tty"
         ;;
     console_clean)
-        echo "This command does NOT boot up the EMQX service"
+        echo "This command does NOT boot up the OpenQTT service"
         echo "It only starts an interactive Erlang or Elixir console with all the"
-        echo "EMQX code available"
+        echo "OpenQTT code available"
         ;;
     foreground)
-        echo "Start EMQX in foreground mode without an interactive shell"
+        echo "Start OpenQTT in foreground mode without an interactive shell"
         ;;
     pid)
-        echo "Print out EMQX process identifier"
+        echo "Print out OpenQTT process identifier"
         ;;
     ping)
-        echo "Check if the EMQX node is up and running"
+        echo "Check if the OpenQTT node is up and running"
         echo "This command exit with 0 silently if node is running"
         ;;
     escript)
-        echo "Execute a escript using the Erlang runtime from EMQX package installation"
+        echo "Execute a escript using the Erlang runtime from OpenQTT package installation"
         echo "For example $progname escript /path/to/my/escript my_arg1 my_arg2"
         ;;
     attach)
-        echo "This command is applicable when EMQX is started in daemon mode."
-        echo "It attaches the current shell to EMQX's control console"
+        echo "This command is applicable when OpenQTT is started in daemon mode."
+        echo "It attaches the current shell to OpenQTT's control console"
         echo "through a named pipe."
         logwarn "try to use the safer alternative, remote_console command."
         ;;
     remote_console)
         echo "Start an interactive shell running an Erlang or Elixir node which "
-        echo "hidden-connects to the running EMQX node".
+        echo "hidden-connects to the running OpenQTT node".
         echo "This command is mostly used for troubleshooting."
         ;;
     ertspath)
@@ -102,28 +102,28 @@ usage() {
         ;;
     rpc)
         echo "Usage: $progname rpc MODULE FUNCTION [ARGS, ...]"
-        echo "Connect to the EMQX node and make an Erlang RPC"
+        echo "Connect to the OpenQTT node and make an Erlang RPC"
         echo "This command blocks for at most 60 seconds."
         echo "It exits with non-zero code in case of any RPC failure"
         echo "including connection error and runtime exception"
         ;;
     rpcterms)
         echo "Usage: $progname rpcterms MODULE FUNCTION [ARGS, ...]"
-        echo "Connect to the EMQX node and make an Erlang RPC"
+        echo "Connect to the OpenQTT node and make an Erlang RPC"
         echo "The result of the RPC call is pretty-printed as an "
         echo "Erlang term"
         ;;
     root_dir)
-        echo "Print EMQX installation root dir"
+        echo "Print OpenQTT installation root dir"
         ;;
     eval)
-        echo "Evaluate an Erlang expression in the EMQX node."
+        echo "Evaluate an Erlang expression in the OpenQTT node."
         ;;
     eval-ex)
-        echo "Evaluate an Elixir expression in the EMQX node. Only applies to Elixir node"
+        echo "Evaluate an Elixir expression in the OpenQTT node. Only applies to Elixir node"
         ;;
     versions)
-        echo "List installed EMQX release versions and their status"
+        echo "List installed OpenQTT release versions and their status"
         ;;
     unpack)
         echo "Usage: $progname unpack [VERSION]"
@@ -168,16 +168,16 @@ usage() {
         echo "                      don't make it permanent"
         ;;
     check_config)
-        echo "Checks the EMQX config without generating any files"
+        echo "Checks the OpenQTT config without generating any files"
         ;;
     *)
         echo "Usage: $progname COMMAND [help]"
         echo ''
         echo "Commonly used COMMANDs:"
-        echo "  start:      Start EMQX in daemon mode"
-        echo "  console:    Start EMQX in an interactive Erlang or Elixir shell"
-        echo "  foreground: Start EMQX in foreground mode without an interactive shell"
-        echo "  stop:       Stop the running EMQX node"
+        echo "  start:      Start OpenQTT in daemon mode"
+        echo "  console:    Start OpenQTT in an interactive Erlang or Elixir shell"
+        echo "  foreground: Start OpenQTT in foreground mode without an interactive shell"
+        echo "  stop:       Stop the running OpenQTT node"
         echo "  ctl:        Administration commands, execute '$progname ctl help' for more details"
         echo ''
         echo "More:"
@@ -193,8 +193,8 @@ usage() {
     esac
 }
 
-# We need to find real directory with emqx files on all platforms
-# even when bin/emqx is symlinked on several levels
+# We need to find real directory with openqtt files on all platforms
+# even when bin/openqtt is symlinked on several levels
 # - readlink -f works perfectly, but `-f` flag has completely different meaning in BSD version,
 #   so we can't use it universally.
 # - `stat -f%R` on MacOS does exactly what `readlink -f` does on Linux, but we can't use it
@@ -260,17 +260,17 @@ if [ -f "$RELUP_PATH/version" ]; then
     export BASE_RUNNER_ROOT_DIR
     ## only print for boot commands to avoid messing the CLI outputs
     if [ "$IS_BOOT_COMMAND" = 'yes' ]; then
-        loginfo "Loading emqx from hot-upgrade dir: $RELUP_PATH"
+        loginfo "Loading openqtt from hot-upgrade dir: $RELUP_PATH"
     fi
-    exec "$RELUP_PATH/$TARGET_VSN"/bin/emqx "$@"
+    exec "$RELUP_PATH/$TARGET_VSN"/bin/openqtt "$@"
 fi
 
 # shellcheck disable=SC1090,SC1091
-. "$RUNNER_ROOT_DIR"/releases/emqx_vars
+. "$RUNNER_ROOT_DIR"/releases/openqtt_vars
 
-# defined in emqx_vars
+# defined in openqtt_vars
 export RUNNER_ROOT_DIR
-export EMQX_ETC_DIR
+export OPENQTT_ETC_DIR
 export REL_VSN
 export SCHEMA_MOD
 export IS_ENTERPRISE
@@ -281,8 +281,8 @@ REL_DIR="$RUNNER_ROOT_DIR/releases/$REL_VSN"
 
 WHOAMI=$(whoami 2>/dev/null || id -u)
 
-# hocon try to read environment variables starting with "EMQX_"
-export HOCON_ENV_OVERRIDE_PREFIX='EMQX_'
+# hocon try to read environment variables starting with "OPENQTT_"
+export HOCON_ENV_OVERRIDE_PREFIX='OPENQTT_'
 
 export ERTS_DIR="$RUNNER_ROOT_DIR/erts-$ERTS_VSN"
 export BINDIR="$ERTS_DIR/bin"
@@ -329,7 +329,7 @@ if [ "$ES" -ne 0 ]; then
 fi
 
 # Make sure log directory exists
-mkdir -p "$EMQX_LOG_DIR"
+mkdir -p "$OPENQTT_LOG_DIR"
 
 # turn off debug as this is static
 set +x
@@ -428,7 +428,7 @@ remsh() {
 
     # shellcheck disable=SC2086
     # Setup remote shell command to control node
-    if [ "$IS_ELIXIR" = no ] || [ "${EMQX_CONSOLE_FLAVOR:-}" = 'erl' ] ; then
+    if [ "$IS_ELIXIR" = no ] || [ "${OPENQTT_CONSOLE_FLAVOR:-}" = 'erl' ] ; then
         set -- "$BINDIR/erl" "$NAME_TYPE" "$id" \
             -remsh "$NAME" -boot "$REL_DIR/start_clean" \
             -boot_var ERTS_LIB_DIR "$ERTS_LIB_DIR" \
@@ -492,9 +492,9 @@ find_emqx_process() {
     ## from BASE_RUNNER_ROOT_DIR (which is either equal to RUNNER_ROOT_DIR or a
     ## parent directory of it).
     local rootdir="${BASE_RUNNER_ROOT_DIR}"
-    if [ -n "${EMQX_NODE__NAME:-}" ]; then
+    if [ -n "${OPENQTT_NODE__NAME:-}" ]; then
         # if node name is provided, filter by node name
-        check_emqx_process "${rootdir}" | $GREP -E "\s-s?name\s${EMQX_NODE__NAME}" || true
+        check_emqx_process "${rootdir}" | $GREP -E "\s-s?name\s${OPENQTT_NODE__NAME}" || true
     else
         check_emqx_process "${rootdir}"
     fi
@@ -508,10 +508,10 @@ if [ "$IS_ENTERPRISE" = 'yes' ]; then
     CONF_KEYS+=( 'license.key' )
 fi
 
-## To be backward compatible, read and then unset EMQX_NODE_NAME
-if [ -n "${EMQX_NODE_NAME:-}" ]; then
-    export EMQX_NODE__NAME="${EMQX_NODE_NAME}"
-    unset EMQX_NODE_NAME
+## To be backward compatible, read and then unset OPENQTT_NODE_NAME
+if [ -n "${OPENQTT_NODE_NAME:-}" ]; then
+    export OPENQTT_NODE__NAME="${OPENQTT_NODE_NAME}"
+    unset OPENQTT_NODE_NAME
 fi
 
 # Turn off debug as the ps output can be quite noisy
@@ -525,18 +525,18 @@ RUNNING_NODES_COUNT="$(echo -e "$PS_LINE" | sed '/^\s*$/d' | wc -l)"
 if [ "$IS_BOOT_COMMAND" = 'yes' ]; then
     if [ "$RUNNING_NODES_COUNT" -gt 0 ] && [ "$COMMAND" != 'check_config' ]; then
         running_node_name=$(echo -e "$PS_LINE" | $GREP -oE "\s-s?name.*" | awk '{print $2}' || true)
-        if [ -n "$running_node_name" ] && [ "$running_node_name" = "${EMQX_NODE__NAME:-}" ]; then
+        if [ -n "$running_node_name" ] && [ "$running_node_name" = "${OPENQTT_NODE__NAME:-}" ]; then
             echo "Node ${running_node_name} is already running!"
             exit 1
         fi
     fi
-    [ -f "$EMQX_ETC_DIR"/emqx.conf ] || die "emqx.conf is not found in $EMQX_ETC_DIR" 1
+    [ -f "$OPENQTT_ETC_DIR"/emqx.conf ] || die "emqx.conf is not found in $OPENQTT_ETC_DIR" 1
     maybe_use_portable_dynlibs
-    if [ "${EMQX_BOOT_CONFIGS:-}" = '' ]; then
-        EMQX_BOOT_CONFIGS="$(call_hocon -s "$SCHEMA_MOD" -c "$EMQX_ETC_DIR"/emqx.conf multi_get "${CONF_KEYS[@]}")"
+    if [ "${OPENQTT_BOOT_CONFIGS:-}" = '' ]; then
+        OPENQTT_BOOT_CONFIGS="$(call_hocon -s "$SCHEMA_MOD" -c "$OPENQTT_ETC_DIR"/emqx.conf multi_get "${CONF_KEYS[@]}")"
         ## export here so the 'console' command recursively called from
         ## 'start' command does not have to parse the configs again
-        export EMQX_BOOT_CONFIGS
+        export OPENQTT_BOOT_CONFIGS
     fi
 else
     # For non-boot commands, we need below runtime facts to connect to the running node:
@@ -569,33 +569,33 @@ else
         tmp_ticktime="$(echo -e "$PS_LINE" | $GREP -oE '\s-kernel\snet_ticktime\s.+\s' | awk '{print $3}' || true)"
         tmp_datadir="$(echo -e "$PS_LINE" | $GREP -oE "\-emqx_data_dir.*" | sed -E 's#.+emqx_data_dir[[:blank:]]##g' | sed -E 's#[[:blank:]]--$##g' || true)"
         ## Make the format like what call_hocon multi_get prints out, but only need 4 args
-        EMQX_BOOT_CONFIGS="node.name=${tmp_nodename}\nnode.cookie=${tmp_cookie}\ncluster.proto_dist=${tmp_proto_dist}\nnode.dist_net_ticktime=$tmp_ticktime\nnode.data_dir=${tmp_datadir}"
+        OPENQTT_BOOT_CONFIGS="node.name=${tmp_nodename}\nnode.cookie=${tmp_cookie}\ncluster.proto_dist=${tmp_proto_dist}\nnode.dist_net_ticktime=$tmp_ticktime\nnode.data_dir=${tmp_datadir}"
     else
         if [ "$RUNNING_NODES_COUNT" -gt 1 ]; then
-            if [ -z "${EMQX_NODE__NAME:-}" ]; then
+            if [ -z "${OPENQTT_NODE__NAME:-}" ]; then
                 tmp_nodenames=$(echo -e "$PS_LINE" | $GREP -oE "\s-s?name.*" | awk '{print $2}' | tr '\n' ' ')
-                logerr "More than one EMQX node found running (root dir: ${RUNNER_ROOT_DIR})"
+                logerr "More than one OpenQTT node found running (root dir: ${RUNNER_ROOT_DIR})"
                 logerr "Running nodes: $tmp_nodenames"
-                logerr "Make sure environment variable EMQX_NODE__NAME is set to indicate for which node this command is intended."
+                logerr "Make sure environment variable OPENQTT_NODE__NAME is set to indicate for which node this command is intended."
                 exit 1
             fi
         else
-            if [ -n "${EMQX_NODE__NAME:-}" ]; then
-                die "Node $EMQX_NODE__NAME is not running?"
+            if [ -n "${OPENQTT_NODE__NAME:-}" ]; then
+                die "Node $OPENQTT_NODE__NAME is not running?"
             fi
         fi
         ## We have no choice but to read the bootstrap config (with environment overrides available in the current shell)
-        [ -f "$EMQX_ETC_DIR"/emqx.conf ] || die "emqx.conf is not found in $EMQX_ETC_DIR" 1
+        [ -f "$OPENQTT_ETC_DIR"/emqx.conf ] || die "emqx.conf is not found in $OPENQTT_ETC_DIR" 1
         maybe_use_portable_dynlibs
-        EMQX_BOOT_CONFIGS="$(call_hocon -s "$SCHEMA_MOD" -c "$EMQX_ETC_DIR"/emqx.conf multi_get "${CONF_KEYS[@]}")"
+        OPENQTT_BOOT_CONFIGS="$(call_hocon -s "$SCHEMA_MOD" -c "$OPENQTT_ETC_DIR"/emqx.conf multi_get "${CONF_KEYS[@]}")"
     fi
 fi
-logdebug "EMQX_BOOT_CONFIGS: $EMQX_BOOT_CONFIGS"
+logdebug "OPENQTT_BOOT_CONFIGS: $OPENQTT_BOOT_CONFIGS"
 [[ "$DEBUG" -gt 0 ]] && set -x
 
 get_boot_config() {
     path_to_value="$1"
-    echo -e "$EMQX_BOOT_CONFIGS" | $GREP "$path_to_value=" | sed -e "s/$path_to_value=//g" | tr -d \"
+    echo -e "$OPENQTT_BOOT_CONFIGS" | $GREP "$path_to_value=" | sed -e "s/$path_to_value=//g" | tr -d \"
 }
 
 EPMD_ARGS="${EPMD_ARGS:-"-start_epmd false -epmd_module ekka_epmd -proto_dist ekka"}"
@@ -606,7 +606,7 @@ TICKTIME="$(get_boot_config 'node.dist_net_ticktime' || echo '120')"
 export EKKA_PROTO_DIST_MOD="${PROTO_DIST:-inet_tcp}"
 if [ "$EKKA_PROTO_DIST_MOD" = 'inet_tls' ] || [ "$EKKA_PROTO_DIST_MOD" = 'inet6_tls' ]; then
     if [ "$IS_BOOT_COMMAND" = 'yes' ]; then
-        SSL_DIST_OPTFILE=${EMQX_SSL_DIST_OPTFILE:-"$EMQX_ETC_DIR/ssl_dist.conf"}
+        SSL_DIST_OPTFILE=${OPENQTT_SSL_DIST_OPTFILE:-"$OPENQTT_ETC_DIR/ssl_dist.conf"}
         case "$SSL_DIST_OPTFILE" in
             *\ *)
                 # there is unfortunately no way to support space for this option because we'd need to grep
@@ -614,8 +614,8 @@ if [ "$EKKA_PROTO_DIST_MOD" = 'inet_tls' ] || [ "$EKKA_PROTO_DIST_MOD" = 'inet6_
                 set +x
                 logerr "Got space in: $SSL_DIST_OPTFILE"
                 logerr "No space is allowed for Erlang distribution over SSL option file path."
-                logerr "Configure it from environment variable EMQX_SSL_DIST_OPTFILE."
-                logerr "Or make sure emqx root path '$RUNNER_ROOT_DIR' has no space"
+                logerr "Configure it from environment variable OPENQTT_SSL_DIST_OPTFILE."
+                logerr "Or make sure openqtt root path '$RUNNER_ROOT_DIR' has no space"
                 exit 1
                 ;;
             *)
@@ -641,14 +641,14 @@ check_license() {
         return 0
     fi
 
-    key_license="${EMQX_LICENSE__KEY:-$(get_boot_config 'license.key' || echo '')}"
+    key_license="${OPENQTT_LICENSE__KEY:-$(get_boot_config 'license.key' || echo '')}"
 
     if [[ -n "$key_license" && ("$key_license" != "undefined") ]]; then
       call_nodetool check_license_key "$key_license"
     else
       set +x
       logerr "License not found."
-      logerr "Please specify one via the EMQX_LICENSE__KEY variable"
+      logerr "Please specify one via the OPENQTT_LICENSE__KEY variable"
       logerr "or via license.key in emqx.conf."
       return 1
     fi
@@ -661,7 +661,7 @@ current_script_version() {
   curr_script=$(basename "${BASH_SOURCE[0]}")
   suffix=${curr_script#*-}
   if [[ "${suffix}" == "${curr_script}" ]]; then
-    # there's no suffix, so we're running the default `emqx` script;
+    # there's no suffix, so we're running the default `openqtt` script;
     # we'll have to trust the REL_VSN variable
     echo "$REL_VSN"
   else
@@ -725,9 +725,9 @@ locate_package() {
   vsn="$1"
 
   if [[ "${IS_ENTERPRISE}" == "yes" ]]; then
-    package_pattern="$RUNNER_ROOT_DIR/releases/emqx-enterprise-$vsn-*.tar.gz"
+    package_pattern="$RUNNER_ROOT_DIR/releases/openqtt-enterprise-$vsn-*.tar.gz"
   else
-    package_pattern="$RUNNER_ROOT_DIR/releases/emqx-$vsn-*.tar.gz"
+    package_pattern="$RUNNER_ROOT_DIR/releases/openqtt-$vsn-*.tar.gz"
   fi
 
   # shellcheck disable=SC2207,SC2086
@@ -748,20 +748,20 @@ ensure_newest_script_is_extracted() {
   local newest_vsn="$1"
   local package_path tmpdir
 
-  if does_script_version_exist "emqx" "$newest_vsn" \
+  if does_script_version_exist "openqtt" "$newest_vsn" \
      && does_script_version_exist "install_upgrade.escript" "$newest_vsn"; then
     return
   else
     package_path="$(locate_package "$newest_vsn")"
-    tmpdir="$(mktemp -dp /tmp emqx.XXXXXXXXXXX)"
+    tmpdir="$(mktemp -dp /tmp openqtt.XXXXXXXXXXX)"
 
     extract_from_package \
       "$package_path" \
       "$tmpdir" \
-      "bin/emqx-$newest_vsn" \
+      "bin/openqtt-$newest_vsn" \
       "bin/install_upgrade.escript-$newest_vsn"
 
-    cp "$tmpdir/bin/emqx-$newest_vsn" \
+    cp "$tmpdir/bin/openqtt-$newest_vsn" \
        "$tmpdir/bin/install_upgrade.escript-$newest_vsn" \
        "$RUNNER_ROOT_DIR/bin/"
 
@@ -786,9 +786,9 @@ check_config() {
     ## this command checks the configs without generating any files
     call_hocon -v \
         -s "$SCHEMA_MOD" \
-        -c "$EMQX_ETC_DIR"/base.hocon \
+        -c "$OPENQTT_ETC_DIR"/base.hocon \
         -c "$CONFIGS_DIR"/cluster.hocon \
-        -c "$EMQX_ETC_DIR"/emqx.conf \
+        -c "$OPENQTT_ETC_DIR"/emqx.conf \
         check_schema
 }
 
@@ -799,7 +799,7 @@ generate_config() {
     local node_name="$2"
     ## Delete the *.siz files first or it can't start after
     ## changing the config 'log.rotation.size'
-    rm -f "${EMQX_LOG_DIR}"/*.siz
+    rm -f "${OPENQTT_LOG_DIR}"/*.siz
 
     ## timestamp for each generation
     local NOW_TIME
@@ -810,15 +810,15 @@ generate_config() {
     ##   - etc/base.hocon
     ##   - $CONFIGS_DIR/cluster.hocon
     ##   - etc/emqx.conf
-    ##   - environment variables starts with EMQX_ e.g. EMQX_NODE__ROLE
+    ##   - environment variables starts with OPENQTT_ e.g. OPENQTT_NODE__ROLE
     ##
     ## NOTE: it's a known issue that cluster.hocon may change right after the node boots up
     ##       because it has to sync cluster.hocon from other nodes.
     call_hocon -v -t "$NOW_TIME" \
         -s "$SCHEMA_MOD" \
-        -c "$EMQX_ETC_DIR"/base.hocon \
+        -c "$OPENQTT_ETC_DIR"/base.hocon \
         -c "$CONFIGS_DIR"/cluster.hocon \
-        -c "$EMQX_ETC_DIR"/emqx.conf \
+        -c "$OPENQTT_ETC_DIR"/emqx.conf \
         -d "$DATA_DIR"/configs generate
 
     ## filenames are per-hocon convention
@@ -827,7 +827,7 @@ generate_config() {
 
     ## Merge hocon generated *.args into the vm.args
     TMP_ARG_FILE="$CONFIGS_DIR/vm.args.tmp"
-    cp "$EMQX_ETC_DIR/vm.args" "$TMP_ARG_FILE"
+    cp "$OPENQTT_ETC_DIR/vm.args" "$TMP_ARG_FILE"
     echo "" >> "$TMP_ARG_FILE"
     echo "-pa \"${REL_DIR}/consolidated\"" >> "$TMP_ARG_FILE"
     ## read lines from generated vm.<time>.args file
@@ -924,29 +924,29 @@ wait_until_return_val() {
     done
 }
 
-# First, there is EMQX_DEFAULT_LOG_HANDLER which can control the default values
+# First, there is OPENQTT_DEFAULT_LOG_HANDLER which can control the default values
 # to be used when generating configs.
 # It's set in docker entrypoint and in systemd service file.
 #
 # To be backward compatible with 4.x and v5.0.0 ~ v5.0.24/e5.0.2:
-# if EMQX_LOG__TO is set, we try to enable handlers from environment variables.
-# i.e. it overrides the default value set in EMQX_DEFAULT_LOG_HANDLER
+# if OPENQTT_LOG__TO is set, we try to enable handlers from environment variables.
+# i.e. it overrides the default value set in OPENQTT_DEFAULT_LOG_HANDLER
 tr_log_to_env() {
-    local log_to=${EMQX_LOG__TO:-undefined}
+    local log_to=${OPENQTT_LOG__TO:-undefined}
     # unset because it's unknown to 5.0
-    unset EMQX_LOG__TO
+    unset OPENQTT_LOG__TO
     case "${log_to}" in
         console)
-            export EMQX_LOG__CONSOLE__ENABLE='true'
-            export EMQX_LOG__FILE__ENABLE='false'
+            export OPENQTT_LOG__CONSOLE__ENABLE='true'
+            export OPENQTT_LOG__FILE__ENABLE='false'
             ;;
         file)
-            export EMQX_LOG__CONSOLE__ENABLE='false'
-            export EMQX_LOG__FILE__ENABLE='true'
+            export OPENQTT_LOG__CONSOLE__ENABLE='false'
+            export OPENQTT_LOG__FILE__ENABLE='true'
             ;;
         both)
-            export EMQX_LOG__CONSOLE__ENABLE='true'
-            export EMQX_LOG__FILE__ENABLE='true'
+            export OPENQTT_LOG__CONSOLE__ENABLE='true'
+            export OPENQTT_LOG__FILE__ENABLE='true'
             ;;
         default)
             # want to use config file defaults, do nothing
@@ -955,18 +955,18 @@ tr_log_to_env() {
             # value not set, do nothing
             ;;
         *)
-            logerr "Unknown environment value for EMQX_LOG__TO=${log_to} discarded"
+            logerr "Unknown environment value for OPENQTT_LOG__TO=${log_to} discarded"
             ;;
     esac
 }
 
 maybe_log_to_console() {
-    if [ "${EMQX_LOG__TO:-}" = 'default' ]; then
+    if [ "${OPENQTT_LOG__TO:-}" = 'default' ]; then
         # want to use defaults, do nothing
-        unset EMQX_LOG__TO
+        unset OPENQTT_LOG__TO
     else
         tr_log_to_env
-        export EMQX_DEFAULT_LOG_HANDLER=${EMQX_DEFAULT_LOG_HANDLER:-console}
+        export OPENQTT_DEFAULT_LOG_HANDLER=${OPENQTT_DEFAULT_LOG_HANDLER:-console}
     fi
 }
 
@@ -980,10 +980,10 @@ maybe_warn_ulimit() {
 
 ## Possible ways to configure emqx node name:
 ## 1. configure node.name in emqx.conf
-## 2. override with environment variable EMQX_NODE__NAME
+## 2. override with environment variable OPENQTT_NODE__NAME
 ## Node name is either short-name (without '@'), e.g. 'emqx'
 ## or long name (with '@') e.g. 'emqx@example.net' or 'emqx@127.0.0.1'
-NAME="${EMQX_NODE__NAME:-}"
+NAME="${OPENQTT_NODE__NAME:-}"
 if [ -z "$NAME" ]; then
     NAME="$(get_boot_config 'node.name')"
 fi
@@ -1011,23 +1011,23 @@ export ESCRIPT_NAME="$SHORT_NAME"
 PIPE_DIR="${PIPE_DIR:-/$DATA_DIR/${WHOAMI}_erl_pipes/$NAME/}"
 
 ## Resolve Erlang cookie.
-if [ -n "${EMQX_NODE_COOKIE:-}" ]; then
-    ## To be backward compatible, read and unset EMQX_NODE_COOKIE
-    export EMQX_NODE__COOKIE="${EMQX_NODE_COOKIE}"
-    unset EMQX_NODE_COOKIE
+if [ -n "${OPENQTT_NODE_COOKIE:-}" ]; then
+    ## To be backward compatible, read and unset OPENQTT_NODE_COOKIE
+    export OPENQTT_NODE__COOKIE="${OPENQTT_NODE_COOKIE}"
+    unset OPENQTT_NODE_COOKIE
 fi
-COOKIE="${EMQX_NODE__COOKIE:-}"
+COOKIE="${OPENQTT_NODE__COOKIE:-}"
 COOKIE_IN_USE="$(get_boot_config 'node.cookie')"
 if [ "$IS_BOOT_COMMAND" != 'yes' ] && [ -n "$COOKIE_IN_USE" ] && [ -n "$COOKIE" ] && [ "$COOKIE" != "$COOKIE_IN_USE" ]; then
-    die "EMQX_NODE__COOKIE is different from the cookie used by $NAME"
+    die "OPENQTT_NODE__COOKIE is different from the cookie used by $NAME"
 fi
 [ -z "$COOKIE" ] && COOKIE="$COOKIE_IN_USE"
-[ -z "$COOKIE" ] && COOKIE="$EMQX_DEFAULT_ERLANG_COOKIE"
+[ -z "$COOKIE" ] && COOKIE="$OPENQTT_DEFAULT_ERLANG_COOKIE"
 
 maybe_warn_default_cookie() {
-    if [ $IS_BOOT_COMMAND = 'yes' ] && [ "$COOKIE" = "$EMQX_DEFAULT_ERLANG_COOKIE" ]; then
+    if [ $IS_BOOT_COMMAND = 'yes' ] && [ "$COOKIE" = "$OPENQTT_DEFAULT_ERLANG_COOKIE" ]; then
         logwarn "Default (insecure) Erlang cookie is in use."
-        logwarn "Configure node.cookie in $EMQX_ETC_DIR/emqx.conf or override from environment variable EMQX_NODE__COOKIE"
+        logwarn "Configure node.cookie in $OPENQTT_ETC_DIR/emqx.conf or override from environment variable OPENQTT_NODE__COOKIE"
         logwarn "NOTE: Use the same cookie for all nodes in the cluster."
     fi
 }
@@ -1037,8 +1037,8 @@ maybe_warn_default_cookie() {
 if [[ "$IS_BOOT_COMMAND" == 'yes' && "$(get_boot_config 'node.db_backend')" == "rlog" ]]; then
     if ! (echo -e "$COMPATIBILITY_INFO" | $GREP -q 'MNESIA_OK'); then
       logwarn "DB Backend is RLOG, but an incompatible OTP version has been detected. Falling back to using Mnesia DB backend."
-      export EMQX_NODE__DB_BACKEND=mnesia
-      export EMQX_NODE__ROLE=core
+      export OPENQTT_NODE__DB_BACKEND=mnesia
+      export OPENQTT_NODE__ROLE=core
     fi
 fi
 
@@ -1047,7 +1047,7 @@ diagnose_boot_failure_and_die() {
     local app_status
     ps_line="$(find_emqx_process)"
     if [ -z "$ps_line" ]; then
-        echo "Find more information in the latest log file: ${EMQX_LOG_DIR}/erlang.log.*"
+        echo "Find more information in the latest log file: ${OPENQTT_LOG_DIR}/erlang.log.*"
         exit 1
     fi
     if ! relx_nodetool "ping" > /dev/null; then
@@ -1073,14 +1073,14 @@ pipe_shutdown() {
     fi
 }
 
-## Call nodetool to stop EMQX
+## Call nodetool to stop OpenQTT
 nodetool_shutdown() {
     # Wait for the node to completely stop...
     PID="$(relx_get_pid)"
     if ! relx_nodetool "stop"; then
         die "Graceful shutdown failed PID=[$PID]"
     fi
-    WAIT_TIME="${EMQX_WAIT_FOR_STOP:-120}"
+    WAIT_TIME="${OPENQTT_WAIT_FOR_STOP:-120}"
     if ! wait_for "$WAIT_TIME" 'is_down' "$PID"; then
         msg="dangling after ${WAIT_TIME} seconds"
         # also log to syslog
@@ -1107,7 +1107,7 @@ case "${COMMAND}" in
 
         # this flag passes down to console mode
         # so we know it's intended to be run in daemon mode
-        export _EMQX_START_DAEMON_MODE=1
+        export _OPENQTT_START_DAEMON_MODE=1
 
         case "$COMMAND" in
             start)
@@ -1135,16 +1135,16 @@ case "${COMMAND}" in
 
         mkdir -p "$PIPE_DIR"
 
-        "$BINDIR/run_erl" -daemon "$PIPE_DIR" "$EMQX_LOG_DIR" \
+        "$BINDIR/run_erl" -daemon "$PIPE_DIR" "$OPENQTT_LOG_DIR" \
                           "$(relx_start_command)"
 
-        WAIT_TIME=${EMQX_WAIT_FOR_START:-120}
+        WAIT_TIME=${OPENQTT_WAIT_FOR_START:-120}
         if wait_until_return_val "true" "$WAIT_TIME" 'relx_nodetool' \
                 'eval' 'emqx:is_running()'; then
-            echo "$EMQX_DESCRIPTION $REL_VSN is started successfully!"
+            echo "$OPENQTT_DESCRIPTION $REL_VSN is started successfully!"
             exit 0
         else
-            logerr "${EMQX_DESCRIPTION} ${REL_VSN} using node name '${NAME}' failed ${WAIT_TIME} probes."
+            logerr "${OPENQTT_DESCRIPTION} ${REL_VSN} using node name '${NAME}' failed ${WAIT_TIME} probes."
             diagnose_boot_failure_and_die
         fi
         ;;
@@ -1202,7 +1202,7 @@ case "${COMMAND}" in
         ensure_newest_script_is_extracted "$newest_vsn"
         # if we are not the newest script, run the same command from it
         if ! am_i_the_newest_script "$newest_vsn"; then
-          script_path="$(versioned_script_path emqx "$newest_vsn")"
+          script_path="$(versioned_script_path openqtt "$newest_vsn")"
           exec "$script_path" "$COMMAND" "$@"
         fi
 
@@ -1250,7 +1250,7 @@ case "${COMMAND}" in
         esac
 
         # set before generate_config
-        if [ "${_EMQX_START_DAEMON_MODE:-}" = 1 ]; then
+        if [ "${_OPENQTT_START_DAEMON_MODE:-}" = 1 ]; then
             tr_log_to_env
         else
             maybe_log_to_console
@@ -1276,7 +1276,7 @@ case "${COMMAND}" in
         # shellcheck disable=SC2086
         # Build an array of arguments to pass to exec later on
         # Build it here because this command will be used for logging.
-        if [ "$IS_ELIXIR" = no ] || [ "${EMQX_CONSOLE_FLAVOR:-}" = 'erl' ] ; then
+        if [ "$IS_ELIXIR" = no ] || [ "${OPENQTT_CONSOLE_FLAVOR:-}" = 'erl' ] ; then
             if [[ "$DEBUG" == 2 ]]; then
               INIT_DEBUG_ARG="-init_debug"
             else
@@ -1371,7 +1371,7 @@ case "${COMMAND}" in
               --erl "+S 2" \
               --rpc-eval "$NAME" "$@"
         else
-            echo "EMQX node is not an Elixir node"
+            echo "OpenQTT node is not an Elixir node"
             usage "$COMMAND"
             exit 1
         fi

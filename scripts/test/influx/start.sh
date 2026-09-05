@@ -5,7 +5,7 @@ NODE2_FQDN="emqx@emqx_2.$NET"
 NODE1_CONTAINER_NAME="emqx_1"
 NODE2_CONTAINER_NAME="emqx_2"
 INFLUXDB_CONTAINER_NAME="influxdb_server"
-export EMQX_IMAGE_TAG="${EMQX_IMAGE_TAG:-latest}"
+export OPENQTT_IMAGE_TAG="${OPENQTT_IMAGE_TAG:-latest}"
 
 cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit
 

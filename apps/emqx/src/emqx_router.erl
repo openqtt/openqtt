@@ -823,7 +823,7 @@ mk_conflict_resolution_action(State) ->
         "\n      This could take some time, depending on the number of clients and their subscriptions."
         "\n      Below conditions should be true for each of the nodes in order to proceed:"
         "\n     a) Command 'ets:info(emqx_subscriber, size)' prints `0`."
-        "\n     b) Command 'emqx ctl topics list' prints No topics.`"
+        "\n     b) Command 'openqtt ctl topics list' prints No topics.`"
         "\n   3. Upgrade the nodes to 5.6.0 or newer.",
     FormatUnkown =
         "Additionally, the following nodes were unreachable during startup: ~0p."

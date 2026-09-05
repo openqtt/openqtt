@@ -1,9 +1,9 @@
 services:
   emqx:
-    image: ${_EMQX_DOCKER_IMAGE_TAG:-emqx/emqx:latest}
+    image: ${_OPENQTT_DOCKER_IMAGE_TAG:-emqx/emqx:latest}
     environment:
-      EMQX_DASHBOARD__DEFAULT_PASSWORD: admin
-      EMQX_LOG__CONSOLE__LEVEL: debug
+      OPENQTT_DASHBOARD__DEFAULT_PASSWORD: admin
+      OPENQTT_LOG__CONSOLE__LEVEL: debug
 
   selenium:
     shm_size: '2gb'

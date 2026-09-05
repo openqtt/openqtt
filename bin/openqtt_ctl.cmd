@@ -1,4 +1,4 @@
-:: The batch file for 'emqx ctl' command
+:: The batch file for 'openqtt ctl' command
 
 @set args=%*
 
@@ -8,4 +8,4 @@
 @for %%A in ("%script_dir%\..") do @(
   set rel_root_dir=%%~fA
 )
-@%rel_root_dir%\bin\emqx.cmd ctl %args%
+@%rel_root_dir%\bin\openqtt.cmd ctl %args%

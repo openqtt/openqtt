@@ -105,7 +105,7 @@ do(Args) ->
                     ok;
                 {badrpc, timeout} ->
                     io:format(
-                        "EMQX is still shutting down, it failed to stop gracefully "
+                        "OpenQTT is still shutting down, it failed to stop gracefully "
                         "within the configured timeout of: ~ps\n",
                         [erlang:convert_time_unit(?SHUTDOWN_TIMEOUT_MS, millisecond, second)]
                     ),
@@ -197,7 +197,7 @@ stop_shutdown_status(Pid) ->
 
 shutdown_status_loop() ->
     timer:sleep(10_000),
-    io:format("EMQX is shutting down, please wait...\n", []),
+    io:format("OpenQTT is shutting down, please wait...\n", []),
     shutdown_status_loop().
 
 parse_eval_args(Args) ->

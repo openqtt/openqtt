@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # ==================================
-#  RESCUE THE UNBOOTABLE EMQX CLUSTER
+#  RESCUE THE UNBOOTABLE OpenQTT CLUSTER
 # ==================================
 
 ##  Global Vars
-# Steal from emqx_ctl
+# Steal from openqtt_ctl
 THIS_DIR="$(cd "$(dirname "$(readlink "$0" || echo "$0")")" || true; pwd -P)"
 
 usage() {
@@ -13,11 +13,11 @@ usage() {
     Script=$(basename "$0")
 
     echo "
-    RESCUE THE UNBOOTABLE EMQX CLUSTER
+    RESCUE THE UNBOOTABLE OpenQTT CLUSTER
 
     Use this script only when the entire cluster is stuck at booting & loading.
 
-    This script provides a list of methods to *hack* the DB of EMQX to bring back
+    This script provides a list of methods to *hack* the DB of OpenQTT to bring back
     the cluster back to service but MAY come with some side effects including:
 
     - Data loss
@@ -25,7 +25,7 @@ usage() {
     - Other undefined behaviors
 
     *DO NOT* use this script unless you understand the consequences.
-    *DO NOT* use this script when EMQX cluster is partitioned.
+    *DO NOT* use this script when OpenQTT cluster is partitioned.
 
     Use Case:
 
@@ -69,14 +69,14 @@ Usage:
     #   Local node will take local data as the data source for pending tables and spread the data
     #   to the other pending nodes.
     #
-    #  * Check EMQX logs to find out which remote node(s) the local node is waiting for
-    #  * To take effect, restart this EMQX node
+    #  * Check OpenQTT logs to find out which remote node(s) the local node is waiting for
+    #  * To take effect, restart this OpenQTT node
     #  * This is a node local setting
 
     $Script lie-node-down RemoteNode
 
 Tips:
-    - Override local node name with envvar: \$EMQX_NODE__NAME
+    - Override local node name with envvar: \$OPENQTT_NODE__NAME
     "
 }
 
@@ -90,7 +90,7 @@ print_pending_tables() {
                    || T <- mnesia:system_info(local_tables), unknown =:= mnesia:table_info(T, load_node) ],
                    ok
                    '
-    exec "$THIS_DIR/emqx" eval "$erl_cmd"
+    exec "$THIS_DIR/openqtt" eval "$erl_cmd"
 }
 
 print_details_per_table() {
@@ -98,7 +98,7 @@ print_details_per_table() {
                    || T <- mnesia:system_info(local_tables), unknown =:= mnesia:table_info(T, load_node) ],
                    ok
                    '
-    exec "$THIS_DIR/emqx" eval "$erl_cmd"
+    exec "$THIS_DIR/openqtt" eval "$erl_cmd"
 }
 
 force-load() {
@@ -111,7 +111,7 @@ force-load() {
                        ]
                       '
     fi
-    exec "$THIS_DIR/emqx" eval "$erl_cmd"
+    exec "$THIS_DIR/openqtt" eval "$erl_cmd"
 }
 
 remove-node() {
@@ -134,7 +134,7 @@ remove-node() {
              end
            end
         "
-    exec "$THIS_DIR/emqx" eval "$erl_cmd"
+    exec "$THIS_DIR/openqtt" eval "$erl_cmd"
 }
 
 set-master-node() {
@@ -144,13 +144,13 @@ set-master-node() {
         local erl_cmd="mnesia:set_master_nodes([]), mnesia_recover:dump_decision_tab()"
     fi
 
-    exec "$THIS_DIR/emqx" eval "$erl_cmd"
+    exec "$THIS_DIR/openqtt" eval "$erl_cmd"
 }
 
 lie-node-down() {
     if [ $# -eq 1 ]; then
         local erl_cmd="mnesia_recover:log_mnesia_down('${1}'), mnesia_recover:dump_decision_tab()"
-        exec "$THIS_DIR/emqx" eval "$erl_cmd"
+        exec "$THIS_DIR/openqtt" eval "$erl_cmd"
     else
         usage
     fi

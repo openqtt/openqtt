@@ -163,7 +163,7 @@ assert_no_excluded_deps() {
         # not currently building the profile which has apps to be excluded
         return 0
     fi
-    local rel_dir="_build/$PROFILE/rel/emqx/lib"
+    local rel_dir="_build/$PROFILE/rel/openqtt/lib"
     local excluded_apps=( "$@" )
     local found
     for app in "${excluded_apps[@]}"; do
@@ -240,7 +240,7 @@ cp_dyn_libs() {
         | sort -u)
 }
 
-## Re-pack the relx assembled .tar.gz to EMQX's package naming scheme
+## Re-pack the relx assembled .tar.gz to the package naming scheme
 ## It assumes the .tar.gz has been built -- relies on Makefile dependency
 make_tgz() {
     local pkgpath="_packages/${PROFILE}"
@@ -260,7 +260,7 @@ make_tgz() {
       # elixir does not have relup yet.
       make_rel tar
 
-      local relpath="_build/${PROFILE}/rel/emqx"
+      local relpath="_build/${PROFILE}/rel/openqtt"
       full_vsn="$(./pkg-vsn.sh "$PROFILE" --long)"
     fi
 
@@ -278,29 +278,29 @@ make_tgz() {
 
     target="${pkgpath}/${target_name}"
 
-    src_tarball="${relpath}/emqx-${PKG_VSN}.tar.gz"
-    tard="$(mktemp -d -t emqx.XXXXXXX)"
-    mkdir -p "${tard}/emqx"
+    src_tarball="${relpath}/openqtt-${PKG_VSN}.tar.gz"
+    tard="$(mktemp -d -t openqtt.XXXXXXX)"
+    mkdir -p "${tard}/openqtt"
     mkdir -p "${pkgpath}"
     if [ ! -f "$src_tarball" ]; then
         log_red "ERROR: $src_tarball is not found"
     fi
-    $TAR zxf "${src_tarball}" -C "${tard}/emqx"
-    if [ -f "${tard}/emqx/releases/${PKG_VSN}/relup" ]; then
-        ./scripts/relup-build/inject-relup.escript "${tard}/emqx/releases/${PKG_VSN}/relup"
+    $TAR zxf "${src_tarball}" -C "${tard}/openqtt"
+    if [ -f "${tard}/openqtt/releases/${PKG_VSN}/relup" ]; then
+        ./scripts/relup-build/inject-relup.escript "${tard}/openqtt/releases/${PKG_VSN}/relup"
     fi
     if [ -z "${BUILD_WITHOUT_QUIC:-}" ]; then
-        find "${tard}/emqx"/lib/quicer-*/priv/ -type f ! -name 'libquicer_nif.so' -print -delete
+        find "${tard}/openqtt"/lib/quicer-*/priv/ -type f ! -name 'libquicer_nif.so' -print -delete
     fi
     ## try to be portable for tar.gz packages.
     ## for DEB and RPM packages the dependencies are resoved by yum and apt
-    cp_dyn_libs "${tard}/emqx"
+    cp_dyn_libs "${tard}/openqtt"
     case "$SYSTEM" in
         macos*)
-            ./scripts/rel/macos-sign-binaries.sh "${tard}/emqx"
-            pushd "${tard}/emqx" >/dev/null
+            ./scripts/rel/macos-sign-binaries.sh "${tard}/openqtt"
+            pushd "${tard}/openqtt" >/dev/null
             ## create zip after change dir
-            ## to avoid creating an extra level of 'emqx' dir in the .zip file
+            ## to avoid creating an extra level of 'openqtt' dir in the .zip file
             zip -r "../${target_name}" -- * >/dev/null
             popd >/dev/null
             mv "${tard}/${target_name}" "${target}"
@@ -310,15 +310,15 @@ make_tgz() {
             ;;
         windows*)
             pushd "${tard}" >/dev/null
-            7z a "${target_name}" ./emqx/* >/dev/null
+            7z a "${target_name}" ./openqtt/* >/dev/null
             popd >/dev/null
             mv "${tard}/${target_name}" "${target}"
             sha256sum "${target}" | head -c 64 > "${target}.sha256"
             ;;
         *)
             ## create tar after change dir
-            ## to avoid creating an extra level of 'emqx' dir in the .tar.gz file
-            pushd "${tard}/emqx" >/dev/null
+            ## to avoid creating an extra level of 'openqtt' dir in the .tar.gz file
+            pushd "${tard}/openqtt" >/dev/null
             $TAR -zcf "../${target_name}" -- *
             popd >/dev/null
             mv "${tard}/${target_name}" "${target}"
@@ -355,8 +355,8 @@ make_docker() {
     # shellcheck disable=SC2155
     local ELIXIR_VSN="$(docker run --rm "${BUILD_FROM}" elixir --short-version)"
     local RUN_FROM="${RUN_FROM:-${EMQX_DOCKER_RUN_FROM}}"
-    local EMQX_DOCKERFILE="${EMQX_DOCKERFILE:-deploy/docker/Dockerfile}"
-    local EMQX_SOURCE_TYPE="${EMQX_SOURCE_TYPE:-src}"
+    local OPENQTT_DOCKERFILE="${OPENQTT_DOCKERFILE:-deploy/docker/Dockerfile}"
+    local OPENQTT_SOURCE_TYPE="${OPENQTT_SOURCE_TYPE:-src}"
     # shellcheck disable=SC2155
     local VSN_MAJOR="$(scripts/semver.sh "$PKG_VSN" --major)"
     # shellcheck disable=SC2155
@@ -375,9 +375,9 @@ make_docker() {
         DOCKER_REGISTRIES+=("$r")
     done
     local DOCKER_ORG="${DOCKER_ORG:-emqx}"
-    local EMQX_BASE_DOCKER_TAG="${DOCKER_ORG}/${PROFILE%%-elixir}"
-    local default_tag="${EMQX_BASE_DOCKER_TAG}:${PKG_VSN}${SUFFIX}"
-    local EMQX_IMAGE_TAG="${EMQX_IMAGE_TAG:-$default_tag}"
+    local OPENQTT_BASE_DOCKER_TAG="${DOCKER_ORG}/${PROFILE%%-elixir}"
+    local default_tag="${OPENQTT_BASE_DOCKER_TAG}:${PKG_VSN}${SUFFIX}"
+    local OPENQTT_IMAGE_TAG="${OPENQTT_IMAGE_TAG:-$default_tag}"
     local EDITION=Opensource
     local LICENSE='Apache-2.0'
     local PRODUCT_URL='https://www.emqx.io'
@@ -400,13 +400,13 @@ make_docker() {
     local DOCKER_BUILDX_ARGS=(
        --build-arg BUILD_FROM="${BUILD_FROM}" \
        --build-arg RUN_FROM="${RUN_FROM}" \
-       --build-arg SOURCE_TYPE="${EMQX_SOURCE_TYPE}" \
+       --build-arg SOURCE_TYPE="${OPENQTT_SOURCE_TYPE}" \
        --build-arg PROFILE="${PROFILE%%-elixir}" \
        --build-arg IS_ELIXIR="$([[ "$PROFILE" = *-elixir ]] && echo yes || echo no)" \
        --build-arg SUFFIX="${SUFFIX}" \
        --build-arg EXTRA_DEPS="${EXTRA_DEPS}" \
        --build-arg PKG_VSN="${PKG_VSN}" \
-       --file "${EMQX_DOCKERFILE}" \
+       --file "${OPENQTT_DOCKERFILE}" \
        --label org.opencontainers.image.title="${PROFILE%%-elixir}" \
        --label org.opencontainers.image.edition="${EDITION}" \
        --label org.opencontainers.image.version="${PKG_VSN}" \
@@ -422,8 +422,8 @@ make_docker() {
     )
     :> ./.emqx_docker_image_tags
     for r in "${DOCKER_REGISTRIES[@]}"; do
-        DOCKER_BUILDX_ARGS+=(--tag "$r/${EMQX_IMAGE_TAG}")
-        echo "$r/${EMQX_IMAGE_TAG}" >> ./.emqx_docker_image_tags
+        DOCKER_BUILDX_ARGS+=(--tag "$r/${OPENQTT_IMAGE_TAG}")
+        echo "$r/${OPENQTT_IMAGE_TAG}" >> ./.emqx_docker_image_tags
     done
     if [ "${DOCKER_BUILD_NOCACHE:-false}" = true ]; then
         DOCKER_BUILDX_ARGS+=(--no-cache)
@@ -433,12 +433,12 @@ make_docker() {
     fi
     if [ "${DOCKER_LATEST:-false}" = true ]; then
         for r in "${DOCKER_REGISTRIES[@]}"; do
-          DOCKER_BUILDX_ARGS+=(--tag "$r/${EMQX_BASE_DOCKER_TAG}:latest${SUFFIX}")
-          echo "$r/${EMQX_BASE_DOCKER_TAG}:latest${SUFFIX}" >> ./.emqx_docker_image_tags
-          DOCKER_BUILDX_ARGS+=(--tag "$r/${EMQX_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}${SUFFIX}")
-          echo "$r/${EMQX_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}${SUFFIX}" >> ./.emqx_docker_image_tags
-          DOCKER_BUILDX_ARGS+=(--tag "$r/${EMQX_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}.${VSN_PATCH}${SUFFIX}")
-          echo "$r/${EMQX_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}.${VSN_PATCH}${SUFFIX}" >> ./.emqx_docker_image_tags
+          DOCKER_BUILDX_ARGS+=(--tag "$r/${OPENQTT_BASE_DOCKER_TAG}:latest${SUFFIX}")
+          echo "$r/${OPENQTT_BASE_DOCKER_TAG}:latest${SUFFIX}" >> ./.emqx_docker_image_tags
+          DOCKER_BUILDX_ARGS+=(--tag "$r/${OPENQTT_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}${SUFFIX}")
+          echo "$r/${OPENQTT_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}${SUFFIX}" >> ./.emqx_docker_image_tags
+          DOCKER_BUILDX_ARGS+=(--tag "$r/${OPENQTT_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}.${VSN_PATCH}${SUFFIX}")
+          echo "$r/${OPENQTT_BASE_DOCKER_TAG}:${VSN_MAJOR}.${VSN_MINOR}.${VSN_PATCH}${SUFFIX}" >> ./.emqx_docker_image_tags
         done
     fi
     if [ "${DOCKER_PLATFORMS:-default}" != 'default' ]; then
@@ -527,22 +527,22 @@ case "$ARTIFACT" in
         ;;
     pkg)
         # this only affect build artifacts, such as schema doc
-        export EMQX_ETC_DIR='/etc/emqx/'
+        export OPENQTT_ETC_DIR='/etc/emqx/'
         if [ -z "${PKGERDIR:-}" ]; then
             log "Skipped making deb/rpm package for $SYSTEM"
             exit 0
         fi
-        export EMQX_REL_FORM="$PKGERDIR"
+        export OPENQTT_REL_FORM="$PKGERDIR"
         if [ "${IS_ELIXIR:-}" = 'yes' ]; then
             make_elixir_rel
         else
             make_rel tar
         fi
-        env EMQX_REL="$(pwd)" \
-            EMQX_BUILD="${PROFILE}" \
+        env OPENQTT_REL="$(pwd)" \
+            OPENQTT_BUILD="${PROFILE}" \
             make -C "deploy/packages/${PKGERDIR}" clean
-        env EMQX_REL="$(pwd)" \
-            EMQX_BUILD="${PROFILE}" \
+        env OPENQTT_REL="$(pwd)" \
+            OPENQTT_BUILD="${PROFILE}" \
             make -C "deploy/packages/${PKGERDIR}"
         ;;
     docker)

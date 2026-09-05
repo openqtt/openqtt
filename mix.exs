@@ -611,7 +611,7 @@ defmodule EMQXUmbrella.MixProject do
 
   defp releases() do
     [
-      emqx: fn ->
+      openqtt: fn ->
         %{
           release_type: release_type,
           package_type: package_type,
@@ -967,9 +967,9 @@ defmodule EMQXUmbrella.MixProject do
     )
 
     render_template(
-      "rel/emqx_vars",
+      "rel/openqtt_vars",
       assigns,
-      Path.join([release.path, "releases", "emqx_vars"])
+      Path.join([release.path, "releases", "openqtt_vars"])
     )
 
     vm_args_template_path =
@@ -988,8 +988,8 @@ defmodule EMQXUmbrella.MixProject do
     )
 
     for name <- [
-          "emqx",
-          "emqx_ctl"
+          "openqtt",
+          "openqtt_ctl"
         ] do
       Mix.Generator.copy_file(
         "bin/#{name}",
@@ -1006,7 +1006,7 @@ defmodule EMQXUmbrella.MixProject do
       )
     end
 
-    for base_name <- ["emqx", "emqx_ctl"],
+    for base_name <- ["openqtt", "openqtt_ctl"],
         suffix <- ["", "-#{release.version}"] do
       name = base_name <> suffix
       File.chmod!(Path.join(bin, name), 0o755)
@@ -1021,20 +1021,20 @@ defmodule EMQXUmbrella.MixProject do
     File.chmod!(Path.join(bin, "node_dump"), 0o755)
 
     Mix.Generator.copy_file(
-      "bin/emqx_cluster_rescue",
-      Path.join(bin, "emqx_cluster_rescue"),
+      "bin/openqtt_cluster_rescue",
+      Path.join(bin, "openqtt_cluster_rescue"),
       force: overwrite?
     )
 
-    File.chmod!(Path.join(bin, "emqx_cluster_rescue"), 0o755)
+    File.chmod!(Path.join(bin, "openqtt_cluster_rescue"), 0o755)
 
     Mix.Generator.copy_file(
-      "bin/emqx_fw",
-      Path.join(bin, "emqx_fw"),
+      "bin/openqtt_fw",
+      Path.join(bin, "openqtt_fw"),
       force: overwrite?
     )
 
-    File.chmod!(Path.join(bin, "emqx_fw"), 0o755)
+    File.chmod!(Path.join(bin, "openqtt_fw"), 0o755)
 
     render_template(
       "rel/BUILD_INFO",
@@ -1206,7 +1206,7 @@ defmodule EMQXUmbrella.MixProject do
         end
 
       {_, :community} ->
-        "EMQX"
+        "OpenQTT"
     end
   end
 
@@ -1318,7 +1318,7 @@ defmodule EMQXUmbrella.MixProject do
       build_info_os: os_cmd("./scripts/get-distro.sh", []),
       build_info_erlang: otp_release(),
       build_info_elixir: System.version(),
-      build_info_relform: System.get_env("EMQX_REL_FORM", "tgz")
+      build_info_relform: System.get_env("OPENQTT_REL_FORM", "tgz")
     ]
   end
 

@@ -2,7 +2,7 @@ x-default-emqx: &default-emqx
     env_file:
       - conf.cluster.env
     healthcheck:
-      test: ["CMD", "/opt/emqx/bin/emqx_ctl", "status"]
+      test: ["CMD", "/opt/openqtt/bin/openqtt_ctl", "status"]
       interval: 5s
       timeout: 25s
       retries: 5
@@ -13,9 +13,9 @@ services:
     container_name: node1.emqx.io
     restart: on-failure
     environment:
-      - "EMQX_HOST=node1.emqx.io"
-      - "EMQX_NODE__DB_BACKEND=mnesia"
-      - "EMQX_NODE__DB_ROLE=core"
+      - "OPENQTT_HOST=node1.emqx.io"
+      - "OPENQTT_NODE__DB_BACKEND=mnesia"
+      - "OPENQTT_NODE__DB_ROLE=core"
 
   emqx2:
     <<: *default-emqx
@@ -24,6 +24,6 @@ services:
       - emqx1
     restart: on-failure
     environment:
-      - "EMQX_HOST=node2.emqx.io"
-      - "EMQX_NODE__DB_BACKEND=mnesia"
-      - "EMQX_NODE__DB_ROLE=core"
+      - "OPENQTT_HOST=node2.emqx.io"
+      - "OPENQTT_NODE__DB_BACKEND=mnesia"
+      - "OPENQTT_NODE__DB_ROLE=core"

@@ -40,31 +40,31 @@
     !docker cp $CUR_PKG $NODE1:/emqx/releases/
 
     ## 1. upgrade to the new version
-    !docker exec -it $NODE1 emqx install $VSN
+    !docker exec -it $NODE1 openqtt install $VSN
     ?Made release permanent: "$VSN"
     ?SH-PROMPT
 
-    !docker exec -it $NODE1 emqx versions | grep permanent
+    !docker exec -it $NODE1 openqtt versions | grep permanent
     ?(.*)$VSN
     ?SH-PROMPT
 
     ## 2. downgrade to the old version
-    !docker exec -it $NODE1 emqx install $OLD_VSN
+    !docker exec -it $NODE1 openqtt install $OLD_VSN
     ?Made release permanent:.*
     ?SH-PROMPT
 
-    !docker exec -it $NODE1 emqx versions | grep permanent | grep -qs "$OLD_VSN"
+    !docker exec -it $NODE1 openqtt versions | grep permanent | grep -qs "$OLD_VSN"
     ?SH-PROMPT:
     !echo ==$$?==
     ?^==0==
     ?SH-PROMPT:
 
     ## 3. again, upgrade to the new version
-    !docker exec -it $NODE1 emqx install $VSN
+    !docker exec -it $NODE1 openqtt install $VSN
     ?Made release permanent: "$VSN"
     ?SH-PROMPT
 
-    !docker exec -it $NODE1 emqx versions | grep permanent
+    !docker exec -it $NODE1 openqtt versions | grep permanent
     ?(.*)$VSN
     ?SH-PROMPT
 
@@ -76,31 +76,31 @@
     !docker cp $CUR_PKG $NODE2:/emqx/releases/
 
     ## 1. upgrade to the new version
-    !docker exec -it $NODE2 emqx install $VSN
+    !docker exec -it $NODE2 openqtt install $VSN
     ?Made release permanent: "$VSN"
     ?SH-PROMPT
 
-    !docker exec -it $NODE2 emqx versions | grep permanent
+    !docker exec -it $NODE2 openqtt versions | grep permanent
     ?(.*)$VSN
     ?SH-PROMPT
 
     ## 2. downgrade to the old version
-    !docker exec -it $NODE2 emqx install $OLD_VSN
+    !docker exec -it $NODE2 openqtt install $OLD_VSN
     ?Made release permanent:.*
     ?SH-PROMPT
 
-    !docker exec -it $NODE2 emqx versions | grep permanent | grep -qs "$OLD_VSN"
+    !docker exec -it $NODE2 openqtt versions | grep permanent | grep -qs "$OLD_VSN"
     ?SH-PROMPT:
     !echo ==$$?==
     ?^==0==
     ?SH-PROMPT:
 
     ## 3. again, upgrade to the new version
-    !docker exec -it $NODE2 emqx install $VSN
+    !docker exec -it $NODE2 openqtt install $VSN
     ?Made release permanent: "$VSN"
     ?SH-PROMPT
 
-    !docker exec -it $NODE2 emqx versions | grep permanent
+    !docker exec -it $NODE2 openqtt versions | grep permanent
     ?(.*)$VSN
     ?SH-PROMPT
 

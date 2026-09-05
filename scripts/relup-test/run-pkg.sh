@@ -10,8 +10,8 @@ PKG="$1"
 mkdir -p emqx
 tar -C emqx -zxf "$PKG"
 
-ln -s "$(pwd)/emqx/bin/emqx" /usr/bin/emqx
-ln -s "$(pwd)/emqx/bin/emqx_ctl" /usr/bin/emqx_ctl
+ln -s "$(pwd)/emqx/bin/openqtt" /usr/bin/openqtt
+ln -s "$(pwd)/emqx/bin/openqtt_ctl" /usr/bin/openqtt_ctl
 
 if command -v apt; then
     apt update -y
@@ -29,4 +29,4 @@ if command -v apt; then
         zip
 fi
 
-emqx console
+openqtt console

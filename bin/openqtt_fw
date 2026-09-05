@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 # ===================================
-# Add/Del Iptables rules for the EMQX
+# Add/Del Iptables rules for the OpenQTT
 # ===================================
 
 usage() {
     local Script
     Script=$(basename "$0")
     echo "
-Firewall rules to protect EMQX listeners.
+Firewall rules to protect OpenQTT listeners.
 
 (requires root)
 
@@ -24,7 +24,7 @@ Usage:
 chain_name_tcp_syn_rate() {
     local dev=$1
     local port=$2
-    echo "EMQX_TCP_${dev}_${port}"
+    echo "OPENQTT_TCP_${dev}_${port}"
 }
 
 add_tcp_syn_rate() {

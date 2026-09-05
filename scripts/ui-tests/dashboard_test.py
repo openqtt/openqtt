@@ -37,7 +37,7 @@ def dashboard_url(dashboard_host, dashboard_port):
 
 def login(driver, dashboard_url):
     # admin is set in CI jobs, hence as default value
-    password = os.getenv("EMQX_DASHBOARD__DEFAULT_PASSWORD", "admin")
+    password = os.getenv("OPENQTT_DASHBOARD__DEFAULT_PASSWORD", "admin")
     driver.get(dashboard_url)
     assert "EMQX Dashboard" == driver.title
     assert f"{dashboard_url}/#/login?to=/dashboard/overview" == driver.current_url

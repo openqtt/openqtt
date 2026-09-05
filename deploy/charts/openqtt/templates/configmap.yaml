@@ -1,51 +1,60 @@
 {{- /*
-Every key under .Values.emqxConfig is written verbatim into this ConfigMap, which
+Every key under .Values.openqttConfig is written verbatim into this ConfigMap, which
 is world-readable to anything with get on configmaps and ends up in GitOps repos
 and backups. Refuse the two keys that must never land here; both have dedicated
 values that route to a Secret instead.
 */ -}}
-{{- range $k, $v := .Values.emqxConfig }}
+{{- range $k, $v := .Values.openqttConfig }}
 {{- /*
    Normalize exactly as the serialization below does, then compare. Checking the
    raw key is not enough: `dashboard.default_password` and `node.cookie` both
    normalize onto the forbidden keys, so a raw-key check passes them through and
    the loop writes the live credential into the ConfigMap anyway.
 */ -}}
-{{- $norm := print "EMQX_" (regexReplaceAllLiteral "\\." (regexReplaceAllLiteral "EMQX[_\\.]" (upper (trimAll " " $k)) "") "__") }}
-{{- if or (eq $norm "EMQX_NODE__COOKIE") (eq $norm "EMQX_DASHBOARD__DEFAULT_PASSWORD") }}
-{{- fail (printf "\n\nopenqtt: emqxConfig.%s (which becomes %s) would be written into a world-readable ConfigMap.\n\nUse the dedicated value instead, which routes to a Secret:\n    EMQX_NODE__COOKIE                 -> nodeCookie\n    EMQX_DASHBOARD__DEFAULT_PASSWORD  -> dashboardPassword\n" $k $norm) }}
+{{- $norm := print "OPENQTT_" (regexReplaceAllLiteral "\\." (regexReplaceAllLiteral "OPENQTT[_\\.]" (upper (trimAll " " $k)) "") "__") }}
+{{- if or (eq $norm "OPENQTT_NODE__COOKIE") (eq $norm "OPENQTT_DASHBOARD__DEFAULT_PASSWORD") }}
+{{- fail (printf "\n\nopenqtt: openqttConfig.%s (which becomes %s) would be written into a world-readable ConfigMap.\n\nUse the dedicated value instead, which routes to a Secret:\n    OPENQTT_NODE__COOKIE                 -> nodeCookie\n    OPENQTT_DASHBOARD__DEFAULT_PASSWORD  -> dashboardPassword\n" $k $norm) }}
+{{- end }}
+{{- /*
+   A key that still carries the EMQX prefix normalises to OPENQTT_EMQX_... It
+   would pass the check above, be written to the ConfigMap, and be ignored by
+   the broker: a stale cookie in a world-readable object and a config that
+   silently does nothing. No config root is named emqx, so refuse the lot.
+*/ -}}
+{{- if hasPrefix "OPENQTT_EMQX" $norm }}
+{{- fail (printf "\n\nopenqtt: openqttConfig.%s still carries the EMQX prefix.\n\nThe environment prefix is OPENQTT_ now, with no fallback. Rename the key:\n    EMQX_NODE__NAME  ->  OPENQTT_NODE__NAME\n\nCredentials do not belong here at all; use nodeCookie and dashboardPassword.\n" $k) }}
 {{- end }}
 {{- end }}
-{{- if .Values.emqxConfig }}
+{{- if .Values.openqttConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "emqx.fullname" . }}-env
+  name: {{ include "openqtt.fullname" . }}-env
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 data:
-  EMQX_NAME:  {{ .Release.Name }}
-  {{- if eq (.Values.emqxConfig.EMQX_CLUSTER__DISCOVERY_STRATEGY)  "k8s"  }}
-  EMQX_CLUSTER__K8S__APISERVER: "https://kubernetes.default.svc:443"
-  EMQX_CLUSTER__K8S__SERVICE_NAME:  {{ include "emqx.fullname" . }}-headless
-  EMQX_CLUSTER__K8S__NAMESPACE: {{ .Release.Namespace }}
-  EMQX_CLUSTER__K8S__ADDRESS_TYPE: "hostname"
-  EMQX_CLUSTER__K8S__SUFFIX: "svc.{{ .Values.clusterDomain }}"
-  {{- else if eq (.Values.emqxConfig.EMQX_CLUSTER__DISCOVERY_STRATEGY)  "dns"  }}
-  EMQX_CLUSTER__DNS__NAME: "{{  include "emqx.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
-  EMQX_CLUSTER__DNS__RECORD_TYPE: "srv"
+  OPENQTT_NAME:  {{ .Release.Name }}
+  {{- if eq (.Values.openqttConfig.OPENQTT_CLUSTER__DISCOVERY_STRATEGY)  "k8s"  }}
+  OPENQTT_CLUSTER__K8S__APISERVER: "https://kubernetes.default.svc:443"
+  OPENQTT_CLUSTER__K8S__SERVICE_NAME:  {{ include "openqtt.fullname" . }}-headless
+  OPENQTT_CLUSTER__K8S__NAMESPACE: {{ .Release.Namespace }}
+  OPENQTT_CLUSTER__K8S__ADDRESS_TYPE: "hostname"
+  OPENQTT_CLUSTER__K8S__SUFFIX: "svc.{{ .Values.clusterDomain }}"
+  {{- else if eq (.Values.openqttConfig.OPENQTT_CLUSTER__DISCOVERY_STRATEGY)  "dns"  }}
+  OPENQTT_CLUSTER__DNS__NAME: "{{  include "openqtt.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+  OPENQTT_CLUSTER__DNS__RECORD_TYPE: "srv"
   {{- end -}}
-  {{- range $index, $value := .Values.emqxConfig }}
+  {{- range $index, $value := .Values.openqttConfig }}
   {{- if $value }}
-  {{- $key := (regexReplaceAllLiteral "\\." (regexReplaceAllLiteral "EMQX[_\\.]" (upper (trimAll " " $index)) "") "__") }}
+  {{- $key := (regexReplaceAllLiteral "\\." (regexReplaceAllLiteral "OPENQTT[_\\.]" (upper (trimAll " " $index)) "") "__") }}
   {{- if or (kindIs "map" $value) (kindIs "slice" $value) }}
-  {{ print "EMQX_" $key }}: {{ tpl (printf "%q" (toJson $value)) $ }}
+  {{ print "OPENQTT_" $key }}: {{ tpl (printf "%q" (toJson $value)) $ }}
   {{- else }}
-  {{ print "EMQX_" $key }}: "{{ tpl (printf "%v" $value) $ }}"
+  {{ print "OPENQTT_" $key }}: "{{ tpl (printf "%v" $value) $ }}"
   {{- end }}
   {{- end }}
   {{- end }}

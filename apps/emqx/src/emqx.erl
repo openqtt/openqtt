@@ -295,7 +295,7 @@ mutable_certs_dir() ->
     filename:join([data_dir(), certs]).
 
 %% @doc Returns the absolute path for a PEM certificate file
-%% which is installed or provisioned by sysadmin in $EMQX_ETC_DIR/certs.
+%% which is installed or provisioned by sysadmin in $OPENQTT_ETC_DIR/certs.
 cert_file(SubPath) ->
     filename:join([etc_dir(), "certs", SubPath]).
 
@@ -306,10 +306,10 @@ etc_file(SubPath) ->
     filename:join([etc_dir(), SubPath]).
 
 etc_dir() ->
-    %% EMQX_ETC_DIR set by emqx boot script,
+    %% OPENQTT_ETC_DIR set by the openqtt boot script,
     %% if it's not set, then it must be test environment
     %% which should uses default path
-    Env = os:getenv("EMQX_ETC_DIR"),
+    Env = os:getenv("OPENQTT_ETC_DIR"),
     case Env =:= "" orelse Env =:= false of
         true -> "etc";
         false -> Env

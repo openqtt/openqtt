@@ -8,12 +8,12 @@ space := $(none) $(none)
 ## RPM does not allow '-' in version number and release string, replace with '_'
 RPM_VSN := $(subst -,_,$(PKG_VSN))
 
-EMQX_NAME=$(subst -pkg,,$(EMQX_BUILD))
+OPENQTT_NAME=$(subst -pkg,,$(OPENQTT_BUILD))
 
-TAR_PKG_DIR ?= _build/$(EMQX_BUILD)/rel/emqx
-TAR_PKG     := $(EMQX_REL)/$(TAR_PKG_DIR)/emqx-$(PKG_VSN).tar.gz
+TAR_PKG_DIR ?= _build/$(OPENQTT_BUILD)/rel/openqtt
+TAR_PKG     := $(OPENQTT_REL)/$(TAR_PKG_DIR)/openqtt-$(PKG_VSN).tar.gz
 SOURCE_PKG  := emqx-$(RPM_VSN).$(shell uname -m)
-TARGET_PKG  := $(EMQX_NAME)-$(shell $(EMQX_REL)/pkg-vsn.sh $(EMQX_NAME) --long)
+TARGET_PKG  := $(OPENQTT_NAME)-$(shell $(OPENQTT_REL)/pkg-vsn.sh $(OPENQTT_NAME) --long)
 
 # Not $(PWD) as it does not work for make -C
 CURDIR := $(shell pwd)
@@ -27,7 +27,7 @@ SERVICE_DST := %{_unitdir}/emqx.service
 all: | $(BUILT)
 	cd $(SRCDIR)
 	rpmbuild -v -bb \
-		--define "_package_name $(EMQX_NAME)" \
+		--define "_package_name $(OPENQTT_NAME)" \
 		--define "_name emqx" \
 		--define "_topdir $(TOPDIR)" \
 		--define "_version $(RPM_VSN)" \
@@ -38,10 +38,10 @@ all: | $(BUILT)
 		--define "_service_src $(SERVICE_SRC)" \
 		--define "_service_dst $(SERVICE_DST)" \
 		emqx.spec
-	mkdir -p $(EMQX_REL)/_packages/$(EMQX_NAME)
-	cp $(TOPDIR)/RPMS/$(shell uname -m)/$(SOURCE_PKG).rpm $(EMQX_REL)/_packages/$(EMQX_NAME)/$(TARGET_PKG).rpm
-	sha256sum $(EMQX_REL)/_packages/$(EMQX_NAME)/$(TARGET_PKG).rpm | head -c 64 > \
-		$(EMQX_REL)/_packages/$(EMQX_NAME)/$(TARGET_PKG).rpm.sha256
+	mkdir -p $(OPENQTT_REL)/_packages/$(OPENQTT_NAME)
+	cp $(TOPDIR)/RPMS/$(shell uname -m)/$(SOURCE_PKG).rpm $(OPENQTT_REL)/_packages/$(OPENQTT_NAME)/$(TARGET_PKG).rpm
+	sha256sum $(OPENQTT_REL)/_packages/$(OPENQTT_NAME)/$(TARGET_PKG).rpm | head -c 64 > \
+		$(OPENQTT_REL)/_packages/$(OPENQTT_NAME)/$(TARGET_PKG).rpm.sha256
 
 $(BUILT):
 	mkdir -p $(TOPDIR) $(SRCDIR) $(SRCDIR)/BUILT

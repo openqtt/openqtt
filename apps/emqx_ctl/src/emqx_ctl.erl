@@ -152,14 +152,14 @@ run_command(Cmd, Args) when is_atom(Cmd) ->
 
 -spec lookup_command(cmd()) -> {module(), atom()} | {error, any()}.
 lookup_command(eval_erl) ->
-    %% So far 'emqx ctl eval_erl Expr' is a undocumented hidden command.
+    %% So far 'openqtt ctl eval_erl Expr' is a undocumented hidden command.
     %% For backward compatibility,
     %% the documented command 'emqx eval Expr' has the expression parsed
     %% in the remsh node (nodetool).
     %%
     %% 'eval_erl' is added for two purposes
     %% 1. 'emqx eval Expr' can be audited
-    %% 2. 'emqx ctl eval_erl Expr' simplifies the scripting part
+    %% 2. 'openqtt ctl eval_erl Expr' simplifies the scripting part
     {ok, {?MODULE, eval_erl}};
 lookup_command(Cmd) when is_atom(Cmd) ->
     case is_initialized() of
@@ -183,7 +183,7 @@ help() ->
                 [] ->
                     print("No commands available.~n");
                 Cmds ->
-                    print("Usage: ~ts~n", ["emqx ctl"]),
+                    print("Usage: ~ts~n", ["openqtt ctl"]),
                     lists:foreach(fun print_usage/1, Cmds)
             end;
         false ->

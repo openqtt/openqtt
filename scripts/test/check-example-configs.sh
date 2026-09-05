@@ -33,7 +33,7 @@ prepare_erl_libs() {
 }
 
 # This is needed when checking schema
-export EMQX_ETC_DIR="apps/emqx/etc"
+export OPENQTT_ETC_DIR="apps/emqx/etc"
 
 prepare_erl_libs "_build/$PROFILE/lib"
 

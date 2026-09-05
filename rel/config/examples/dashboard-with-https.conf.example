@@ -20,13 +20,13 @@ dashboard {
             ## then the issuer's issuer certificate, and so on.
             ## Root CA certificate is optional.
             ## The path prefix (only prefix) can be an environment variable.
-            certfile = "${EMQX_ETC_DIR}/certs/cert.pem"
+            certfile = "${OPENQTT_ETC_DIR}/certs/cert.pem"
 
             ## PEM format private key
-            keyfile = "${EMQX_ETC_DIR}/certs/key.pem"
+            keyfile = "${OPENQTT_ETC_DIR}/certs/key.pem"
 
             ## Optional. When need to verify client certificates, list trusted client's root CA certificates in this file
-            # cacertfile = "${EMQX_ETC_DIR}/certs/cacert.pem"
+            # cacertfile = "${OPENQTT_ETC_DIR}/certs/cacert.pem"
 
             ## Optional. Force client to send their certificate chain during TLS handshake.
             # fail_if_no_peer_cert = true

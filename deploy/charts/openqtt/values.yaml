@@ -34,7 +34,7 @@ serviceAccount:
 
 ## Credentials. These are rendered into a chart-managed Secret and injected as
 ## environment variables AFTER the ConfigMap, so they never appear in the
-## ConfigMap and they win at runtime. Never put these keys in `emqxConfig`:
+## ConfigMap and they win at runtime. Never put these keys in `openqttConfig`:
 ## every key there is serialised verbatim into a world-readable ConfigMap.
 
 ## The Erlang distribution cookie. Every node in the cluster must share it, and
@@ -77,7 +77,7 @@ podLabels: {}
 # To redeploy a chart with existing PVC(s), the value must be set to Parallel to avoid deadlock
 podManagementPolicy: Parallel
 
-## What lives in /opt/emqx/data: the Mnesia/Mria disc tables (REST API users,
+## What lives in /opt/openqtt/data: the Mnesia/Mria disc tables (REST API users,
 ## retained messages, built-in authn/authz) and cluster.hocon, which is where
 ## every config change made through the REST API is persisted. With persistence
 ## off a rolling restart is survivable, but a full cluster stop loses all of it.
@@ -111,7 +111,7 @@ resources:
 extraVolumeMounts: []
 ## Additional volumeMounts to the default backend container.
 #  - name: my-owner-acl
-#    mountPath: /opt/emqx/etc/acl.conf
+#    mountPath: /opt/openqtt/etc/acl.conf
 #    subPath: acl.conf
 
 extraVolumes: []
@@ -119,7 +119,7 @@ extraVolumes: []
 #  - name: my-owner-acl
 #    secret:  fake-acl-conf
 
-# Containers that run before the creation of EMQX containers. They can contain utilities or setup scripts.
+# Containers that run before the creation of OpenQTT containers. They can contain utilities or setup scripts.
 initContainers: {}
   # - name: sysctl
   #   image: busybox
@@ -159,14 +159,14 @@ initContainers: {}
   #       sysctl -w net.netfilter.nf_conntrack_max=1000000
   #       sysctl -w net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
 
-## Broker configuration, as EMQX_-prefixed environment variables. Every key here
+## Broker configuration, as OPENQTT_-prefixed environment variables. Every key here
 ## is written verbatim into a ConfigMap, so it is the wrong place for secrets:
 ## put the cookie in `nodeCookie` and the API password in `dashboardPassword`.
 ## The chart refuses to render if either lands here.
 ## Configuration reference: https://docs.emqx.com/en/emqx/v5.8/configuration/configuration.html
-emqxConfig:
-  EMQX_CLUSTER__DISCOVERY_STRATEGY: "dns"
-  EMQX_DASHBOARD__DEFAULT_USERNAME: "admin"
+openqttConfig:
+  OPENQTT_CLUSTER__DISCOVERY_STRATEGY: "dns"
+  OPENQTT_DASHBOARD__DEFAULT_USERNAME: "admin"
 
 service:
   ## Service type
@@ -244,7 +244,7 @@ affinity: {}
 
 ## Spread across zones where the cluster has them. ScheduleAnyway so a single-zone
 ## or single-node cluster (kind, minikube) still schedules. The label selector is
-## not set here on purpose: the StatefulSet template computes it from `emqx.name`
+## not set here on purpose: the StatefulSet template computes it from `openqtt.name`
 ## and the release name, so it keeps matching when nameOverride is set.
 topologySpreadConstraints:
   - maxSkew: 1
