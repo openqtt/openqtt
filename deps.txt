@@ -6,7 +6,6 @@ emqx_auth_ext: none
 emqx_auth_http: all
 emqx_auth_jwt: none
 emqx_auth_kerberos: none
-emqx_auth_ldap: none
 emqx_auth_mnesia: all
 emqx_auth_mongodb: none
 emqx_auth_mysql: none

@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | --- | --- |
-| 1.x | yes |
+| 0.x | yes |
 
 OpenQTT tracks no upstream release. Fixes land in this repository and ship as a
 new tag.

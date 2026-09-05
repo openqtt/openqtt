@@ -88,10 +88,10 @@ case "${PROFILE}" in
     *)
         RELEASE_EDITION="EMQX_RELEASE_CE"
         # OpenQTT: upstream tagged community releases `v5.8.9`; this repository
-        # tags its own releases `v1.0.0` and marks the import point `emqx-v5.8.9`.
-        # Only the latter is a statement about the EMQX version inside, so only
-        # it may be compared against emqx_release.hrl below. A `v1.x` tag on HEAD
-        # is an OpenQTT release, not a claim that EMQX is 1.x.
+        # tags its own releases `v0.1.0`, `v1.2.3` and so on, and marks the import
+        # point `emqx-v5.8.9`. Only the latter is a statement about the EMQX
+        # version inside, so only it may be compared against emqx_release.hrl below.
+        # A `v*` tag on HEAD is an OpenQTT release, not a claim about the EMQX version.
         GIT_TAG_PREFIX="emqx-v"
         ;;
 esac

@@ -41,13 +41,13 @@ later.
 
 ## Running it
 
-Images are published to `ghcr.io/scadable-iot/openqtt` and a Helm chart to
-`oci://ghcr.io/scadable-iot/charts/openqtt`, both from a tagged release. Deploy
+Images are published to `ghcr.io/openqtt/openqtt` and a Helm chart to
+`oci://ghcr.io/openqtt/charts/openqtt`, both from a tagged release. Deploy
 the image by the digest recorded in the release notes. The chart's README covers
 the two values you must set before installing it.
 
 ```
-docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/scadable-iot/openqtt:1.0.0
+docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:0.1.0
 ```
 
 The version the broker reports is the EMQX version inside, `5.8.9`. OpenQTT's

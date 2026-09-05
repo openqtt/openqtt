@@ -2,13 +2,19 @@
 ## This is a YAML-formatted file.
 ## Declare variables to be passed into your templates.
 
-## It is recommended to have odd number of nodes in a cluster, otherwise the emqx cluster cannot be automatically healed in case of net-split.
+## An odd number of nodes is recommended; otherwise the cluster cannot heal
+## itself automatically after a net-split.
 replicaCount: 3
 image:
-  repository: ghcr.io/scadable-iot/openqtt
+  repository: ghcr.io/openqtt/openqtt
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  ## The image tag defaults to the CHART version (the OpenQTT version), not to
+  ## appVersion. appVersion is the EMQX version inside the image (5.8.9) and is
+  ## never published as a tag.
   tag: ""
+  ## Pin by digest instead of tag. When set, this wins over `tag`.
+  ## Example: sha256:0123abcd...
+  digest: ""
   ## Optionally specify an array of imagePullSecrets.
   ## Secrets must be manually created in the namespace.
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -26,11 +32,28 @@ serviceAccount:
   # Annotations to add to the service account
   annotations: {}
 
-# The name of a secret in the same kubernetes namespace which contains values to
-# be added to the environment (must be manually created)
-# This can be useful for passwords and logins, etc.
+## Credentials. These are rendered into a chart-managed Secret and injected as
+## environment variables AFTER the ConfigMap, so they never appear in the
+## ConfigMap and they win at runtime. Never put these keys in `emqxConfig`:
+## every key there is serialised verbatim into a world-readable ConfigMap.
 
-# envFromSecret: "emqx-secrets"
+## The Erlang distribution cookie. Every node in the cluster must share it, and
+## anything that can reach port 4370 knowing it gets a distribution connection,
+## which is remote code execution inside the broker. There is deliberately no
+## default: the chart refuses to render without it. Generate one with
+##   openssl rand -hex 32
+nodeCookie: ""
+
+## Initial password for the REST API `admin` user. Leave empty to keep the
+## upstream default of `public`, which you should only do for a throwaway
+## cluster.
+dashboardPassword: ""
+
+# The name of a secret in the same kubernetes namespace which contains values to
+# be added to the environment (must be manually created). Applied after the
+# chart-managed Secret above, so it can override anything here.
+
+# envFromSecret: "openqtt-secrets"
 
 ## Forces the recreation of pods during helm upgrades. This can be useful to update configuration values even if the container image did not change.
 recreatePods: false
@@ -54,9 +77,13 @@ podLabels: {}
 # To redeploy a chart with existing PVC(s), the value must be set to Parallel to avoid deadlock
 podManagementPolicy: Parallel
 
+## What lives in /opt/emqx/data: the Mnesia/Mria disc tables (REST API users,
+## retained messages, built-in authn/authz) and cluster.hocon, which is where
+## every config change made through the REST API is persisted. With persistence
+## off a rolling restart is survivable, but a full cluster stop loses all of it.
 persistence:
   enabled: false
-  size: 20Mi
+  size: 1Gi
   storageClassName: ""
   accessMode: ReadWriteOnce
   ## Existing PersistentVolumeClaims
@@ -64,8 +91,17 @@ persistence:
   ## So, for example, the name can depend on .Release or .Chart
   # existingClaim: ""
 
-resources: {}
-  # limits:
+## Defaults are the measured values from our own three-node deployment. With
+## `resources: {}` the pods are BestEffort: first evicted under node pressure,
+## and no CPU reservation for the BEAM schedulers.
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  # unused-example:
   #   cpu: 500m
   #   memory: 512Mi
   # requests:
@@ -123,16 +159,14 @@ initContainers: {}
   #       sysctl -w net.netfilter.nf_conntrack_max=1000000
   #       sysctl -w net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
 
-## EMQX configuration item, see the documentation (https://hub.docker.com/r/emqx/emqx)
+## Broker configuration, as EMQX_-prefixed environment variables. Every key here
+## is written verbatim into a ConfigMap, so it is the wrong place for secrets:
+## put the cookie in `nodeCookie` and the API password in `dashboardPassword`.
+## The chart refuses to render if either lands here.
+## Configuration reference: https://docs.emqx.com/en/emqx/v5.8/configuration/configuration.html
 emqxConfig:
   EMQX_CLUSTER__DISCOVERY_STRATEGY: "dns"
   EMQX_DASHBOARD__DEFAULT_USERNAME: "admin"
-  EMQX_DASHBOARD__DEFAULT_PASSWORD: "public"
-
-## EMQX Enterprise Edition requires manual creation of a Secret containing the licensed content. Write the name of Secret to the value of "emqxLicenseSecretName"
-## Example:
-##   kubectl create secret generic emqx-license-secret-name --from-file=/path/to/emqx.lic
-emqxLicenseSecretName:
 
 service:
   ## Service type
@@ -203,12 +237,23 @@ nodeSelector: {}
 
 tolerations: []
 
+## Left empty on purpose. The chart renders a soft podAntiAffinity per node and a
+## zone spread by default, with selectors computed from the release so they keep
+## matching when nameOverride is set. Setting this replaces that default outright.
 affinity: {}
 
-topologySpreadConstraints: []
+## Spread across zones where the cluster has them. ScheduleAnyway so a single-zone
+## or single-node cluster (kind, minikube) still schedules. The label selector is
+## not set here on purpose: the StatefulSet template computes it from `emqx.name`
+## and the release name, so it keeps matching when nameOverride is set.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
 
 ingress:
-  ## ingress for EMQX Dashboard
+  ## Ingress for the REST API on 18083. There is no web UI in this build, so
+  ## `/` behind this host returns 404; the useful surface is `/api/v5`.
   dashboard:
     enabled: false
     # ingressClassName: nginx
@@ -218,7 +263,7 @@ ingress:
     path: /
     pathType: ImplementationSpecific
     hosts:
-    - dashboard.emqx.local
+    - api.openqtt.local
     tls: []
   ## ingress for MQTT
   mqtt:
@@ -232,7 +277,7 @@ ingress:
     path: /
     pathType: ImplementationSpecific
     hosts:
-    - mqtt.emqx.local
+    - mqtt.openqtt.local
     tls: []
   ws:
     enabled: false
@@ -245,7 +290,7 @@ ingress:
     path: /mqtt
     pathType: ImplementationSpecific
     hosts:
-      - mqtt.emqx.local
+      - mqtt.openqtt.local
     tls: []
 
 podSecurityContext:
@@ -256,10 +301,20 @@ podSecurityContext:
   supplementalGroups:
     - 1000
 
+## These defaults satisfy the `restricted` Pod Security Standard. Without the
+## last three fields, pods are rejected outright in any namespace labelled
+## pod-security.kubernetes.io/enforce=restricted.
 containerSecurityContext:
   enabled: true
   runAsNonRoot: true
   runAsUser: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 metrics:
   enabled: false
@@ -268,7 +323,7 @@ metrics:
 ssl:
   enabled: false
   useExisting: false
-  existingName: emqx-tls
+  existingName: openqtt-tls
   dnsnames: []
   commonName:
   issuer:
@@ -279,5 +334,5 @@ ssl:
 ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb
 ##
 pdb:
-  enabled: false
+  enabled: true
   maxUnavailable: 1

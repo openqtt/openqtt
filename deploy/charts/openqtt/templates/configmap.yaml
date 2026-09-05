@@ -1,3 +1,21 @@
+{{- /*
+Every key under .Values.emqxConfig is written verbatim into this ConfigMap, which
+is world-readable to anything with get on configmaps and ends up in GitOps repos
+and backups. Refuse the two keys that must never land here; both have dedicated
+values that route to a Secret instead.
+*/ -}}
+{{- range $k, $v := .Values.emqxConfig }}
+{{- /*
+   Normalize exactly as the serialization below does, then compare. Checking the
+   raw key is not enough: `dashboard.default_password` and `node.cookie` both
+   normalize onto the forbidden keys, so a raw-key check passes them through and
+   the loop writes the live credential into the ConfigMap anyway.
+*/ -}}
+{{- $norm := print "EMQX_" (regexReplaceAllLiteral "\\." (regexReplaceAllLiteral "EMQX[_\\.]" (upper (trimAll " " $k)) "") "__") }}
+{{- if or (eq $norm "EMQX_NODE__COOKIE") (eq $norm "EMQX_DASHBOARD__DEFAULT_PASSWORD") }}
+{{- fail (printf "\n\nopenqtt: emqxConfig.%s (which becomes %s) would be written into a world-readable ConfigMap.\n\nUse the dedicated value instead, which routes to a Secret:\n    EMQX_NODE__COOKIE                 -> nodeCookie\n    EMQX_DASHBOARD__DEFAULT_PASSWORD  -> dashboardPassword\n" $k $norm) }}
+{{- end }}
+{{- end }}
 {{- if .Values.emqxConfig }}
 apiVersion: v1
 kind: ConfigMap
