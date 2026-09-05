@@ -1318,7 +1318,7 @@ defmodule EMQXUmbrella.MixProject do
       build_info_os: os_cmd("./scripts/get-distro.sh", []),
       build_info_erlang: otp_release(),
       build_info_elixir: System.version(),
-      build_info_relform: System.get_env("EMQX_REL_FORM", "tgz")
+      build_info_relform: System.get_env("OPENQTT_REL_FORM", "tgz")
     ]
   end
 
