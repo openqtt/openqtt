@@ -1,0 +1,76 @@
+# Every pull request builds the community image the same way a release does,
+# without pushing it. Thirty to forty minutes on a standard runner: EMQX is a
+# large Erlang release and the builder image alone is several gigabytes.
+name: build
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write # the builder mirror, see below
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # THE BUILDER IS A MIRROR OF UPSTREAM'S. deploy/docker/Dockerfile builds from
+  # ghcr.io/scadable-iot/emqx-builder rather than from EMQ's registry, so a
+  # build never depends on EMQ keeping an image published. This job makes sure
+  # the mirror exists before anything tries to pull it; it is a no-op once it does.
+  mirror-builder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Copy the builder image if the mirror is missing
+        run: |
+          set -euo pipefail
+          SRC="ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13"
+          DST="ghcr.io/scadable-iot/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13"
+          if docker manifest inspect "$DST" >/dev/null 2>&1; then
+            echo "mirror present: $DST"
+          else
+            docker buildx imagetools create --tag "$DST" "$SRC"
+            echo "mirrored $SRC -> $DST"
+          fi
+
+  image:
+    needs: mirror-builder
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # pkg-vsn.sh reads tags
+      - name: Make room on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h / | tail -1
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/charts/openqtt
+      - run: helm template openqtt deploy/charts/openqtt --set persistence.enabled=true >/dev/null

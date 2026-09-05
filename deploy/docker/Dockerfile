@@ -1,4 +1,7 @@
-ARG BUILD_FROM=ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13
+# THE BUILDER IS A MIRROR OF UPSTREAM'S, copied by digest into this organisation
+# so that a build never depends on EMQ keeping an image published. The release
+# workflow refreshes the mirror before it builds.
+ARG BUILD_FROM=ghcr.io/scadable-iot/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13
 ARG RUN_FROM=debian:13-slim
 ARG SOURCE_TYPE=src # tgz
 
@@ -20,6 +23,10 @@ ARG DEBUG
 
 ENV EMQX_RELUP=false
 ENV EMQX_REL_FORM='docker'
+# English descriptions are generated from this tree. The Chinese translation is
+# a build-time download from a moving branch of emqx/emqx-i18n, which makes two
+# builds of one commit differ; a release build fetches nothing it does not pin.
+ENV DOWNLOAD_I18N_TRANSLATIONS=false
 
 WORKDIR /emqx/
 

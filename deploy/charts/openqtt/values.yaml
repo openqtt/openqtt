@@ -1,11 +1,11 @@
-## Default values for emqx.
+## Default values for openqtt.
 ## This is a YAML-formatted file.
 ## Declare variables to be passed into your templates.
 
 ## It is recommended to have odd number of nodes in a cluster, otherwise the emqx cluster cannot be automatically healed in case of net-split.
 replicaCount: 3
 image:
-  repository: emqx/emqx
+  repository: ghcr.io/scadable-iot/openqtt
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""

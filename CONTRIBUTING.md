@@ -1,6 +1,8 @@
 # Contributing
 
-You are welcome to submit any bugs, issues and feature requests on this repository.
+You are welcome to submit bugs, issues and fixes on this repository. Everything
+contributed is licensed under the Apache License 2.0; code from EMQX 5.9 or later
+cannot be accepted, because it is not.
 
 ## Commit Message Guidelines
 

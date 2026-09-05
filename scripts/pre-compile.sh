@@ -8,19 +8,14 @@ set -euo pipefail
 # it might be with suffix such as -pkg etc.
 PROFILE_STR="${1}"
 
-case "$PROFILE_STR" in
-    *enterprise*)
-        dashboard_version="$EMQX_EE_DASHBOARD_VERSION"
-        ;;
-    *)
-        dashboard_version="$EMQX_DASHBOARD_VERSION"
-        ;;
-esac
-
 # ensure dir
 cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
-./scripts/get-dashboard.sh "$dashboard_version"
+# OpenQTT SHIPS NO DASHBOARD UI. Upstream downloaded a prebuilt web console here
+# from emqx/emqx-dashboard5, a repository that carries no license, so it cannot
+# be part of an Apache 2.0 distribution. The dashboard application itself, which
+# is Apache and serves the REST API on 18083, is untouched; only the static
+# files behind `/` are absent, and requests for them answer 404.
 
 # generate merged config files and English translation of the desc (desc.en.hocon)
 ./scripts/merge-config.escript
