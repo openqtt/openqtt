@@ -8,10 +8,10 @@ apiVersion: extensions/v1beta1
 {{- end }}
 kind: Ingress
 metadata:
-  name: {{ printf "%s-%s" (include "emqx.fullname" .) "dashboard" }}
+  name: {{ printf "%s-%s" (include "openqtt.fullname" .) "dashboard" }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if .Values.ingress.dashboard.annotations }}
@@ -34,11 +34,11 @@ spec:
         backend:
           {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
           service:
-            name: {{ include "emqx.fullname" $ }}
+            name: {{ include "openqtt.fullname" $ }}
             port:
               number: {{ $.Values.service.dashboard }}
           {{- else }}
-          serviceName: {{ include "emqx.fullname" $ }}
+          serviceName: {{ include "openqtt.fullname" $ }}
           servicePort: {{ $.Values.service.dashboard }}
           {{- end }}
   {{- end -}}
@@ -58,10 +58,10 @@ apiVersion: extensions/v1beta1
 {{- end }}
 kind: Ingress
 metadata:
-  name: {{ printf "%s-%s" (include "emqx.fullname" .) "mqtt" }}
+  name: {{ printf "%s-%s" (include "openqtt.fullname" .) "mqtt" }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if .Values.ingress.mqtt.annotations }}
@@ -84,11 +84,11 @@ spec:
         backend:
           {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
           service:
-            name: {{ include "emqx.fullname" $ }}
+            name: {{ include "openqtt.fullname" $ }}
             port:
               number: {{ $.Values.service.mqtt }}
           {{- else }}
-          serviceName: {{ include "emqx.fullname" $ }}
+          serviceName: {{ include "openqtt.fullname" $ }}
           servicePort: {{ $.Values.service.mqtt }}
           {{- end }}
   {{- end -}}
@@ -108,10 +108,10 @@ apiVersion: extensions/v1beta1
 {{- end }}
 kind: Ingress
 metadata:
-  name: {{ printf "%s-%s" (include "emqx.fullname" .) "ws" }}
+  name: {{ printf "%s-%s" (include "openqtt.fullname" .) "ws" }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if .Values.ingress.ws.annotations }}
@@ -134,11 +134,11 @@ spec:
         backend:
           {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
           service:
-            name: {{ include "emqx.fullname" $ }}
+            name: {{ include "openqtt.fullname" $ }}
             port:
               number: {{ $.Values.service.ws }}
           {{- else }}
-          serviceName: {{ include "emqx.fullname" $ }}
+          serviceName: {{ include "openqtt.fullname" $ }}
           servicePort: {{ $.Values.service.ws }}
           {{- end }}
   {{- end -}}

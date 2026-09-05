@@ -3,9 +3,10 @@
 Deploys OpenQTT, the Apache 2.0 continuation of EMQX 5.8, as a StatefulSet
 that clusters itself through DNS discovery on its headless Service.
 
-The chart is upstream's `emqx` chart at 5.8.9 with the name and the default
-image changed, plus the fixes in the 0.1.0 release notes. Values are documented in `values.yaml`. Template helpers keep
-their `emqx.*` names so that upstream fixes still apply cleanly.
+The chart started as upstream's `emqx` chart at 5.8.9. Values are documented in
+`values.yaml`. Everything operator-facing now reads `openqtt`: the values key is
+`openqttConfig`, broker variables carry the `OPENQTT_` prefix, and the template
+helpers are `openqtt.name`, `openqtt.fullname` and friends.
 
 ## Installing
 
@@ -34,11 +35,11 @@ cluster.
 
 Both are written to a chart-managed Secret and injected after the ConfigMap, so
 they never appear in the ConfigMap and they win at runtime. Do not put either key
-in `emqxConfig`: everything there is serialised verbatim into a world-readable
+in `openqttConfig`: everything there is serialised verbatim into a world-readable
 ConfigMap, and the chart fails the render if it sees them.
 
 If you manage secrets yourself, point `envFromSecret` at your own Secret carrying
-`EMQX_NODE__COOKIE`; that satisfies the guard and is applied last.
+`OPENQTT_NODE__COOKIE`; that satisfies the guard and is applied last.
 
 ## Pinning the image
 

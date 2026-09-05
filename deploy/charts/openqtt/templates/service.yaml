@@ -1,14 +1,14 @@
-{{- if and .Values.service.dashboardtls (empty .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND) }}
-{{- fail "\n\nopenqtt: service.dashboardtls is set but the broker has no HTTPS dashboard listener.\n\nThe Service would publish a port with no matching container port, so it would\nsilently have no endpoints. Set both, or neither:\n    --set service.dashboardtls=18084 \\\n    --set emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND=18084\n" }}
+{{- if and .Values.service.dashboardtls (empty .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTPS__BIND) }}
+{{- fail "\n\nopenqtt: service.dashboardtls is set but the broker has no HTTPS dashboard listener.\n\nThe Service would publish a port with no matching container port, so it would\nsilently have no endpoints. Set both, or neither:\n    --set service.dashboardtls=18084 \\\n    --set openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTPS__BIND=18084\n" }}
 {{- end }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "emqx.fullname" . }}
+  name: {{ include "openqtt.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if .Values.service.labels }}
@@ -95,18 +95,18 @@ spec:
     {{- end }}
   {{- end }}
   selector:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "emqx.fullname" . }}-headless
+  name: {{ include "openqtt.fullname" . }}-headless
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
@@ -140,5 +140,5 @@ spec:
     protocol: TCP
     targetPort: ekka
   selector:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

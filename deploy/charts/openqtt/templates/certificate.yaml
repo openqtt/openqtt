@@ -3,9 +3,9 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "emqx.fullname" . }}-tls
+  name: {{ include "openqtt.fullname" . }}-tls
 spec:
-  secretName: {{ include "emqx.fullname" . }}-tls
+  secretName: {{ include "openqtt.fullname" . }}-tls
   issuerRef:
     name: {{ default "letsencrypt-staging" .Values.ssl.issuer.name }}
     kind: {{ default "ClusterIssuer" .Values.ssl.issuer.kind }}

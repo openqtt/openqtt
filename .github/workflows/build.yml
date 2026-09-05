@@ -76,7 +76,7 @@ jobs:
       # one. This value is a test fixture and never reaches a published artifact.
       - run: helm lint deploy/charts/openqtt --set nodeCookie=ci-not-a-real-cookie
       - run: helm template openqtt deploy/charts/openqtt --set nodeCookie=ci-not-a-real-cookie --set persistence.enabled=true >/dev/null
-      - name: The chart must refuse an unset cookie and a cookie in emqxConfig
+      - name: The chart must refuse an unset cookie and a cookie in openqttConfig
         run: |
           set -euo pipefail
           if helm template openqtt deploy/charts/openqtt >/dev/null 2>&1; then
@@ -84,7 +84,7 @@ jobs:
             exit 1
           fi
           if helm template openqtt deploy/charts/openqtt \
-              --set nodeCookie=x --set emqxConfig.EMQX_NODE__COOKIE=x >/dev/null 2>&1; then
+              --set nodeCookie=x --set openqttConfig.OPENQTT_NODE__COOKIE=x >/dev/null 2>&1; then
             echo "chart let a cookie into the ConfigMap" >&2
             exit 1
           fi

@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "emqx.fullname" . }}
+  name: {{ include "openqtt.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
-  serviceName: {{ include "emqx.fullname" . }}-headless
+  serviceName: {{ include "openqtt.fullname" . }}-headless
   podManagementPolicy: {{ .Values.podManagementPolicy }}
   {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
   volumeClaimTemplates:
     - metadata:
-        name: emqx-data
+        name: openqtt-data
         namespace: {{ .Release.Namespace }}
         labels:
-          app.kubernetes.io/name: {{ include "emqx.name" . }}
+          app.kubernetes.io/name: {{ include "openqtt.name" . }}
           app.kubernetes.io/instance: {{ .Release.Name }}
           app.kubernetes.io/managed-by: {{ .Release.Service }}
       spec:
@@ -38,7 +38,7 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "emqx.name" . }}
+      app.kubernetes.io/name: {{ include "openqtt.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
@@ -46,9 +46,9 @@ spec:
       {{- with .Values.podLabels }}
           {{- toYaml . | nindent 8 }}
       {{- end }}
-        app: {{ include "emqx.name" . }}
+        app: {{ include "openqtt.name" . }}
         version: {{ .Chart.Version }}
-        app.kubernetes.io/name: {{ include "emqx.name" . }}
+        app.kubernetes.io/name: {{ include "openqtt.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
       {{- with .Values.podAnnotations }}
@@ -57,7 +57,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | quote }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum | quote }}
     spec:
-      serviceAccountName: {{ include "emqx.serviceAccountName" . }}
+      serviceAccountName: {{ include "openqtt.serviceAccountName" . }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
@@ -65,13 +65,13 @@ spec:
       {{- if .Values.ssl.enabled }}
       - name: ssl-cert
         secret:
-          secretName: {{ include "emqx.ssl.secretName" . }}
+          secretName: {{ include "openqtt.ssl.secretName" . }}
       {{- end }}
       {{- if not .Values.persistence.enabled }}
-      - name: emqx-data
+      - name: openqtt-data
         emptyDir: {}
       {{- else if .Values.persistence.existingClaim }}
-      - name: emqx-data
+      - name: openqtt-data
         persistentVolumeClaim:
         {{- with .Values.persistence.existingClaim }}
           claimName: {{ tpl . $ }}
@@ -94,7 +94,7 @@ spec:
       {{- end }}
       {{- end }}
       containers:
-        - name: emqx
+        - name: openqtt
           image: "{{ .Values.image.repository }}{{ if .Values.image.digest }}@{{ .Values.image.digest }}{{ else }}:{{ .Values.image.tag | default .Chart.Version }}{{ end }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
@@ -102,18 +102,18 @@ spec:
           {{- end }}
           ports:
           - name: mqtt
-            containerPort: {{ splitList ":" ( .Values.emqxConfig.EMQX_LISTENERS__TCP__DEFAULT__BIND | default "1883" ) | last }}
+            containerPort: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_LISTENERS__TCP__DEFAULT__BIND | default "1883" ) | last }}
           - name: mqttssl
-            containerPort: {{ splitList ":" ( .Values.emqxConfig.EMQX_LISTENERS__SSL__DEFAULT__BIND | default "8883" ) | last }}
+            containerPort: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_LISTENERS__SSL__DEFAULT__BIND | default "8883" ) | last }}
           - name: ws
-            containerPort: {{ splitList ":" ( .Values.emqxConfig.EMQX_LISTENERS__WS__DEFAULT__BIND | default "8083" ) | last }}
+            containerPort: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_LISTENERS__WS__DEFAULT__BIND | default "8083" ) | last }}
           - name: wss
-            containerPort: {{ splitList ":" ( .Values.emqxConfig.EMQX_LISTENERS__WSS__DEFAULT__BIND | default "8084" ) | last }}
+            containerPort: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_LISTENERS__WSS__DEFAULT__BIND | default "8084" ) | last }}
           - name: dashboard
-            containerPort: {{ splitList ":" ( .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
-          {{- if not (empty .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND) }}
+            containerPort: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
+          {{- if not (empty .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTPS__BIND) }}
           - name: dashboardtls
-            containerPort: {{ splitList ":" .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND | last }}
+            containerPort: {{ splitList ":" .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTPS__BIND | last }}
           {{- end }}
           - name: ekka
             containerPort: 4370
@@ -125,13 +125,13 @@ spec:
               fieldRef:
                 apiVersion: v1
                 fieldPath: metadata.name
-          - name: EMQX_HOST
-            value: $(POD_NAME).{{ include "emqx.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+          - name: OPENQTT_HOST
+            value: $(POD_NAME).{{ include "openqtt.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local
           envFrom:
             - configMapRef:
-                name: {{ include "emqx.fullname" . }}-env
+                name: {{ include "openqtt.fullname" . }}-env
             - secretRef:
-                name: {{ include "emqx.fullname" . }}-credentials
+                name: {{ include "openqtt.fullname" . }}-credentials
           {{- if .Values.envFromSecret }}
             - secretRef:
                 name: {{ .Values.envFromSecret }}
@@ -139,8 +139,8 @@ spec:
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           volumeMounts:
-          - name: emqx-data
-            mountPath: "/opt/emqx/data"
+          - name: openqtt-data
+            mountPath: "/opt/openqtt/data"
           {{- if .Values.ssl.enabled }}
           - name: ssl-cert
             mountPath: /tmp/ssl
@@ -152,14 +152,14 @@ spec:
           readinessProbe:
             httpGet:
               path: /status
-              port: {{ splitList ":" ( .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
+              port: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /status
-              port: {{ splitList ":" ( .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
+              port: {{ splitList ":" ( .Values.openqttConfig.OPENQTT_DASHBOARD__LISTENERS__HTTP__BIND | default "18083" ) | last }}
             initialDelaySeconds: 60
             periodSeconds: 30
             failureThreshold: 10
@@ -174,7 +174,7 @@ spec:
       {{- /*
          Soft anti-affinity so a three node cluster does not land on one node.
          The selector has to be built here rather than in values.yaml: the pod
-         labels follow `emqx.name` and the release name, so a hardcoded default
+         labels follow `openqtt.name` and the release name, so a hardcoded default
          in values.yaml matches nothing as soon as nameOverride is set, and the
          spreading silently stops happening.
       */}}
@@ -186,7 +186,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
                 labelSelector:
                   matchLabels:
-                    app.kubernetes.io/name: {{ include "emqx.name" . }}
+                    app.kubernetes.io/name: {{ include "openqtt.name" . }}
                     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- end }}
     {{- with .Values.tolerations }}
@@ -201,7 +201,7 @@ spec:
           whenUnsatisfiable: {{ .whenUnsatisfiable }}
           labelSelector:
             matchLabels:
-              app.kubernetes.io/name: {{ include "emqx.name" $ }}
+              app.kubernetes.io/name: {{ include "openqtt.name" $ }}
               app.kubernetes.io/instance: {{ $.Release.Name }}
         {{- if .minDomains }}
           minDomains: {{ .minDomains }}

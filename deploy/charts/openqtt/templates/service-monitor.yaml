@@ -2,11 +2,11 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "emqx.fullname" . }}
+  name: {{ include "openqtt.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   {{- if .Values.service.labels }}
@@ -27,10 +27,10 @@ spec:
         - prometheus
     basicAuth:
       password:
-        name: {{ include "emqx.fullname" . }}-basic-auth
+        name: {{ include "openqtt.fullname" . }}-basic-auth
         key: password
       username:
-        name: {{ include "emqx.fullname" . }}-basic-auth
+        name: {{ include "openqtt.fullname" . }}-basic-auth
         key: username
   jobLabel: {{ .Release.Name }}-scraping
   namespaceSelector:
@@ -38,5 +38,5 @@ spec:
       -  {{ .Release.Namespace }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "emqx.name" . }}
+      app.kubernetes.io/name: {{ include "openqtt.name" . }}
 {{- end }}

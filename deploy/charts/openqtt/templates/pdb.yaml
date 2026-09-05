@@ -2,17 +2,17 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "emqx.fullname" . }}-pdb
+  name: {{ include "openqtt.fullname" . }}-pdb
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ include "emqx.name" . }}
-    helm.sh/chart: {{ include "emqx.chart" . }}
+    app.kubernetes.io/name: {{ include "openqtt.name" . }}
+    helm.sh/chart: {{ include "openqtt.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   maxUnavailable: {{ .Values.pdb.maxUnavailable }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "emqx.name" . }}
+      app.kubernetes.io/name: {{ include "openqtt.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
