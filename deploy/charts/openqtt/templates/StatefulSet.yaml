@@ -167,9 +167,27 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-    {{- with .Values.affinity }}
+    {{- if .Values.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.affinity | nindent 8 }}
+    {{- else }}
+      {{- /*
+         Soft anti-affinity so a three node cluster does not land on one node.
+         The selector has to be built here rather than in values.yaml: the pod
+         labels follow `emqx.name` and the release name, so a hardcoded default
+         in values.yaml matches nothing as soon as nameOverride is set, and the
+         spreading silently stops happening.
+      */}}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: {{ include "emqx.name" . }}
+                    app.kubernetes.io/instance: {{ .Release.Name }}
     {{- end }}
     {{- with .Values.tolerations }}
       tolerations:

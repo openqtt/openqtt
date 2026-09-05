@@ -237,28 +237,19 @@ nodeSelector: {}
 
 tolerations: []
 
-## Soft anti-affinity: keep the brokers on separate nodes where the scheduler
-## can, but do not block scheduling if it cannot. A chart that claims a three
-## node cluster should not silently put all three on one node.
-affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          topologyKey: kubernetes.io/hostname
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: openqtt
+## Left empty on purpose. The chart renders a soft podAntiAffinity per node and a
+## zone spread by default, with selectors computed from the release so they keep
+## matching when nameOverride is set. Setting this replaces that default outright.
+affinity: {}
 
-## Spread across zones where the cluster has them. ScheduleAnyway so a
-## single-zone or single-node cluster (kind, minikube) still schedules.
+## Spread across zones where the cluster has them. ScheduleAnyway so a single-zone
+## or single-node cluster (kind, minikube) still schedules. The label selector is
+## not set here on purpose: the StatefulSet template computes it from `emqx.name`
+## and the release name, so it keeps matching when nameOverride is set.
 topologySpreadConstraints:
   - maxSkew: 1
     topologyKey: topology.kubernetes.io/zone
     whenUnsatisfiable: ScheduleAnyway
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: openqtt
 
 ingress:
   ## Ingress for the REST API on 18083. There is no web UI in this build, so
