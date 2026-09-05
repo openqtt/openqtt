@@ -1,3 +1,6 @@
+{{- if and .Values.service.dashboardtls (empty .Values.emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND) }}
+{{- fail "\n\nopenqtt: service.dashboardtls is set but the broker has no HTTPS dashboard listener.\n\nThe Service would publish a port with no matching container port, so it would\nsilently have no endpoints. Set both, or neither:\n    --set service.dashboardtls=18084 \\\n    --set emqxConfig.EMQX_DASHBOARD__LISTENERS__HTTPS__BIND=18084\n" }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:

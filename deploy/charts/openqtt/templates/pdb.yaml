@@ -1,4 +1,4 @@
-{{- if and (.Values.pdb.enabled) (.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget") }}
+{{- if .Values.pdb.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
