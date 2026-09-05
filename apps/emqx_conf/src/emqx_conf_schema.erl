@@ -1251,7 +1251,7 @@ tr_gen_rpc_ssl_options(Conf) ->
     [{ciphers, Ciphers}, {versions, Versions}].
 
 tr_config_files(_Conf) ->
-    case os:getenv("EMQX_ETC_DIR") of
+    case os:getenv("OPENQTT_ETC_DIR") of
         false ->
             %% testing, or running emqx app as deps
             [filename:join([code:lib_dir(emqx), "etc", "emqx.conf"])];
@@ -1288,7 +1288,7 @@ log_handler_common_confs(Handler, Default) ->
             console -> ["console", "both"];
             file -> ["file", "both", "", false]
         end,
-    EnvValue = os:getenv("EMQX_DEFAULT_LOG_HANDLER"),
+    EnvValue = os:getenv("OPENQTT_DEFAULT_LOG_HANDLER"),
     Enable = lists:member(EnvValue, EnableValues),
     LevelDesc = maps:get(level_desc, Default, "common_handler_level"),
     EnableImportance =
@@ -1426,7 +1426,7 @@ log_handler_common_confs(Handler, Default) ->
     ].
 
 crash_dump_file_default() ->
-    case os:getenv("EMQX_LOG_DIR") of
+    case os:getenv("OPENQTT_LOG_DIR") of
         false ->
             %% testing, or running emqx app as deps
             <<"log/erl_crash.dump">>;
@@ -1580,7 +1580,7 @@ maybe_subst_log_dir("${" ++ _ = Dir, Name) ->
     %% the original path is already using environment variable
     filename:join([Dir, Name]);
 maybe_subst_log_dir(Dir, Name) ->
-    Env = os:getenv("EMQX_LOG_DIR"),
+    Env = os:getenv("OPENQTT_LOG_DIR"),
     IsEnvSet = (Env =/= false andalso Env =/= ""),
     case Env =:= Dir of
         true ->

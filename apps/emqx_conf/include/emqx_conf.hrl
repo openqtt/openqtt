@@ -38,7 +38,7 @@
 -define(SUGGESTION(Node),
     lists:flatten(
         io_lib:format(
-            "run `./bin/emqx_ctl conf cluster_sync fix`"
+            "run `./bin/openqtt ctl conf cluster_sync fix`"
             " on ~p(config leader) to force sync the configs, "
             "if this node has been lagging for more than 3 minutes.",
             [Node]

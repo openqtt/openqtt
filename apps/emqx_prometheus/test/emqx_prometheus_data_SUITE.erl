@@ -51,7 +51,7 @@ authorization {
   deny_action = ignore
   no_match = allow
   sources = [
-    {path = \"${EMQX_ETC_DIR}/acl.conf\", type = file}
+    {path = \"${OPENQTT_ETC_DIR}/acl.conf\", type = file}
   ]
 }
 connectors {

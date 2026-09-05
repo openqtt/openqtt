@@ -153,9 +153,9 @@ t_compatibility_ssl_cert(init, Config) ->
             <<"listeners">> => #{
                 <<"https">> => #{
                     bind => 18084,
-                    cacertfile => naive_env_interpolation(<<"${EMQX_ETC_DIR}/certs/cacert.pem">>),
-                    certfile => naive_env_interpolation(<<"${EMQX_ETC_DIR}/certs/cert.pem">>),
-                    keyfile => naive_env_interpolation(<<"${EMQX_ETC_DIR}/certs/key.pem">>),
+                    cacertfile => naive_env_interpolation(<<"${OPENQTT_ETC_DIR}/certs/cacert.pem">>),
+                    certfile => naive_env_interpolation(<<"${OPENQTT_ETC_DIR}/certs/cert.pem">>),
+                    keyfile => naive_env_interpolation(<<"${OPENQTT_ETC_DIR}/certs/key.pem">>),
                     max_connections => MaxConnection
                 }
             }
@@ -180,13 +180,13 @@ t_normal_ssl_cert(init, Config) ->
                     <<"bind">> => 18084,
                     <<"ssl_options">> => #{
                         <<"cacertfile">> => naive_env_interpolation(
-                            <<"${EMQX_ETC_DIR}/certs/cacert.pem">>
+                            <<"${OPENQTT_ETC_DIR}/certs/cacert.pem">>
                         ),
                         <<"certfile">> => naive_env_interpolation(
-                            <<"${EMQX_ETC_DIR}/certs/cert.pem">>
+                            <<"${OPENQTT_ETC_DIR}/certs/cert.pem">>
                         ),
                         <<"keyfile">> => naive_env_interpolation(
-                            <<"${EMQX_ETC_DIR}/certs/key.pem">>
+                            <<"${OPENQTT_ETC_DIR}/certs/key.pem">>
                         ),
                         <<"depth">> => 5
                     },
@@ -253,7 +253,7 @@ t_verify_cacertfile(Config) ->
     VerifyPeerConf2 = emqx_utils_maps:deep_put(
         [<<"dashboard">>, <<"listeners">>, <<"https">>, <<"ssl_options">>, <<"cacertfile">>],
         VerifyPeerConf1,
-        naive_env_interpolation(<<"${EMQX_ETC_DIR}/certs/cacert.pem">>)
+        naive_env_interpolation(<<"${OPENQTT_ETC_DIR}/certs/cacert.pem">>)
     ),
     {ok, _} = emqx:update_config([<<"dashboard">>], maps:get(<<"dashboard">>, VerifyPeerConf2)),
     wait_listener_config_processed_requests(),
@@ -291,7 +291,7 @@ t_bad_certfile(init, Config) ->
             <<"listeners">> => #{
                 <<"https">> => #{
                     <<"bind">> => 18084,
-                    <<"certfile">> => <<"${EMQX_ETC_DIR}/certs/not_found_cert.pem">>
+                    <<"certfile">> => <<"${OPENQTT_ETC_DIR}/certs/not_found_cert.pem">>
                 }
             }
         }
@@ -407,9 +407,9 @@ naive_env_interpolation(Str0) ->
 
 default_ssl_cert() ->
     #{
-        cacertfile => <<"${EMQX_ETC_DIR}/certs/cacert.pem">>,
-        certfile => <<"${EMQX_ETC_DIR}/certs/cert.pem">>,
-        keyfile => <<"${EMQX_ETC_DIR}/certs/key.pem">>
+        cacertfile => <<"${OPENQTT_ETC_DIR}/certs/cacert.pem">>,
+        certfile => <<"${OPENQTT_ETC_DIR}/certs/cert.pem">>,
+        keyfile => <<"${OPENQTT_ETC_DIR}/certs/key.pem">>
     }.
 
 emqx_cth_suite_start(Case, DashboardConf, Config) ->

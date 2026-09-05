@@ -458,7 +458,7 @@ do_install_package(NameVsn, FileName, Bin) ->
             Msg = iolist_to_binary([
                 <<"Package is not allowed installation;">>,
                 <<" first allow it to be installed by running:">>,
-                <<" `emqx ctl plugins allow ">>,
+                <<" `openqtt ctl plugins allow ">>,
                 NameVsn,
                 <<"`">>
             ]),

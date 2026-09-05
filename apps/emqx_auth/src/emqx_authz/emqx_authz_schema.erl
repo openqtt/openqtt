@@ -258,7 +258,7 @@ default_authz() ->
     #{
         <<"type">> => <<"file">>,
         <<"enable">> => true,
-        <<"path">> => <<"${EMQX_ETC_DIR}/acl.conf">>
+        <<"path">> => <<"${OPENQTT_ETC_DIR}/acl.conf">>
     }.
 
 common_field() ->

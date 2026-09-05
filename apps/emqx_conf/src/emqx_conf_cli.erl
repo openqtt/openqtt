@@ -381,7 +381,7 @@ load_config_from_raw(RawConf0, Opts) ->
             warning(Opts, "load config failed~n~ts~n", [Reason]),
             warning(
                 Opts,
-                "Maybe try `emqx_ctl conf reload` to reload etc/emqx.conf on local node~n",
+                "Maybe try `openqtt ctl conf reload` to reload etc/emqx.conf on local node~n",
                 []
             ),
             {error, Reason};

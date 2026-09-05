@@ -174,10 +174,10 @@ load(_, Lib) ->
 gen_schema_json(Dir, SchemaModule, Lang) ->
     SchemaJsonFile = filename:join([Dir, "schema-" ++ Lang ++ ".json"]),
     io:format(user, "===< Generating: ~s~n", [SchemaJsonFile]),
-    %% EMQX_SCHEMA_FULL_DUMP is quite a hidden API
+    %% OPENQTT_SCHEMA_FULL_DUMP is quite a hidden API
     %% it is used to dump the full schema for EMQX developers and supporters
     IncludeImportance =
-        case os:getenv("EMQX_SCHEMA_FULL_DUMP") =:= "1" of
+        case os:getenv("OPENQTT_SCHEMA_FULL_DUMP") =:= "1" of
             true -> ?IMPORTANCE_HIDDEN;
             false -> ?IMPORTANCE_LOW
         end,

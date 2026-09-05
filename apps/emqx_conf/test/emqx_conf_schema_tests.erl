@@ -416,9 +416,9 @@ listeners_test() ->
         <<"wss">> := #{<<"default">> := DefaultWss, <<"new">> := NewWss},
         <<"ssl">> := #{<<"default">> := Ssl}
     } = Listeners,
-    DefaultCacertFile = <<"${EMQX_ETC_DIR}/certs/cacert.pem">>,
-    DefaultCertFile = <<"${EMQX_ETC_DIR}/certs/cert.pem">>,
-    DefaultKeyFile = <<"${EMQX_ETC_DIR}/certs/key.pem">>,
+    DefaultCacertFile = <<"${OPENQTT_ETC_DIR}/certs/cacert.pem">>,
+    DefaultCertFile = <<"${OPENQTT_ETC_DIR}/certs/cert.pem">>,
+    DefaultKeyFile = <<"${OPENQTT_ETC_DIR}/certs/key.pem">>,
     ?assertMatch(
         #{
             <<"bind">> := {{0, 0, 0, 0}, 1883},
@@ -493,7 +493,7 @@ to_bin(Format, Args) ->
     iolist_to_binary(io_lib:format(Format, Args)).
 
 ensure_acl_conf() ->
-    File = emqx_schema:naive_env_interpolation(<<"${EMQX_ETC_DIR}/acl.conf">>),
+    File = emqx_schema:naive_env_interpolation(<<"${OPENQTT_ETC_DIR}/acl.conf">>),
     ok = filelib:ensure_dir(filename:dirname(File)),
     case filelib:is_regular(File) of
         true -> ok;

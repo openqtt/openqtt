@@ -79,7 +79,7 @@ bootstrap_fields() ->
                 #{
                     desc => ?DESC(bootstrap_file),
                     required => false,
-                    default => <<"${EMQX_ETC_DIR}/auth-built-in-db-bootstrap.csv">>
+                    default => <<"${OPENQTT_ETC_DIR}/auth-built-in-db-bootstrap.csv">>
                 }
             )},
         {bootstrap_type,

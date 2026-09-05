@@ -184,7 +184,7 @@ maybe_disable_autocluster() ->
             emqx_ctl:print(
                 "Automatic cluster discovery is disabled on this node: ~p to avoid"
                 " re-joining the same cluster again, if the node is not stopped soon."
-                " To enable it run: 'emqx ctl cluster discovery enable' or restart the node.~n",
+                " To enable it run: 'openqtt ctl cluster discovery enable' or restart the node.~n",
                 [node()]
             );
         false ->
