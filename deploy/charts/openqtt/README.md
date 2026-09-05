@@ -12,11 +12,11 @@ helpers are `openqtt.name`, `openqtt.fullname` and friends.
 
 Each release attaches the packaged chart to the GitHub release:
 
-    helm install openqtt https://github.com/openqtt/OpenQTT/releases/download/v0.1.0/openqtt-0.1.0.tgz
+    helm install openqtt https://github.com/openqtt/OpenQTT/releases/download/v1.0.0/openqtt-1.0.0.tgz
 
 or from the OCI registry:
 
-    helm install openqtt oci://ghcr.io/openqtt/charts/openqtt --version 0.1.0
+    helm install openqtt oci://ghcr.io/openqtt/charts/openqtt --version 1.0.0
 
 ## The one value you must set
 
@@ -26,7 +26,7 @@ image falls back to `emqxsecretcookie`, a string published in EMQX's git history
 Anything that can reach port 4370 knowing it gets an Erlang distribution
 connection, which is code execution inside the broker.
 
-    helm install openqtt oci://ghcr.io/openqtt/charts/openqtt --version 0.1.0 \
+    helm install openqtt oci://ghcr.io/openqtt/charts/openqtt --version 1.0.0 \
       --set nodeCookie=$(openssl rand -hex 32)
 
 `dashboardPassword` sets the initial password for the REST API `admin` user. Left

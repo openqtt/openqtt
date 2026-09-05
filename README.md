@@ -47,7 +47,7 @@ the image by the digest recorded in the release notes. The chart's README covers
 the two values you must set before installing it.
 
 ```
-docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:0.1.0
+docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
 ```
 
 The version the broker reports is the EMQX version inside, `5.8.9`. OpenQTT's
