@@ -51,12 +51,28 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+  # ONE BUILD PER ARCHITECTURE, ON ITS OWN ARCHITECTURE. A single job with
+  # platforms: linux/amd64,linux/arm64 builds the arm64 half under QEMU, and this
+  # release takes 30 to 40 minutes natively, so emulation would run past the
+  # timeout. GitHub's arm64 runners are free for public repositories, so each
+  # half builds native and a later job stitches them into one manifest.
+  #
+  # An IoT broker without an arm64 image is the wrong shape: Raspberry Pi,
+  # Jetson and Graviton are exactly where a fleet's brokers and gateways run.
   image:
     needs: [mirror-builder, version]
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,22 +87,102 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # PUSHED BY DIGEST, NOT BY TAG. Two jobs pushing the same tag would race
+      # and the loser's architecture would vanish. Each pushes an untagged image
+      # and reports its digest; the merge job names them.
       - id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/docker/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ghcr.io/openqtt/openqtt:${{ needs.version.outputs.version }}
-            ghcr.io/openqtt/openqtt:sha-${{ github.sha }}
+          platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.licenses=Apache-2.0
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,name=ghcr.io/openqtt/openqtt,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      # The shell strips the sha256: prefix, not the Actions expression: ${{ }}
+      # has no parameter expansion and would emit the literal text.
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # THE MANIFEST LIST, which is what a `docker pull` of the tag actually
+  # resolves. imagetools copies across registries, so Docker Hub is populated
+  # from the images already in GHCR rather than built or pushed a second time.
+  #
+  # GHCR STAYS CANONICAL. Docker Hub rate-limits anonymous pulls in a way GHCR
+  # does not, and a Kubernetes cluster re-pulls on every scale-up and node
+  # replacement. Docker Hub is here because people search it; the chart default
+  # and the docs point at GHCR.
+  manifest:
+    needs: [version, image]
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create the manifest in both registries
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd /tmp/digests
+          SOURCES=$(printf 'ghcr.io/openqtt/openqtt@sha256:%s ' *)
+          echo "combining: $SOURCES"
+          docker buildx imagetools create \
+            --tag "ghcr.io/openqtt/openqtt:${VERSION}" \
+            --tag "ghcr.io/openqtt/openqtt:sha-${GITHUB_SHA}" \
+            $SOURCES
+          docker buildx imagetools create \
+            --tag "docker.io/openqtt/openqtt:${VERSION}" \
+            --tag "docker.io/openqtt/openqtt:latest" \
+            $SOURCES
+      - id: digest
+        name: The digest deployments pin
+        run: |
+          set -euo pipefail
+          D=$(docker buildx imagetools inspect \
+                "ghcr.io/openqtt/openqtt:${{ needs.version.outputs.version }}" \
+                --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=$D" >> "$GITHUB_OUTPUT"
+          echo "manifest digest: $D"
+      - name: Both architectures are present
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "ghcr.io/openqtt/openqtt:${{ needs.version.outputs.version }}"
+          for a in amd64 arm64; do
+            docker buildx imagetools inspect \
+              "ghcr.io/openqtt/openqtt:${{ needs.version.outputs.version }}" --raw \
+              | grep -q "\"architecture\":\"$a\"" || { echo "missing $a in the manifest" >&2; exit 1; }
+          done
+          echo "amd64 and arm64 both present"
 
   chart:
     needs: version
@@ -112,7 +208,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [version, image, chart]
+    needs: [version, manifest, chart]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +220,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
-          IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.manifest.outputs.digest }}
           CHART_DIGEST: ${{ needs.chart.outputs.digest }}
         run: |
           set -euo pipefail
@@ -136,6 +232,8 @@ jobs:
           | Artifact | Reference |
           | --- | --- |
           | Image | \`ghcr.io/openqtt/openqtt:$VERSION\` |
+          | Image (mirror) | \`docker.io/openqtt/openqtt:$VERSION\` |
+          | Architectures | \`linux/amd64\`, \`linux/arm64\` |
           | Image digest | \`$IMAGE_DIGEST\` |
           | Chart | \`oci://ghcr.io/openqtt/charts/openqtt:$VERSION\` |
           | Chart digest | \`$CHART_DIGEST\` |

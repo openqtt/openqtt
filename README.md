@@ -41,10 +41,15 @@ later.
 
 ## Running it
 
-Images are published to `ghcr.io/openqtt/openqtt` and a Helm chart to
-`oci://ghcr.io/openqtt/charts/openqtt`, both from a tagged release. Deploy
-the image by the digest recorded in the release notes. The chart's README covers
-the two values you must set before installing it.
+Images are published to `ghcr.io/openqtt/openqtt` for `linux/amd64` and
+`linux/arm64`, and mirrored to `docker.io/openqtt/openqtt`. The Helm chart goes
+to `oci://ghcr.io/openqtt/charts/openqtt`. All of it comes from a tagged release.
+
+Prefer the GHCR reference. Docker Hub rate limits anonymous pulls in a way GHCR
+does not, and a Kubernetes cluster pulls again on every scale up and node
+replacement; the mirror exists because people search Docker Hub. Deploy by the
+digest recorded in the release notes rather than by tag. The chart's README
+covers the value you must set before installing it.
 
 ```
 docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
