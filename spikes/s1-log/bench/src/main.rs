@@ -36,7 +36,11 @@ struct Cli {
 enum Cmd {
     /// The durability floor: one write plus one sync, by primitive.
     Fsync {
-        #[arg(long, value_delimiter = ',', default_value = "std-sync-data,fsync,fullfsync,barrier")]
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "std-sync-data,fsync,fullfsync,barrier"
+        )]
         prims: Vec<exp::fsync::Primitive>,
         #[arg(long, value_delimiter = ',', default_value = "128,4096,65536,1048576")]
         sizes: Vec<usize>,
@@ -55,7 +59,11 @@ enum Cmd {
         sizes: Vec<usize>,
         #[arg(long, value_delimiter = ',', default_value = "0,1000,2000")]
         windows_us: Vec<u64>,
-        #[arg(long, value_delimiter = ',', default_value = "c1,c64,c1024,o10000,o50000")]
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "c1,c64,c1024,o10000,o50000"
+        )]
         loads: Vec<String>,
         #[arg(long, default_value_t = 2.0)]
         warmup: f64,
@@ -80,7 +88,11 @@ enum Cmd {
         /// Sessions that exist before the storm.
         #[arg(long, default_value_t = 1_000_000)]
         sessions: u64,
-        #[arg(long, value_delimiter = ',', default_value = "10000,25000,50000,100000,200000")]
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "10000,25000,50000,100000,200000"
+        )]
         rates: Vec<u64>,
         /// Apply threads, standing in for partition state machines.
         #[arg(long, default_value_t = 4)]
@@ -176,7 +188,11 @@ enum Cmd {
         #[arg(long, value_delimiter = ',', default_value = "128,256")]
         groups: Vec<u32>,
         /// heartbeat:election_min:election_max in ms, several separated by commas.
-        #[arg(long, value_delimiter = ',', default_value = "50:150:300,250:1000:2000")]
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "50:150:300,250:1000:2000"
+        )]
         timings: Vec<String>,
         #[arg(long, default_value_t = 0)]
         delay_us: u64,
@@ -200,24 +216,68 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     std::fs::create_dir_all(&cli.data)?;
     match cli.cmd {
-        Cmd::Fsync { prims, sizes, threads, modes, secs } => {
-            exp::fsync::run(&cli.data, &cli.out, &prims, &sizes, &threads, &modes, secs)
-        }
-        Cmd::Write { engines, sizes, windows_us, loads, warmup, secs: s } => {
+        Cmd::Fsync {
+            prims,
+            sizes,
+            threads,
+            modes,
+            secs,
+        } => exp::fsync::run(&cli.data, &cli.out, &prims, &sizes, &threads, &modes, secs),
+        Cmd::Write {
+            engines,
+            sizes,
+            windows_us,
+            loads,
+            warmup,
+            secs: s,
+        } => {
             let loads: Vec<Load> = loads.iter().map(|l| Load::parse(l)).collect();
-            exp::write::run(&cli.data, &cli.out, &engines, &sizes, &windows_us, &loads, secs(warmup), secs(s))
+            exp::write::run(
+                &cli.data,
+                &cli.out,
+                &engines,
+                &sizes,
+                &windows_us,
+                &loads,
+                secs(warmup),
+                secs(s),
+            )
         }
-        Cmd::Shared { engines, loads, warmup, secs: s } => {
+        Cmd::Shared {
+            engines,
+            loads,
+            warmup,
+            secs: s,
+        } => {
             let loads: Vec<Load> = loads.iter().map(|l| Load::parse(l)).collect();
             exp::write::shared(&cli.data, &cli.out, &engines, &loads, secs(warmup), secs(s))
         }
-        Cmd::Claims { engines, sessions, rates, workers, cache_mb, warmup, secs: s } => {
-            exp::claims::run(
-                &cli.data, &cli.out, &engines, sessions, &rates, workers, secs(warmup), secs(s),
-                cache_mb,
-            )
-        }
-        Cmd::Footprint { engine, sessions, phase, cache_mb, reads } => match phase.as_str() {
+        Cmd::Claims {
+            engines,
+            sessions,
+            rates,
+            workers,
+            cache_mb,
+            warmup,
+            secs: s,
+        } => exp::claims::run(
+            &cli.data,
+            &cli.out,
+            &engines,
+            sessions,
+            &rates,
+            workers,
+            secs(warmup),
+            secs(s),
+            cache_mb,
+        ),
+        Cmd::Footprint {
+            engine,
+            sessions,
+            phase,
+            cache_mb,
+            reads,
+        } => match phase.as_str() {
             "load" => exp::footprint::load(&cli.data, &cli.out, engine, sessions, cache_mb),
             "idle" => exp::footprint::idle(&cli.data, &cli.out, engine, sessions, cache_mb, reads),
             "remove" => {
@@ -226,13 +286,36 @@ fn main() -> Result<()> {
             }
             other => anyhow::bail!("unknown phase {other}"),
         },
-        Cmd::Churn { engine, secs: s, rate, sessions, body, min_off_s, max_off_s } => {
-            exp::churn::run(&cli.data, &cli.out, engine, s, rate, sessions, body, min_off_s, max_off_s)
-        }
-        Cmd::Recovery { engine, phase, gib, label, quick_repair, entries, sync_every_mb, sessions } => match phase.as_str() {
-            "load" => {
-                exp::recovery::load(&cli.data, &cli.out, engine, gib, quick_repair, sync_every_mb, sessions)
-            }
+        Cmd::Churn {
+            engine,
+            secs: s,
+            rate,
+            sessions,
+            body,
+            min_off_s,
+            max_off_s,
+        } => exp::churn::run(
+            &cli.data, &cli.out, engine, s, rate, sessions, body, min_off_s, max_off_s,
+        ),
+        Cmd::Recovery {
+            engine,
+            phase,
+            gib,
+            label,
+            quick_repair,
+            entries,
+            sync_every_mb,
+            sessions,
+        } => match phase.as_str() {
+            "load" => exp::recovery::load(
+                &cli.data,
+                &cli.out,
+                engine,
+                gib,
+                quick_repair,
+                sync_every_mb,
+                sessions,
+            ),
             "open" => exp::recovery::open(&cli.data, &cli.out, engine, &label, quick_repair),
             "crash-writer" => exp::recovery::crash_writer(&cli.data, engine, quick_repair),
             "replay" => exp::recovery::replay(&cli.data, &cli.out, engine, entries),
@@ -243,8 +326,16 @@ fn main() -> Result<()> {
             other => anyhow::bail!("unknown phase {other}"),
         },
         Cmd::Repl {
-            schemes, groups, delays_us, flush_us, loads, heartbeat_ms, election_min_ms,
-            election_max_ms, warmup, secs: s,
+            schemes,
+            groups,
+            delays_us,
+            flush_us,
+            loads,
+            heartbeat_ms,
+            election_min_ms,
+            election_max_ms,
+            warmup,
+            secs: s,
         } => {
             let args = repl::LatencyArgs {
                 schemes,
@@ -262,7 +353,13 @@ fn main() -> Result<()> {
             };
             repl::latency(&cli.out, &args)
         }
-        Cmd::Idle { schemes, groups, timings, delay_us, secs: s } => {
+        Cmd::Idle {
+            schemes,
+            groups,
+            timings,
+            delay_us,
+            secs: s,
+        } => {
             let timings: Vec<(u64, u64, u64)> = timings
                 .iter()
                 .map(|t| {

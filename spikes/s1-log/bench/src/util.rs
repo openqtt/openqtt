@@ -4,7 +4,6 @@
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use hdrhistogram::Histogram;
@@ -53,7 +52,9 @@ const ID_ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 pub fn client_id(i: u64) -> Vec<u8> {
     let mut r = Rng::new(i.wrapping_mul(0x2545_F491_4F6C_DD1D) ^ 0x5EED);
     let len = 16 + r.below(49) as usize;
-    (0..len).map(|_| ID_ALPHABET[r.below(36) as usize]).collect()
+    (0..len)
+        .map(|_| ID_ALPHABET[r.below(36) as usize])
+        .collect()
 }
 
 /// Partitions in a cluster, R3's default.
@@ -175,19 +176,6 @@ impl Lat {
     }
 }
 
-/// A histogram several threads record into.
-#[derive(Default)]
-pub struct SharedLat(pub Mutex<Lat>);
-
-impl SharedLat {
-    pub fn record(&self, d: Duration) {
-        self.0.lock().expect("not poisoned").record(d);
-    }
-    pub fn summary(&self) -> Value {
-        self.0.lock().expect("not poisoned").summary()
-    }
-}
-
 /// Process-wide resource usage at one instant.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Usage {
@@ -236,7 +224,13 @@ fn platform_usage(u: &mut Usage) {
     if let Ok(s) = fs::read_to_string("/proc/self/status") {
         for line in s.lines() {
             if let Some(kb) = line.strip_prefix("VmRSS:") {
-                u.rss = kb.trim().trim_end_matches(" kB").trim().parse::<u64>().unwrap_or(0) * 1024;
+                u.rss = kb
+                    .trim()
+                    .trim_end_matches(" kB")
+                    .trim()
+                    .parse::<u64>()
+                    .unwrap_or(0)
+                    * 1024;
                 u.footprint = u.rss;
             }
         }

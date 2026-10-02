@@ -8,8 +8,12 @@ fn main() {
 
     #[cfg(feature = "fjall")]
     {
-        let db = fjall::Database::builder(dir.join("fjall")).open().expect("open");
-        let ks = db.keyspace("k", fjall::KeyspaceCreateOptions::default).expect("keyspace");
+        let db = fjall::Database::builder(dir.join("fjall"))
+            .open()
+            .expect("open");
+        let ks = db
+            .keyspace("k", fjall::KeyspaceCreateOptions::default)
+            .expect("keyspace");
         ks.insert("a", "b").expect("insert");
         db.persist(fjall::PersistMode::SyncData).expect("persist");
         assert!(ks.get("a").expect("get").is_some());
@@ -21,10 +25,19 @@ fn main() {
         const T: TableDefinition<&str, &str> = TableDefinition::new("k");
         let db = redb::Database::create(dir.join("redb")).expect("create");
         let tx = db.begin_write().expect("begin");
-        tx.open_table(T).expect("table").insert("a", "b").expect("insert");
+        tx.open_table(T)
+            .expect("table")
+            .insert("a", "b")
+            .expect("insert");
         tx.commit().expect("commit");
         let rx = db.begin_read().expect("read");
-        assert!(rx.open_table(T).expect("table").get("a").expect("get").is_some());
+        assert!(
+            rx.open_table(T)
+                .expect("table")
+                .get("a")
+                .expect("get")
+                .is_some()
+        );
     }
 
     #[cfg(feature = "rocksdb")]
@@ -38,7 +51,9 @@ fn main() {
 
     #[cfg(feature = "openraft")]
     {
-        let c = openraft::Config::default().validate().expect("valid config");
+        let c = openraft::Config::default()
+            .validate()
+            .expect("valid config");
         assert!(c.heartbeat_interval > 0);
     }
 

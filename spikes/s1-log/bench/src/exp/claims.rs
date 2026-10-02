@@ -18,8 +18,8 @@ use crate::commit::{Committer, Req, Shape};
 use crate::engine::{self, Engine, Kind, Op, Opts, Space};
 use crate::exp::write::merge;
 use crate::util::{
-    Lat, Rng, TAG_OWN, TAG_SESS, client_id, dir_size, emit, fresh_dir, key, log_key,
-    own_conn_gen, own_value, partition, round2, sess_value, usage,
+    Lat, Rng, TAG_OWN, TAG_SESS, client_id, dir_size, emit, fresh_dir, key, log_key, own_conn_gen,
+    own_value, partition, round2, sess_value, usage,
 };
 
 /// Writes `n` sessions (`own` and `sess`) in client-id order, which is random key order, in
@@ -36,7 +36,11 @@ pub fn preload(eng: &dyn Engine, n: u64) -> Result<()> {
             key(p, TAG_OWN, &[&cid]),
             own_value((i % 3) as u32, 1, 1),
         ));
-        ops.push(Op::Put(Space::State, key(p, TAG_SESS, &[&cid]), sess_value(&cid)));
+        ops.push(Op::Put(
+            Space::State,
+            key(p, TAG_SESS, &[&cid]),
+            sess_value(&cid),
+        ));
         if ops.len() >= 20_000 {
             batches += 1;
             eng.write(&ops, batches % 10 == 0)?;
@@ -168,7 +172,11 @@ fn storm(
                 let idx = log_index.fetch_add(1, Ordering::Relaxed);
                 let node = (i % 3) as u32;
                 let ops = vec![
-                    Op::Put(Space::Log, log_key(u32::from(p), idx), claim_entry(&cid, node, 2)),
+                    Op::Put(
+                        Space::Log,
+                        log_key(u32::from(p), idx),
+                        claim_entry(&cid, node, 2),
+                    ),
                     Op::Put(Space::State, own_key, own_value(node, 2, generation)),
                 ];
                 let sh = shared.clone();

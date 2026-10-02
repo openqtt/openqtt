@@ -98,7 +98,11 @@ pub fn run(
         .map(|i| {
             let cid = client_id(1_000_000_000 + i);
             let p = partition(&cid);
-            Session { cid, p, queued: Vec::new() }
+            Session {
+                cid,
+                p,
+                queued: Vec::new(),
+            }
         })
         .collect();
     // Sessions and the set of still-queued sequence numbers, shared by the publisher and the
@@ -212,7 +216,11 @@ pub fn run(
                 let o = outstanding.clone();
                 o.fetch_add(1, Ordering::Relaxed);
                 sender.submit(Req {
-                    ops: vec![Op::DelRange(Space::State, q_key(p, &cid, 0), q_key(p, &cid, last + 1))],
+                    ops: vec![Op::DelRange(
+                        Space::State,
+                        q_key(p, &cid, 0),
+                        q_key(p, &cid, last + 1),
+                    )],
                     done: Some(Box::new(move |at| {
                         d.record(sec, at - t0);
                         o.fetch_sub(1, Ordering::Relaxed);

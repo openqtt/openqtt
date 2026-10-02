@@ -16,12 +16,12 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use futures_util::{Stream, StreamExt as _};
+use openraft10::base::{BoxFuture, BoxStream};
 use openraft10::errors::{RPCError, ReplicationClosed, StreamingError, Unreachable};
 use openraft10::network::{RPCOption, RaftNetworkFactory, v2::RaftNetworkV2};
-use openraft10::base::{BoxFuture, BoxStream};
 use openraft10::raft::{
-    AppendEntriesRequest, AppendEntriesResponse, SnapshotResponse, StreamAppendResult,
-    VoteRequest, VoteResponse,
+    AppendEntriesRequest, AppendEntriesResponse, SnapshotResponse, StreamAppendResult, VoteRequest,
+    VoteResponse,
 };
 use openraft10::storage::{EntryResponder, IOFlushed, LogState, RaftLogStorage, RaftStateMachine};
 use openraft10::type_config::alias::{
@@ -198,7 +198,8 @@ impl RaftStateMachine<C10> for Sm {
                         g.applied
                     }
                     EntryPayload::Membership(m) => {
-                        g.membership = StoredMembershipOf::<C10>::new(Some(entry.log_id.clone()), m);
+                        g.membership =
+                            StoredMembershipOf::<C10>::new(Some(entry.log_id.clone()), m);
                         0
                     }
                 }
@@ -214,7 +215,11 @@ impl RaftStateMachine<C10> for Sm {
         self.clone()
     }
 
-    async fn install_snapshot(&mut self, meta: &SnapshotMetaOf<C10>, _snapshot: Snap) -> Result<(), io::Error> {
+    async fn install_snapshot(
+        &mut self,
+        meta: &SnapshotMetaOf<C10>,
+        _snapshot: Snap,
+    ) -> Result<(), io::Error> {
         let mut g = self.inner.lock().expect("not poisoned");
         g.last_applied = meta.last_log_id.clone();
         g.membership = meta.last_membership.clone();
@@ -248,7 +253,11 @@ impl Router {
     }
 
     fn get(&self, group: u32, node: u64) -> Option<R10> {
-        self.rafts.read().expect("not poisoned").get(&(group, node)).cloned()
+        self.rafts
+            .read()
+            .expect("not poisoned")
+            .get(&(group, node))
+            .cloned()
     }
 }
 
@@ -325,7 +334,10 @@ impl RaftNetworkV2<C10> for Conn {
         &'s mut self,
         input: S,
         _option: RPCOption,
-    ) -> BoxFuture<'s, Result<BoxStream<'s, Result<StreamAppendResult<C10>, RPCError<C10>>>, RPCError<C10>>>
+    ) -> BoxFuture<
+        's,
+        Result<BoxStream<'s, Result<StreamAppendResult<C10>, RPCError<C10>>>, RPCError<C10>>,
+    >
     where
         S: Stream<Item = AppendEntriesRequest<C10>> + OptionalSend + Unpin + 'static,
     {
@@ -357,7 +369,11 @@ impl RaftNetworkV2<C10> for Conn {
         r.map_err(|e| RPCError::Unreachable(Unreachable::new(&e)))
     }
 
-    async fn vote(&mut self, rpc: VoteRequest<C10>, _option: RPCOption) -> Result<VoteResponse<C10>, RPCError<C10>> {
+    async fn vote(
+        &mut self,
+        rpc: VoteRequest<C10>,
+        _option: RPCOption,
+    ) -> Result<VoteResponse<C10>, RPCError<C10>> {
         self.router.rpcs.fetch_add(1, Ordering::Relaxed);
         self.router.line.sleep(self.router.delay).await;
         let r = self.raft()?.vote(rpc).await;
@@ -433,19 +449,27 @@ impl Cluster {
                     Sm::default(),
                 )
                 .await?;
-                router.rafts.write().expect("not poisoned").insert((g, n), raft);
+                router
+                    .rafts
+                    .write()
+                    .expect("not poisoned")
+                    .insert((g, n), raft);
             }
         }
         let members: BTreeMap<u64, BasicNode> =
             (0..3u64).map(|n| (n, BasicNode::default())).collect();
         for g in 0..groups {
             let leader = u64::from(g % 3);
-            let raft = router.get(g, leader).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, leader)
+                .ok_or_else(|| anyhow!("missing raft"))?;
             raft.initialize(members.clone()).await?;
         }
         for g in 0..groups {
             let leader = u64::from(g % 3);
-            let raft = router.get(g, leader).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, leader)
+                .ok_or_else(|| anyhow!("missing raft"))?;
             raft.wait(Some(Duration::from_secs(60)))
                 .current_leader(leader, "leader elected")
                 .await?;
@@ -453,10 +477,15 @@ impl Cluster {
         // An elected leader may still refuse writes until its first entry commits; start the
         // clock only once every group has taken one.
         for g in 0..groups {
-            let raft = router.get(g, u64::from(g % 3)).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, u64::from(g % 3))
+                .ok_or_else(|| anyhow!("missing raft"))?;
             let deadline = std::time::Instant::now() + Duration::from_secs(30);
             while raft
-                .client_write(Cmd { cid: b"warm".to_vec(), val: Vec::new() })
+                .client_write(Cmd {
+                    cid: b"warm".to_vec(),
+                    val: Vec::new(),
+                })
                 .await
                 .is_err()
             {
@@ -466,11 +495,17 @@ impl Cluster {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         }
-        Ok(Cluster { router, groups, disks })
+        Ok(Cluster {
+            router,
+            groups,
+            disks,
+        })
     }
 
     fn leader(&self, group: u32) -> R10 {
-        self.router.get(group, u64::from(group % 3)).expect("raft exists")
+        self.router
+            .get(group, u64::from(group % 3))
+            .expect("raft exists")
     }
 
     pub async fn write(&self, group: u32, cmd: Cmd) -> Result<()> {

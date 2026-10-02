@@ -142,7 +142,11 @@ pub fn crash_writer(data: &Path, kind: Kind, quick_repair: bool) -> Result<()> {
             let cid = client_id(i % 1_000_000);
             let p = partition(&cid);
             let ops = vec![
-                Op::Put(Space::Log, log_key(10_000 + u32::from(p), i), rng.bytes(1024)),
+                Op::Put(
+                    Space::Log,
+                    log_key(10_000 + u32::from(p), i),
+                    rng.bytes(1024),
+                ),
                 Op::Put(Space::State, key(p, TAG_OWN, &[&cid]), own_value(2, 3, i)),
             ];
             let tx = tx.clone();
@@ -204,7 +208,11 @@ pub fn replay(data: &Path, out: &Path, kind: Kind, entries: u64) -> Result<()> {
                 let len = usize::from(u16::from_be_bytes([v[0], v[1]]));
                 let cid = &v[2..2 + len];
                 let val = v[2 + len..].to_vec();
-                batch.push(Op::Put(Space::State, key(partition(cid), TAG_OWN, &[cid]), val));
+                batch.push(Op::Put(
+                    Space::State,
+                    key(partition(cid), TAG_OWN, &[cid]),
+                    val,
+                ));
             },
         )?;
         read_s += r0.elapsed().as_secs_f64();

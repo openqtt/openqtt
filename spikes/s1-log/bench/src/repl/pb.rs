@@ -262,7 +262,10 @@ impl Cluster {
     }
 
     pub fn messages(&self) -> u64 {
-        self.nodes.iter().map(|n| n.messages.load(Ordering::Relaxed)).sum()
+        self.nodes
+            .iter()
+            .map(|n| n.messages.load(Ordering::Relaxed))
+            .sum()
     }
 
     pub fn refused(&self) -> u64 {

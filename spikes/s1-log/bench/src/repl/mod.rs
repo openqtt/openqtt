@@ -65,15 +65,24 @@ impl AnyCluster {
         timing: &Timing,
     ) -> Result<Self> {
         Ok(match scheme {
-            Scheme::Raft => AnyCluster::Raft(raft::Cluster::start(groups, line, delay, flush, timing).await?),
+            Scheme::Raft => {
+                AnyCluster::Raft(raft::Cluster::start(groups, line, delay, flush, timing).await?)
+            }
             Scheme::RaftBatched => AnyCluster::Raft(
                 raft::Cluster::start(groups, line, delay, flush, timing)
                     .await?
                     .with_batching(),
             ),
             Scheme::Raft10 | Scheme::Raft10Seq => AnyCluster::Raft10(
-                raft10::Cluster::start(groups, line, delay, flush, timing, scheme == Scheme::Raft10Seq)
-                    .await?,
+                raft10::Cluster::start(
+                    groups,
+                    line,
+                    delay,
+                    flush,
+                    timing,
+                    scheme == Scheme::Raft10Seq,
+                )
+                .await?,
             ),
             Scheme::Pb => AnyCluster::Pb(pb::Cluster::start(groups, line, delay, flush)),
         })
@@ -163,7 +172,13 @@ fn line_cpu(c: &AnyCluster) -> f64 {
 }
 
 /// Offers load to a running cluster and measures commit latency from when each write was due.
-async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration, measure: Duration) -> Value {
+async fn offer(
+    c: Arc<AnyCluster>,
+    groups: u32,
+    load: Offered,
+    warmup: Duration,
+    measure: Duration,
+) -> Value {
     let start = Instant::now();
     let from = start + warmup;
     let until = from + measure;
@@ -175,8 +190,13 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
     let handle = tokio::runtime::Handle::current();
     let generator = match load {
         Offered::Open(rate) => {
-            let (c, lat, completed, errors, outstanding) =
-                (c.clone(), lat.clone(), completed.clone(), errors.clone(), outstanding.clone());
+            let (c, lat, completed, errors, outstanding) = (
+                c.clone(),
+                lat.clone(),
+                completed.clone(),
+                errors.clone(),
+                outstanding.clone(),
+            );
             let first_error = first_error.clone();
             Some(std::thread::spawn(move || {
                 let mut rng = Rng::new(rate);
@@ -202,9 +222,15 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
                             let at = Instant::now();
                             if let Err(e) = r {
                                 errors.fetch_add(1, Ordering::Relaxed);
-                                first_error.lock().expect("not poisoned").get_or_insert_with(|| {
-                                    format!("{:.3}s after start: {e:#}", (at - start).as_secs_f64())
-                                });
+                                first_error
+                                    .lock()
+                                    .expect("not poisoned")
+                                    .get_or_insert_with(|| {
+                                        format!(
+                                            "{:.3}s after start: {e:#}",
+                                            (at - start).as_secs_f64()
+                                        )
+                                    });
                             } else if due >= from && at <= until {
                                 lat.lock().expect("not poisoned").record(at - due);
                                 completed.fetch_add(1, Ordering::Relaxed);
@@ -219,8 +245,13 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         }
         Offered::Closed(n) => {
             for k in 0..n {
-                let (c, lat, completed, errors, outstanding) =
-                    (c.clone(), lat.clone(), completed.clone(), errors.clone(), outstanding.clone());
+                let (c, lat, completed, errors, outstanding) = (
+                    c.clone(),
+                    lat.clone(),
+                    completed.clone(),
+                    errors.clone(),
+                    outstanding.clone(),
+                );
                 let first_error = first_error.clone();
                 outstanding.fetch_add(1, Ordering::Relaxed);
                 tokio::spawn(async move {
@@ -232,9 +263,12 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
                         let at = Instant::now();
                         if let Err(e) = r {
                             errors.fetch_add(1, Ordering::Relaxed);
-                            first_error.lock().expect("not poisoned").get_or_insert_with(|| {
-                                format!("{:.3}s after start: {e:#}", (at - start).as_secs_f64())
-                            });
+                            first_error
+                                .lock()
+                                .expect("not poisoned")
+                                .get_or_insert_with(|| {
+                                    format!("{:.3}s after start: {e:#}", (at - start).as_secs_f64())
+                                });
                         } else if due >= from && at <= until {
                             lat.lock().expect("not poisoned").record(at - due);
                             completed.fetch_add(1, Ordering::Relaxed);
@@ -253,7 +287,12 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
     let d0: Vec<(u64, u64)> = c
         .disks()
         .iter()
-        .map(|d| (d.flushes.load(Ordering::Relaxed), d.items.load(Ordering::Relaxed)))
+        .map(|d| {
+            (
+                d.flushes.load(Ordering::Relaxed),
+                d.items.load(Ordering::Relaxed),
+            )
+        })
         .collect();
     tokio::time::sleep_until(until.into()).await;
     let u1 = usage();

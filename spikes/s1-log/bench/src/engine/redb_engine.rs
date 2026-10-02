@@ -5,9 +5,7 @@ use std::path::Path;
 use std::sync::RwLock;
 
 use anyhow::Result;
-use redb::{
-    Database, Durability, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
-};
+use redb::{Database, Durability, ReadableDatabase, ReadableTableMetadata, TableDefinition};
 use serde_json::{Value, json};
 
 use super::{Engine, Op, Opts, Space};

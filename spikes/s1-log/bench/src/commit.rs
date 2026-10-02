@@ -78,7 +78,12 @@ pub struct Committer {
 }
 
 impl Committer {
-    pub fn start(engine: Arc<dyn Engine>, window: Duration, shape: Shape, max_batch: usize) -> Self {
+    pub fn start(
+        engine: Arc<dyn Engine>,
+        window: Duration,
+        shape: Shape,
+        max_batch: usize,
+    ) -> Self {
         let (tx, rx) = mpsc::channel::<Req>();
         let stats = Arc::new(Mutex::new(CommitStats::default()));
         let queued = Arc::new(AtomicU64::new(0));

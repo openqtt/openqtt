@@ -40,6 +40,8 @@ pub enum Space {
 
 pub enum Op {
     Put(Space, Vec<u8>, Vec<u8>),
+    // Part of the shape the log role's engine needs; no experiment deletes a single key.
+    #[allow(dead_code)]
     Del(Space, Vec<u8>),
     /// Removes every key in `[start, end)`. RocksDB writes one range tombstone; fjall writes a
     /// tombstone per key it finds; redb removes the keys from its tree.

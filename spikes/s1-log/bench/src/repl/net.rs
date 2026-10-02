@@ -46,7 +46,6 @@ pub struct DelayLine {
     /// CPU seconds the delay thread has used, as f64 bits, so it can be subtracted from the
     /// process total.
     pub cpu_bits: Arc<AtomicU64>,
-    pub fired: Arc<AtomicU64>,
 }
 
 impl DelayLine {
@@ -54,17 +53,15 @@ impl DelayLine {
         let (tx, rx) = mpsc::channel::<(Instant, oneshot::Sender<()>)>();
         let lateness = Arc::new(Mutex::new(Lat::default()));
         let cpu_bits = Arc::new(AtomicU64::new(0));
-        let fired = Arc::new(AtomicU64::new(0));
-        let (l, c, f) = (lateness.clone(), cpu_bits.clone(), fired.clone());
+        let (l, c) = (lateness.clone(), cpu_bits.clone());
         std::thread::Builder::new()
             .name("delay-line".into())
-            .spawn(move || run(rx, l, c, f))
+            .spawn(move || run(rx, l, c))
             .expect("spawn delay line");
         DelayLine {
             tx,
             lateness,
             cpu_bits,
-            fired,
         }
     }
 
@@ -128,7 +125,6 @@ fn run(
     rx: mpsc::Receiver<(Instant, oneshot::Sender<()>)>,
     lateness: Arc<Mutex<Lat>>,
     cpu_bits: Arc<AtomicU64>,
-    fired: Arc<AtomicU64>,
 ) {
     raise_timer_precision();
     let mut heap: BinaryHeap<Reverse<Timer>> = BinaryHeap::new();
@@ -168,7 +164,6 @@ fn run(
             let Reverse(t) = heap.pop().expect("peeked");
             late.record(now - t.at);
             let _ = t.tx.send(());
-            fired.fetch_add(1, Ordering::Relaxed);
         }
         if now - last_report > Duration::from_millis(200) {
             last_report = now;

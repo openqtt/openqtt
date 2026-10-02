@@ -13,7 +13,9 @@ use serde_json::json;
 
 use crate::engine::{self, Kind, Opts, Space};
 use crate::exp::claims::preload;
-use crate::util::{Rng, TAG_OWN, client_id, dir_size, emit, fresh_dir, key, partition, round2, usage};
+use crate::util::{
+    Rng, TAG_OWN, client_id, dir_size, emit, fresh_dir, key, partition, round2, usage,
+};
 
 fn dir_for(data: &Path, kind: Kind, n: u64) -> std::path::PathBuf {
     data.join(format!("footprint-{}-{n}", kind.name()))
@@ -90,7 +92,10 @@ pub fn idle(data: &Path, out: &Path, kind: Kind, n: u64, cache_mb: u64, reads: u
     for _ in 0..reads {
         let i = rng.below(n);
         let cid = client_id(i);
-        if eng.get(Space::State, &key(partition(&cid), TAG_OWN, &[&cid]))?.is_none() {
+        if eng
+            .get(Space::State, &key(partition(&cid), TAG_OWN, &[&cid]))?
+            .is_none()
+        {
             missing += 1;
         }
     }

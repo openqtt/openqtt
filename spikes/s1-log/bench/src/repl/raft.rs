@@ -53,7 +53,10 @@ fn encode_batch(cmds: &[Cmd]) -> Cmd {
         val.extend_from_slice(&(c.val.len() as u16).to_be_bytes());
         val.extend_from_slice(&c.val);
     }
-    Cmd { cid: Vec::new(), val }
+    Cmd {
+        cid: Vec::new(),
+        val,
+    }
 }
 
 fn decode_batch(val: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
@@ -290,7 +293,9 @@ impl RaftStateMachine<TypeConfig> for Sm {
         Ok(())
     }
 
-    async fn get_current_snapshot(&mut self) -> Result<Option<Snapshot<TypeConfig>>, StorageError<u64>> {
+    async fn get_current_snapshot(
+        &mut self,
+    ) -> Result<Option<Snapshot<TypeConfig>>, StorageError<u64>> {
         let g = self.inner.lock().expect("not poisoned");
         Ok(g.snapshot.clone().map(|meta| Snapshot {
             meta,
@@ -313,7 +318,11 @@ impl Router {
     }
 
     fn get(&self, group: u32, node: u64) -> Option<Raft<TypeConfig>> {
-        self.rafts.read().expect("not poisoned").get(&(group, node)).cloned()
+        self.rafts
+            .read()
+            .expect("not poisoned")
+            .get(&(group, node))
+            .cloned()
     }
 
     async fn hop(&self) {
@@ -357,7 +366,10 @@ impl RaftNetwork<TypeConfig> for Conn {
     ) -> Result<AppendEntriesResponse<u64>, RPCError<u64, BasicNode, RaftError<u64>>> {
         self.router.rpcs.fetch_add(1, Ordering::Relaxed);
         self.router.hop().await;
-        let raft = self.router.get(self.group, self.target).ok_or_else(unreachable)?;
+        let raft = self
+            .router
+            .get(self.group, self.target)
+            .ok_or_else(unreachable)?;
         let r = raft.append_entries(rpc).await;
         self.router.hop().await;
         r.map_err(|e| RPCError::RemoteError(RemoteError::new(self.target, e)))
@@ -373,7 +385,10 @@ impl RaftNetwork<TypeConfig> for Conn {
     > {
         self.router.rpcs.fetch_add(1, Ordering::Relaxed);
         self.router.hop().await;
-        let raft = self.router.get(self.group, self.target).ok_or_else(unreachable)?;
+        let raft = self
+            .router
+            .get(self.group, self.target)
+            .ok_or_else(unreachable)?;
         let r = raft.install_snapshot(rpc).await;
         self.router.hop().await;
         r.map_err(|e| RPCError::RemoteError(RemoteError::new(self.target, e)))
@@ -386,7 +401,10 @@ impl RaftNetwork<TypeConfig> for Conn {
     ) -> Result<VoteResponse<u64>, RPCError<u64, BasicNode, RaftError<u64>>> {
         self.router.rpcs.fetch_add(1, Ordering::Relaxed);
         self.router.hop().await;
-        let raft = self.router.get(self.group, self.target).ok_or_else(unreachable)?;
+        let raft = self
+            .router
+            .get(self.group, self.target)
+            .ok_or_else(unreachable)?;
         let r = raft.vote(rpc).await;
         self.router.hop().await;
         r.map_err(|e| RPCError::RemoteError(RemoteError::new(self.target, e)))
@@ -399,7 +417,8 @@ pub struct Cluster {
     pub disks: Vec<Disk>,
     /// With batching, one proposer per group turns whatever claims are waiting into one entry,
     /// at most two entries in flight, because 0.9 appends one client write per flush.
-    proposers: Option<Vec<tokio::sync::mpsc::UnboundedSender<(Cmd, tokio::sync::oneshot::Sender<bool>)>>>,
+    proposers:
+        Option<Vec<tokio::sync::mpsc::UnboundedSender<(Cmd, tokio::sync::oneshot::Sender<bool>)>>>,
 }
 
 pub struct Timing {
@@ -449,18 +468,26 @@ impl Cluster {
                     Sm::default(),
                 )
                 .await?;
-                router.rafts.write().expect("not poisoned").insert((g, n), raft);
+                router
+                    .rafts
+                    .write()
+                    .expect("not poisoned")
+                    .insert((g, n), raft);
             }
         }
         let members: BTreeSet<u64> = [0, 1, 2].into();
         for g in 0..groups {
             let leader = u64::from(g % 3);
-            let raft = router.get(g, leader).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, leader)
+                .ok_or_else(|| anyhow!("missing raft"))?;
             raft.initialize(members.clone()).await?;
         }
         for g in 0..groups {
             let leader = u64::from(g % 3);
-            let raft = router.get(g, leader).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, leader)
+                .ok_or_else(|| anyhow!("missing raft"))?;
             raft.wait(Some(Duration::from_secs(60)))
                 .current_leader(leader, "leader elected")
                 .await?;
@@ -468,10 +495,15 @@ impl Cluster {
         // An elected leader may still refuse writes until its first entry commits; start the
         // clock only once every group has taken one.
         for g in 0..groups {
-            let raft = router.get(g, u64::from(g % 3)).ok_or_else(|| anyhow!("missing raft"))?;
+            let raft = router
+                .get(g, u64::from(g % 3))
+                .ok_or_else(|| anyhow!("missing raft"))?;
             let deadline = std::time::Instant::now() + Duration::from_secs(30);
             while raft
-                .client_write(Cmd { cid: b"warm".to_vec(), val: Vec::new() })
+                .client_write(Cmd {
+                    cid: b"warm".to_vec(),
+                    val: Vec::new(),
+                })
                 .await
                 .is_err()
             {
@@ -500,7 +532,9 @@ impl Cluster {
             tokio::spawn(async move {
                 let slots = Arc::new(tokio::sync::Semaphore::new(2));
                 loop {
-                    let Ok(permit) = slots.clone().acquire_owned().await else { return };
+                    let Ok(permit) = slots.clone().acquire_owned().await else {
+                        return;
+                    };
                     let Some(first) = rx.recv().await else { return };
                     let mut batch = vec![first];
                     while batch.len() < 1024 {
@@ -550,9 +584,7 @@ impl Cluster {
     /// Groups whose leader is not the one placed there (an election happened).
     pub fn misplaced_leaders(&self) -> u32 {
         (0..self.groups)
-            .filter(|&g| {
-                self.leader(g).metrics().borrow().current_leader != Some(u64::from(g % 3))
-            })
+            .filter(|&g| self.leader(g).metrics().borrow().current_leader != Some(u64::from(g % 3)))
             .count() as u32
     }
 
