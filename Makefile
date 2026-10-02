@@ -98,9 +98,10 @@ layers:
 	if [ -n "$$users" ]; then echo "$$users"; \
 		echo "error: openqtt-testkit must only ever be a dev-dependency"; exit 1; fi
 	@# One TLS stack and one crypto provider: in the binary at most one rustls (exactly one once
-	@# QUIC lands there), and in the client, which speaks QUIC, exactly one.
+	@# QUIC lands there), and in the client and the test kit, which speak QUIC, exactly one.
 	$(call one_tls,openqtt,0)
 	$(call one_tls,openqtt-client,1)
+	$(call one_tls,openqtt-testkit,1)
 
 # --- Markdown -----------------------------------------------------------------------------
 
