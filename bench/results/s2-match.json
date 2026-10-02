@@ -110,26 +110,26 @@
         "filters": 1000100,
         "n": 1000000,
         "result": {
-          "bulk_mean_ns": 737.618042,
+          "bulk_mean_ns": 856.46,
           "match_only_filters_found": 1000000,
           "match_only_per_call": {
-            "max_ns": 619375,
-            "mean_ns": 524.768556,
-            "p50_ns": 500,
-            "p90_ns": 666,
-            "p999_ns": 1375,
-            "p99_ns": 875,
+            "max_ns": 93750,
+            "mean_ns": 609.269977,
+            "p50_ns": 542,
+            "p90_ns": 709,
+            "p999_ns": 5584,
+            "p99_ns": 3666,
             "samples": 1000000
           },
-          "mean_destinations": 10.0,
+          "mean_destinations": 9.999982,
           "mean_matching_filters": 1.0,
           "per_call": {
-            "max_ns": 637167,
-            "mean_ns": 1102.804105,
-            "p50_ns": 917,
-            "p90_ns": 1625,
-            "p999_ns": 7792,
-            "p99_ns": 5167,
+            "max_ns": 36917,
+            "mean_ns": 851.329634,
+            "p50_ns": 792,
+            "p90_ns": 1000,
+            "p999_ns": 5958,
+            "p99_ns": 4166,
             "samples": 1000000
           }
         },
@@ -150,5 +150,31 @@
       "smallest_nonzero_ns": 41
     }
   },
-  "spike": "S2"
+  "spike": "S2",
+  "reruns": [
+    {
+      "date": "2026-10-02T06:35:46Z",
+      "args": {
+        "n": "1000000",
+        "samples": "1000000",
+        "workloads": "c"
+      },
+      "replaced_rows": [
+        "workload c"
+      ],
+      "reason": "collect() now sorts and deduplicates whenever more than one destination set contributes, the plain destinations and each shared group's pick counting as one set each; before, a single filter with several groups could return duplicates and skipped that work. Workloads a and b do not take that path and are from the original run.",
+      "timer": {
+        "empty_interval": {
+          "max_ns": 13750,
+          "mean_ns": 16.638554,
+          "p50_ns": 0,
+          "p90_ns": 42,
+          "p999_ns": 42,
+          "p99_ns": 42,
+          "samples": 1000000
+        },
+        "smallest_nonzero_ns": 41
+      }
+    }
+  ]
 }
