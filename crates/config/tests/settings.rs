@@ -972,3 +972,42 @@ fn the_plain_print_shows_only_what_the_file_and_the_variables_set() {
          [storage]\ndata_dir = \"/data\"\n"
     );
 }
+
+#[test]
+fn both_prints_keep_an_empty_set_of_listeners_and_a_listener_with_no_settings_of_its_own() {
+    // No listener at all, as a router's configuration may say, and a listener that takes every
+    // default. Leaving either table out of the print would bring the default listener back.
+    for (text, names) in [
+        ("[listeners.quic]\n", &[][..]),
+        ("[listeners.quic.custom]\n", &["custom"][..]),
+        (
+            "[listeners.quic.custom]\n[listeners.quic.other]\nbind = \"0.0.0.0:443\"\n",
+            &["custom", "other"][..],
+        ),
+    ] {
+        let loaded = load(Some(&file("listeners-in.toml", text)), &[]).unwrap();
+        assert_eq!(
+            loaded.settings().listeners.quic.keys().collect::<Vec<_>>(),
+            names
+        );
+        assert_eq!(
+            loaded.explicit_toml(),
+            text.replace("[listeners.quic.other]", "\n[listeners.quic.other]")
+        );
+        for printed in [loaded.settings().to_toml(), loaded.explicit_toml()] {
+            let reloaded = settings(Some(&file("listeners-out.toml", &printed)), &[]);
+            assert_eq!(&reloaded, loaded.settings(), "{printed}");
+        }
+    }
+}
+
+#[test]
+fn the_plain_print_loads_back_to_the_same_settings() {
+    let loaded = load(
+        Some(&file("edge-again.toml", &edge_settings().to_toml())),
+        &[],
+    )
+    .unwrap();
+    let printed = file("edge-plain.toml", &loaded.explicit_toml());
+    assert_eq!(&settings(Some(&printed), &[]), loaded.settings());
+}

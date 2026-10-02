@@ -29,16 +29,27 @@ pub(crate) fn values(settings: &Settings) -> toml::Table {
 /// value is written as a comment.
 pub(crate) fn toml_text(values: &toml::Table, unset: bool) -> String {
     let mut out = String::new();
-    section_text(&mut out, schema::fields(), values, &mut Vec::new(), unset);
+    section_text(
+        &mut out,
+        schema::fields(),
+        values,
+        &mut Vec::new(),
+        unset,
+        false,
+    );
     out
 }
 
+/// Writes one section: its header and settings, then its nested sections. With `declare`, the
+/// header is written even when the section has no line of its own, because the table being
+/// there means something: a listener that takes every default still exists.
 fn section_text(
     out: &mut String,
     fields: &[Field],
     values: &toml::Table,
     path: &mut Vec<String>,
     unset: bool,
+    declare: bool,
 ) {
     let mut lines = Vec::new();
     for field in fields {
@@ -50,13 +61,8 @@ fn section_text(
             }
         }
     }
-    if !lines.is_empty() {
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        if !path.is_empty() {
-            let _ = writeln!(out, "[{}]", path.join("."));
-        }
+    if !lines.is_empty() || declare {
+        header(out, path);
         for line in lines {
             out.push_str(&line);
             out.push('\n');
@@ -66,25 +72,38 @@ fn section_text(
     let empty = toml::Table::new();
     for field in fields {
         let value = values.get(field.name).and_then(toml::Value::as_table);
-        match &field.node {
-            Node::Leaf(_) => {}
-            Node::Section(inner) => {
-                path.push(field.name.to_owned());
-                section_text(out, inner, value.unwrap_or(&empty), path, unset);
-                path.pop();
+        path.push(field.name.to_owned());
+        match (&field.node, value) {
+            (Node::Leaf(_), _) | (Node::Map { .. }, None) => {}
+            (Node::Section(inner), _) => {
+                section_text(out, inner, value.unwrap_or(&empty), path, unset, false);
             }
-            Node::Map { entry, .. } => {
-                path.push(field.name.to_owned());
-                for (name, entry_values) in value.unwrap_or(&empty) {
+            // A map that is there but empty says there are no entries, which leaving it out would
+            // not: without it, a file gets the default listener back.
+            (Node::Map { .. }, Some(entries)) if entries.is_empty() => header(out, path),
+            (Node::Map { entry, .. }, Some(entries)) => {
+                for (name, entry_values) in entries {
                     path.push(name.clone());
                     let section = entry_values.as_table().unwrap_or(&empty);
-                    section_text(out, entry, section, path, unset);
+                    section_text(out, entry, section, path, unset, true);
                     path.pop();
                 }
-                path.pop();
             }
         }
+        path.pop();
     }
+}
+
+/// The `[a.b]` line that opens the table at `path`, after a blank line unless it comes first.
+/// The top of the file has none.
+fn header(out: &mut String, path: &[String]) {
+    if path.is_empty() {
+        return;
+    }
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    let _ = writeln!(out, "[{}]", path.join("."));
 }
 
 /// A value as TOML writes it, on one line.
