@@ -2,7 +2,7 @@
 
 use bytes::{Bytes, BytesMut};
 
-use crate::encode::{Encode, encode_methods};
+use crate::encode::{Encode, encode_methods, exceeds};
 use crate::publish::publish_qos;
 use crate::{
     Auth, ConnAck, Connect, Disconnect, Error, PacketType, PropertyId, PubAck, PubComp, PubRec,
@@ -242,6 +242,92 @@ impl Encode for Packet {
 
 encode_methods!(Packet);
 
+impl Packet {
+    /// Makes the packet fit in `max_packet_size` bytes, the receiver's Maximum Packet Size, by
+    /// dropping its Reason String and then its User Properties, and returns its size.
+    ///
+    /// Those two properties of a CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK,
+    /// DISCONNECT or AUTH are diagnostics, and their sender must leave them out rather than
+    /// exceed the receiver's limit ([MQTT-3.2.2-19], [MQTT-3.2.2-20], [MQTT-3.4.2-2],
+    /// [MQTT-3.4.2-3], [MQTT-3.5.2-2], [MQTT-3.5.2-3], [MQTT-3.6.2-2], [MQTT-3.6.2-3],
+    /// [MQTT-3.7.2-2], [MQTT-3.7.2-3], [MQTT-3.9.2-1], [MQTT-3.9.2-2], [MQTT-3.11.2-1],
+    /// [MQTT-3.11.2-2], [MQTT-3.14.2-3], [MQTT-3.14.2-4], [MQTT-3.15.2-2], [MQTT-3.15.2-3]).
+    /// Nothing is dropped from a packet that already fits, and nothing from other packet
+    /// types: a PUBLISH that does not fit is discarded whole ([MQTT-3.1.2-25]).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PacketTooLarge`] when the packet does not fit even without them, and any
+    /// error encoding the packet would return.
+    pub fn fit_within(&mut self, max_packet_size: u32) -> Result<usize, Error> {
+        for diagnostic in [Diagnostic::ReasonString, Diagnostic::UserProperties] {
+            let size = self.encoded_len()?;
+            if !exceeds(size, max_packet_size) {
+                return Ok(size);
+            }
+            if !self.drop_diagnostic(diagnostic) {
+                break;
+            }
+        }
+        let size = self.encoded_len()?;
+        if exceeds(size, max_packet_size) {
+            return Err(Error::PacketTooLarge {
+                size,
+                maximum: max_packet_size,
+            });
+        }
+        Ok(size)
+    }
+
+    /// Drops one diagnostic property from a packet whose sender drops them to fit, or
+    /// returns false for a packet that has none to drop.
+    fn drop_diagnostic(&mut self, diagnostic: Diagnostic) -> bool {
+        let (reason_string, user_properties) = match self {
+            Self::ConnAck(packet) => (
+                &mut packet.properties.reason_string,
+                &mut packet.properties.user_properties,
+            ),
+            Self::PubAck(PubAck { properties, .. })
+            | Self::PubRec(PubRec { properties, .. })
+            | Self::PubRel(PubRel { properties, .. })
+            | Self::PubComp(PubComp { properties, .. })
+            | Self::SubAck(SubAck { properties, .. })
+            | Self::UnsubAck(UnsubAck { properties, .. }) => (
+                &mut properties.reason_string,
+                &mut properties.user_properties,
+            ),
+            Self::Disconnect(Disconnect { properties, .. }) => (
+                &mut properties.reason_string,
+                &mut properties.user_properties,
+            ),
+            Self::Auth(Auth { properties, .. }) => (
+                &mut properties.reason_string,
+                &mut properties.user_properties,
+            ),
+            Self::Connect(_)
+            | Self::Publish(_)
+            | Self::Subscribe(_)
+            | Self::Unsubscribe(_)
+            | Self::PingReq
+            | Self::PingResp => return false,
+        };
+        match diagnostic {
+            Diagnostic::ReasonString => *reason_string = None,
+            Diagnostic::UserProperties => user_properties.clear(),
+        }
+        true
+    }
+}
+
+/// What [`Packet::fit_within`] drops, in order.
+#[derive(Clone, Copy)]
+enum Diagnostic {
+    /// The Reason String.
+    ReasonString,
+    /// Every User Property.
+    UserProperties,
+}
+
 /// Wraps each packet struct into its [`Packet`].
 macro_rules! into_packet {
     ($($name:ident => $wrap:expr),+ $(,)?) => {$(
@@ -267,4 +353,131 @@ into_packet! {
     UnsubAck => Self::UnsubAck,
     Disconnect => Self::Disconnect,
     Auth => Self::Auth,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        AckProperties, ConnAckProperties, ConnectReasonCode, DisconnectProperties,
+        DisconnectReasonCode, PacketId, PubAckReasonCode, PublishProperties,
+    };
+
+    fn unauthorized_puback() -> Packet {
+        Packet::PubAck(PubAck {
+            reason_code: PubAckReasonCode::NotAuthorized,
+            properties: AckProperties {
+                reason_string: Some("topic is outside the device namespace".into()),
+                user_properties: vec![("rule".into(), "13".into())],
+            },
+            ..PubAck::new(PacketId::new(1).unwrap())
+        })
+    }
+
+    #[test]
+    fn mqtt_3_4_2_2_and_mqtt_3_4_2_3_diagnostics_are_dropped_to_fit() {
+        let full = unauthorized_puback();
+        let full_size = full.encoded_len().unwrap();
+
+        // Room for everything: nothing is dropped.
+        let mut packet = full.clone();
+        assert_eq!(
+            packet.fit_within(u32::try_from(full_size).unwrap()),
+            Ok(full_size)
+        );
+        assert_eq!(packet, full);
+
+        // Room for the User Property but not the Reason String: the Reason String goes.
+        let mut packet = full.clone();
+        let without_reason = full_size - (1 + 2 + 37);
+        assert_eq!(
+            packet.fit_within(u32::try_from(without_reason).unwrap()),
+            Ok(without_reason)
+        );
+        let Packet::PubAck(ack) = &packet else {
+            panic!("still a PUBACK");
+        };
+        assert_eq!(ack.properties.reason_string, None);
+        assert_eq!(ack.properties.user_properties.len(), 1);
+
+        // Room for neither: both go, and the reason code stays.
+        let mut packet = full;
+        assert_eq!(packet.fit_within(5), Ok(3 + 2));
+        assert_eq!(
+            packet,
+            Packet::PubAck(PubAck {
+                reason_code: PubAckReasonCode::NotAuthorized,
+                ..PubAck::new(PacketId::new(1).unwrap())
+            })
+        );
+        assert_eq!(
+            packet.fit_within(4),
+            Err(Error::PacketTooLarge {
+                size: 5,
+                maximum: 4
+            })
+        );
+    }
+
+    #[test]
+    fn mqtt_3_2_2_19_and_mqtt_3_2_2_20_connack_diagnostics_are_dropped_to_fit() {
+        let mut connack = Packet::from(ConnAck {
+            reason_code: ConnectReasonCode::NotAuthorized,
+            properties: ConnAckProperties {
+                reason_string: Some("not on the list".into()),
+                user_properties: vec![("a".into(), "b".into())],
+                server_keep_alive: Some(30),
+                ..ConnAckProperties::default()
+            },
+            ..ConnAck::default()
+        });
+        // Five bytes of CONNACK plus three of Server Keep Alive, which is not a diagnostic.
+        assert_eq!(connack.fit_within(8), Ok(8));
+        let Packet::ConnAck(connack) = connack else {
+            panic!("still a CONNACK");
+        };
+        assert_eq!(connack.properties.server_keep_alive, Some(30));
+        assert!(connack.properties.reason_string.is_none());
+        assert!(connack.properties.user_properties.is_empty());
+    }
+
+    #[test]
+    fn mqtt_3_14_2_3_and_mqtt_3_14_2_4_disconnect_diagnostics_are_dropped_to_fit() {
+        let mut disconnect = Packet::Disconnect(Disconnect {
+            reason_code: DisconnectReasonCode::ServerShuttingDown,
+            properties: DisconnectProperties {
+                reason_string: Some("rolling upgrade".into()),
+                user_properties: vec![("drain".into(), "true".into())],
+                ..DisconnectProperties::default()
+            },
+        });
+        assert_eq!(disconnect.fit_within(3), Ok(3));
+        assert_eq!(
+            disconnect,
+            Packet::Disconnect(Disconnect {
+                reason_code: DisconnectReasonCode::ServerShuttingDown,
+                ..Disconnect::default()
+            })
+        );
+    }
+
+    #[test]
+    fn mqtt_3_1_2_25_a_publish_is_never_trimmed() {
+        let publish = Packet::Publish(Publish {
+            topic: "t".into(),
+            properties: PublishProperties {
+                user_properties: vec![("k".into(), "v".into())],
+                ..PublishProperties::default()
+            },
+            payload: Bytes::from_static(b"payload"),
+            ..Publish::default()
+        });
+        let size = publish.encoded_len().unwrap();
+        let mut packet = publish.clone();
+        assert_eq!(
+            packet.fit_within(10),
+            Err(Error::PacketTooLarge { size, maximum: 10 })
+        );
+        assert_eq!(packet, publish);
+    }
 }

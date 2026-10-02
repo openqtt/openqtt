@@ -25,7 +25,9 @@
 //! Encoding checks a packet against every rule its receiver would refuse it for before it
 //! writes a byte, so a packet that encodes decodes to itself, and one that does not leaves
 //! the buffer as it was. `encoded_len` is exact, for holding a packet to the peer's Maximum
-//! Packet Size before writing it ([MQTT-3.1.2-24]); `encode_within` does that check itself.
+//! Packet Size before writing it ([MQTT-3.1.2-24]); `encode_within` does that check itself,
+//! and [`Packet::fit_within`] first drops the Reason String and User Properties that a reply
+//! must go without rather than exceed the limit ([MQTT-3.4.2-2] and its like).
 //!
 //! # Errors and reason codes
 //!
