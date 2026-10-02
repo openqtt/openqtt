@@ -3,8 +3,9 @@
 //! Validation of names and filters (section 4.7 of MQTT 5.0), the `$share/{ShareName}/` form of
 //! shared subscriptions (section 4.8), matching a name against a filter, including the rule that
 //! a filter starting with a wildcard does not match a topic beginning with `$`, mountpoints,
-//! which give each client a namespace of its own (report R2, rule 6), and [`TopicIndex`], the
-//! arena trie of reports R3 and R6 that finds every filter matching a topic.
+//! which give each client a namespace of its own (report R2, rule 6), [`TopicIndex`], the arena
+//! trie of reports R3 and R6 that finds every filter matching a topic, and [`shape_cover`], the
+//! coarse form of its interest that an edge registers with the router (R6, D2).
 //!
 //! Topics are strings here, not packets, so this crate must not depend on `openqtt-codec`. The
 //! codec checks that a Topic Name or a Topic Filter is a UTF-8 Encoded String and no more; the
@@ -21,12 +22,14 @@
 //! roles that never parse MQTT (router, log) reach the topic types through core without
 //! reaching the codec, and this crate stays a leaf with nothing below it.
 
+mod cover;
 mod error;
 mod filter;
 mod index;
 mod mount;
 mod name;
 
+pub use cover::{CoverEntry, CoverRule, shape_cover};
 pub use error::Error;
 pub use filter::TopicFilter;
 pub use index::{Destination, Matched, Memory, Scratch, SharedGroup, TopicIndex};

@@ -6,14 +6,18 @@
 //! - the index finds exactly the destinations the naive matcher does, each once;
 //! - random inserts and removes never lose or duplicate a destination, compaction changes
 //!   nothing, and removing everything leaves an empty index;
-//! - mounting keeps matching, and stripping undoes it.
+//! - mounting keeps matching, and stripping undoes it;
+//! - a shape cover matches every name its filters match, and is the filters themselves when
+//!   nothing is over the threshold.
 //!
 //! The strategies draw levels from a small alphabet, so that random filters and names match
 //! each other often and the index's paths are shared.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use openqtt_topic::{Mountpoint, Scratch, TopicFilter, TopicIndex, TopicName};
+use openqtt_topic::{
+    CoverRule, Mountpoint, Scratch, TopicFilter, TopicIndex, TopicName, shape_cover,
+};
 use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest::sample::select;
@@ -209,7 +213,8 @@ proptest! {
             prop_assert_eq!(added, model.insert((filter.as_str().to_owned(), *dest)));
         }
         for name in &names {
-            prop_assert_eq!(collect(&index, name), reference_collect(&model, name.as_str()), "{}", name);
+            let expected = reference_collect(&model, name.as_str());
+            prop_assert_eq!(collect(&index, name), expected, "{}", name);
         }
     }
 
@@ -231,7 +236,8 @@ proptest! {
                 prop_assert_eq!(index.remove(filter, dest), model.remove(&key));
             }
             prop_assert_eq!(index.entries(), model.len());
-            prop_assert_eq!(index.contains(filter, dest), model.contains(&(filter.as_str().to_owned(), dest)));
+            let held = model.contains(&(filter.as_str().to_owned(), dest));
+            prop_assert_eq!(index.contains(filter, dest), held);
         }
         let patterns: BTreeSet<&str> = model.iter().map(|(f, _)| reference_pattern(f)).collect();
         prop_assert_eq!(index.filters(), patterns.len());
@@ -279,5 +285,67 @@ proptest! {
             prop_assert!(name.starts_with_dollar());
             prop_assert!(filter.pattern().starts_with(['+', '#']));
         }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    #[test]
+    fn a_shape_cover_matches_everything_its_filters_match(
+        filters in vec(filter(), 0..40),
+        names in vec(name(), 1..16),
+        threshold in 0..4usize,
+        floor in 0..4usize,
+    ) {
+        let cover = shape_cover(&filters, CoverRule { threshold, floor });
+        let texts: Vec<&str> = cover.iter().map(|e| e.filter.as_str()).collect();
+        let mut sorted = texts.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        prop_assert_eq!(&sorted, &texts, "sorted, each filter once");
+        for name in &names {
+            for filter in filters.iter().filter(|f| !f.is_shared() && f.matches(name)) {
+                prop_assert!(
+                    cover.iter().any(|e| !e.filter.is_shared() && e.filter.matches(name)),
+                    "{} matches {} and nothing in {:?}", filter, name, texts
+                );
+            }
+        }
+        for filter in filters.iter().filter(|f| f.is_shared()) {
+            prop_assert!(cover.iter().any(|e| e.filter == *filter && !e.coarse));
+        }
+        // An entry that is not coarse is one of the edge's own filters.
+        for entry in cover.iter().filter(|e| !e.coarse) {
+            prop_assert!(filters.contains(&entry.filter), "{} is not the edge's", entry.filter);
+        }
+    }
+
+    #[test]
+    fn under_a_high_threshold_the_cover_is_the_filters(filters in vec(filter(), 0..40)) {
+        // Forty filters cannot give a node more than 64 children, so nothing is coarsened, and
+        // a filter is left out only when a `#` filter of the edge covers it.
+        let cover = shape_cover(&filters, CoverRule::DEFAULT);
+        prop_assert!(cover.iter().all(|e| !e.coarse));
+        for entry in &cover {
+            prop_assert!(filters.contains(&entry.filter));
+        }
+        for filter in &filters {
+            let kept = cover.iter().any(|e| e.filter == *filter);
+            let covered = !filter.is_shared()
+                && cover.iter().any(|e| {
+                    !e.filter.is_shared() && below_hash(e.filter.pattern(), filter.pattern())
+                });
+            prop_assert!(kept || covered, "{} is missing from the cover", filter);
+        }
+    }
+}
+
+/// Whether `pattern` is covered by `hash`, a filter ending in `#`: equal to its parent level or
+/// below it, and for `#` alone, not a `$` topic's.
+fn below_hash(hash: &str, pattern: &str) -> bool {
+    match hash.strip_suffix("/#") {
+        Some(parent) => pattern == parent || pattern.starts_with(&format!("{parent}/")),
+        None => hash == "#" && !pattern.starts_with('$'),
     }
 }
