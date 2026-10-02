@@ -1331,3 +1331,138 @@ async fn publications_wait_for_room_to_be_written() {
     }
     assert_eq!(second.await.unwrap().unwrap(), Published::AtMostOnce);
 }
+
+/// A server that never stops sending: CONNACK, then QoS 0 PUBLISH packets for as long as the
+/// client reads. It is ready whenever it is polled within the task's budget, as a fast link
+/// with a backlog is.
+struct Flood {
+    connack: Vec<u8>,
+    sent: usize,
+    publish: Vec<u8>,
+    offset: usize,
+}
+
+impl Flood {
+    fn new() -> Self {
+        let mut connack = BytesMut::new();
+        Packet::from(ConnAck::default())
+            .encode(&mut connack)
+            .unwrap();
+        let mut publish = BytesMut::new();
+        Packet::Publish(Publish {
+            topic: "t".into(),
+            payload: Bytes::from_static(b"x"),
+            ..Publish::default()
+        })
+        .encode(&mut publish)
+        .unwrap();
+        Self {
+            connack: connack.to_vec(),
+            sent: 0,
+            publish: publish.to_vec(),
+            offset: 0,
+        }
+    }
+}
+
+impl tokio::io::AsyncRead for Flood {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        let coop = std::task::ready!(tokio::task::coop::poll_proceed(cx));
+        let this = self.get_mut();
+        if this.sent < this.connack.len() {
+            let count = buf.remaining().min(this.connack.len() - this.sent);
+            buf.put_slice(&this.connack[this.sent..this.sent + count]);
+            this.sent += count;
+        } else {
+            while buf.remaining() > 0 {
+                let rest = &this.publish[this.offset..];
+                let count = buf.remaining().min(rest.len());
+                buf.put_slice(&rest[..count]);
+                this.offset = (this.offset + count) % this.publish.len();
+            }
+        }
+        coop.made_progress();
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// Everything the client writes, kept.
+#[derive(Clone, Default)]
+struct Written(std::sync::Arc<Mutex<Vec<u8>>>);
+
+impl Written {
+    fn packets(&self) -> Vec<Packet> {
+        let decoder = Decoder::new().with_sender(Sender::Client);
+        let mut bytes = BytesMut::from(&self.0.lock().unwrap()[..]);
+        let mut packets = Vec::new();
+        while let Ok(Some(packet)) = decoder.decode(&mut bytes) {
+            packets.push(packet);
+        }
+        packets
+    }
+}
+
+impl tokio::io::AsyncWrite for Written {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<io::Result<usize>> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        std::task::Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// A transport whose server floods the client and keeps what the client writes.
+struct Flooding(Written);
+
+impl Transport for Flooding {
+    fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
+        let written = self.0.clone();
+        Box::pin(async move { Ok(Link::new(Flood::new(), written, Unclosable)) })
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn mqtt_3_1_2_20_a_pingreq_falls_due_under_a_flood_of_messages() {
+    let written = Written::default();
+    let (_client, events) = Client::connect(
+        &Flooding(written.clone()),
+        ConnectOptions::new("c").keep_alive(10),
+    )
+    .await
+    .unwrap();
+    // The application takes no message, so nothing holds the reading back: there is always
+    // more to read.
+    drop(events);
+    // The client sends nothing for the Keep Alive, so PINGREQ is due.
+    tokio::time::advance(Duration::from_secs(11)).await;
+    for _ in 0..50 {
+        if written.packets().contains(&Packet::PingReq) {
+            return;
+        }
+        tokio::task::yield_now().await;
+    }
+    panic!(
+        "no PINGREQ while the server floods the client: {:?}",
+        written.packets()
+    );
+}

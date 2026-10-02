@@ -327,6 +327,13 @@ impl Driver {
         self.decode_buffered()?;
         loop {
             let ping_at = self.ping_deadline();
+            // A due PINGREQ, or an overdue PINGRESP, comes before anything else: the timer
+            // branch below is reached only when nothing else is ready, and a server that
+            // keeps sending keeps the reads ready.
+            if ping_at.is_some_and(|at| at <= Instant::now()) {
+                self.keep_alive_due()?;
+                continue;
+            }
             let pending = !self.outbox.is_empty();
             let writing = !self.write_buf.is_empty();
             let (events, outbox) = (&self.events, &mut self.outbox);
@@ -385,9 +392,9 @@ impl Driver {
                     Ok(_) => self.decode_buffered()?,
                     Err(error) => return Err(Stop::Lost(error.to_string())),
                 },
-                () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {
-                    self.keep_alive_due()?;
-                }
+                // Wakes an idle connection when the next PINGREQ falls due; the check at the
+                // top of the loop serves it.
+                () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {}
             }
         }
     }
