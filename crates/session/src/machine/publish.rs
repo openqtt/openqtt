@@ -63,19 +63,29 @@ impl Session {
             // report R1 D8). A reserved identifier is published again instead, under its
             // receipt, which the log keeps from the first commit if there was one.
             let repeat = match self.inbound.get(&packet_id.get()) {
-                Some(inbound) if publish.qos == QoS::ExactlyOnce => match inbound.state {
-                    InboundState::Committing(token) => Some(ReplyState::Waiting(token)),
-                    InboundState::AwaitingRelease => Some(ReplyState::Ready(AckCode::Success)),
-                    // Sent before the client could know of the refusal: the same refusal.
-                    InboundState::Refusing(code) | InboundState::Refused(code) => {
-                        Some(ReplyState::Ready(code))
-                    }
-                    InboundState::Reserved => None,
-                },
+                Some(inbound) if publish.qos == QoS::ExactlyOnce => {
+                    let state = match inbound.state {
+                        InboundState::Committing(token) => Some(ReplyState::Waiting(token)),
+                        InboundState::AwaitingRelease => Some(ReplyState::Ready(AckCode::Success)),
+                        // Sent before the client could know of the refusal: the same refusal.
+                        InboundState::Refusing(code) | InboundState::Refused(code) => {
+                            Some(ReplyState::Ready(code))
+                        }
+                        InboundState::Reserved => None,
+                    };
+                    state.map(|state| (state, inbound.exchange))
+                }
                 _ => None,
             };
-            if let Some(state) = repeat {
-                self.push_reply(stream, packet_id, ReplyKind::PubRec, state, false);
+            if let Some((state, exchange)) = repeat {
+                let reply = Reply {
+                    packet_id,
+                    kind: ReplyKind::PubRec,
+                    state,
+                    counted: false,
+                    exchange,
+                };
+                self.push_reply(stream, reply);
                 self.settle_refusal(packet_id.get());
                 return self.flush(stream, now, fx);
             }
@@ -229,6 +239,7 @@ impl Session {
         let token = match publish.packet_id {
             None => None,
             Some(packet_id) => {
+                // The commit's token also numbers a QoS 2 exchange.
                 let token = self.token();
                 let kind = if publish.qos == QoS::ExactlyOnce {
                     self.inbound.insert(
@@ -237,6 +248,7 @@ impl Session {
                             state: InboundState::Committing(token),
                             stream,
                             counted: true,
+                            exchange: token,
                         },
                     );
                     ReplyKind::PubRec
@@ -253,7 +265,14 @@ impl Session {
                     },
                 );
                 // [MQTT-4.3.2-4], [MQTT-4.3.3-8]: acknowledged once durable (report R1, D26).
-                self.push_reply(stream, packet_id, kind, ReplyState::Waiting(token), true);
+                let reply = Reply {
+                    packet_id,
+                    kind,
+                    state: ReplyState::Waiting(token),
+                    counted: true,
+                    exchange: token,
+                };
+                self.push_reply(stream, reply);
                 Some(PublishToken(token))
             }
         };
@@ -282,18 +301,26 @@ impl Session {
             };
             return fx.push(Effect::Count(counter));
         };
-        let kind = if publish.qos == QoS::ExactlyOnce {
+        let (kind, exchange) = if publish.qos == QoS::ExactlyOnce {
             // The refusal ends the exchange and frees the identifier for the client
             // ([MQTT-4.3.3-9]), so whatever the log holds under it goes too: nothing from this
             // PUBLISH, but a receipt a cut-off commit of a reserved identifier may have left,
             // which would swallow the next message sent with it.
-            self.refusing(stream, packet_id, code);
+            let exchange = self.token();
+            self.refusing(stream, packet_id, code, exchange);
             fx.push(Effect::ReleaseReceipt(packet_id));
-            ReplyKind::PubRec
+            (ReplyKind::PubRec, exchange)
         } else {
-            ReplyKind::PubAck
+            (ReplyKind::PubAck, 0)
         };
-        self.push_reply(stream, packet_id, kind, ReplyState::Ready(code), true);
+        let reply = Reply {
+            packet_id,
+            kind,
+            state: ReplyState::Ready(code),
+            counted: true,
+            exchange,
+        };
+        self.push_reply(stream, reply);
         self.flush(stream, now, fx);
     }
 
@@ -328,7 +355,8 @@ impl Session {
                     // nothing, but a repeat of a reserved identifier may find the log still
                     // holding the receipt of the first, cut-off commit: it goes with the
                     // exchange.
-                    self.refusing(commit.stream, commit.packet_id, code);
+                    let exchange = inbound.exchange;
+                    self.refusing(commit.stream, commit.packet_id, code, exchange);
                     fx.push(Effect::ReleaseReceipt(commit.packet_id));
                 } else {
                     inbound.state = InboundState::AwaitingRelease;
@@ -356,22 +384,24 @@ impl Session {
 
     /// A QoS 2 exchange is refused with `code`. Until a PUBREC refusing it goes out, a PUBLISH
     /// with the identifier is a repeat and gets the same refusal.
-    fn refusing(&mut self, stream: StreamId, packet_id: PacketId, code: AckCode) {
+    fn refusing(&mut self, stream: StreamId, packet_id: PacketId, code: AckCode, exchange: u64) {
         self.inbound.insert(
             packet_id.get(),
             Inbound {
                 state: InboundState::Refusing(code),
                 stream,
                 counted: false,
+                exchange,
             },
         );
     }
 
-    /// A PUBREC refusing a PUBLISH with this identifier went out, the first one's or a
-    /// repeat's: the client may take the identifier for a new message from now on
-    /// ([MQTT-4.3.3-9]).
-    fn refusal_sent(&mut self, id: u16) {
+    /// A PUBREC refusing a PUBLISH of this exchange went out, the first one's or a repeat's:
+    /// the client may take the identifier for a new message from now on ([MQTT-4.3.3-9]). One
+    /// from an older exchange with the identifier, held back until now, ends nothing newer.
+    fn refusal_sent(&mut self, id: u16, exchange: u64) {
         if let Some(inbound) = self.inbound.get_mut(&id)
+            && inbound.exchange == exchange
             && let InboundState::Refusing(code) = inbound.state
         {
             inbound.state = InboundState::Refused(code);
@@ -391,20 +421,8 @@ impl Session {
     }
 
     /// Adds an acknowledgement to those owed on `stream`.
-    fn push_reply(
-        &mut self,
-        stream: StreamId,
-        packet_id: PacketId,
-        kind: ReplyKind,
-        state: ReplyState,
-        counted: bool,
-    ) {
-        self.replies.entry(stream).or_default().push_back(Reply {
-            packet_id,
-            kind,
-            state,
-            counted,
-        });
+    fn push_reply(&mut self, stream: StreamId, reply: Reply) {
+        self.replies.entry(stream).or_default().push_back(reply);
     }
 
     /// Sends the acknowledgements owed on `stream` that are ready, in the order the packets
@@ -462,7 +480,7 @@ impl Session {
                         fx,
                     );
                     if code.is_error() {
-                        self.refusal_sent(reply.packet_id.get());
+                        self.refusal_sent(reply.packet_id.get(), reply.exchange);
                     }
                 }
             }

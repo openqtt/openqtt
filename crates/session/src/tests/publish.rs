@@ -360,6 +360,52 @@ fn a_repeat_of_a_new_publish_behind_a_pubrel_takes_no_slot() {
 }
 
 #[test]
+fn an_older_exchanges_refusal_leaves_a_newer_one_with_the_identifier_refusing() {
+    let mut harness = authorizing(8);
+    harness.auto.commit = false;
+    // QoS 1 PUBLISH packets whose commits stay out hold back the acknowledgements on streams 4
+    // and 8 (report R1, O15).
+    harness.send_on(StreamId::Data(4), publish1("a", 1, "a"));
+    decide(&mut harness, Decision::Allow);
+    let held = last_token(&harness);
+    harness.send_on(StreamId::Data(8), publish1("b", 2, "b"));
+    decide(&mut harness, Decision::Allow);
+    // 7 is refused. Its repeat on stream 4 gets the same refusal, held there.
+    harness.send(publish2("t", 7, "old"));
+    let mut repeat = publish2("t", 7, "old");
+    repeat.dup = true;
+    harness.send_on(StreamId::Data(4), repeat);
+    assert_eq!(
+        pubrec_code(one(decide(&mut harness, Decision::Deny))),
+        (7, PubRecReasonCode::NotAuthorized)
+    );
+    // Having read the refusal, the client sends a new message with 7 on stream 8. It is
+    // refused too, and the PUBREC saying so waits there.
+    harness.send_on(StreamId::Data(8), publish2("t", 7, "new"));
+    assert!(decide(&mut harness, Decision::Deny).is_empty());
+    // The commit on stream 4 lets the old repeat's refusal out. It is the old exchange's.
+    let packets = harness.input(Input::Committed {
+        token: held,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    assert!(
+        matches!(&packets[..], [Packet::PubAck(_), Packet::PubRec(rec)]
+            if rec.reason_code == PubRecReasonCode::NotAuthorized),
+        "{packets:?}"
+    );
+    // A repeat of the new message, sent before its refusal went out, still belongs to the new
+    // exchange: the same refusal, no authorization of its own, nothing published.
+    let mut repeat = publish2("t", 7, "new");
+    repeat.dup = true;
+    assert_eq!(
+        pubrec_code(one(harness.send(repeat))),
+        (7, PubRecReasonCode::NotAuthorized)
+    );
+    assert!(harness.authorizations.is_empty());
+    assert_eq!(harness.published().len(), 2);
+}
+
+#[test]
 fn a_qos_2_publish_repeated_while_it_commits_gets_its_pubrec_after_the_commit() {
     let mut harness = Harness::connected();
     harness.auto.loopback = false;

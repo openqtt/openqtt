@@ -512,6 +512,7 @@ impl Session {
             });
         }
         for packet_id in state.awaiting_release {
+            let exchange = self.token();
             self.inbound.insert(
                 packet_id.get(),
                 Inbound {
@@ -519,14 +520,17 @@ impl Session {
                     stream: StreamId::Control,
                     // A new connection starts with a full quota (section 4.9).
                     counted: false,
+                    exchange,
                 },
             );
         }
         for packet_id in state.awaiting_commit {
+            let exchange = self.token();
             self.inbound.entry(packet_id.get()).or_insert(Inbound {
                 state: InboundState::Reserved,
                 stream: StreamId::Control,
                 counted: false,
+                exchange,
             });
         }
         for stored in state.queue {

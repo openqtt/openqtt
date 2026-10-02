@@ -353,6 +353,9 @@ struct Reply {
     state: ReplyState,
     /// Whether sending it with this code frees a slot of the server's Receive Maximum.
     counted: bool,
+    /// For a PUBREC, the QoS 2 exchange it answers for, so that a refusal from an older
+    /// exchange with the identifier ends nothing newer.
+    exchange: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -426,6 +429,9 @@ struct Inbound {
     stream: StreamId,
     /// Whether it holds a slot of the server's Receive Maximum on this connection.
     counted: bool,
+    /// A number of its own, drawn like commit tokens, which the PUBREC packets answering it
+    /// carry.
+    exchange: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
