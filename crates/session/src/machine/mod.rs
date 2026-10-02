@@ -743,44 +743,50 @@ impl Session {
 
     /// Whether a QoS 2 PUBLISH with this Packet Identifier, arriving now, is a repeat the
     /// machine will answer from the exchange open for the identifier ([MQTT-4.3.3-10]), and so
-    /// takes no slot of Receive Maximum. The exchange is open from the arrival of its first
-    /// PUBLISH, through authorization and the commit, until the PUBREC refusing it or the
-    /// PUBCOMP ending it goes out ([MQTT-4.3.3-9], [MQTT-4.3.3-12]). It is not counted on while
-    /// a PUBREL with the identifier waits, which may end it first, nor for a reserved
-    /// identifier, which is published again. The backlog is bounded, so looking through it
-    /// costs little.
+    /// takes no slot of Receive Maximum. The exchange is followed from where it stands through
+    /// the backlog, in the order the machine will get to it: a PUBLISH with the identifier opens
+    /// it, or repeats it if it is open. A PUBREL may end it, depending on whether its commit
+    /// came back first, so after one it is not counted on until the next PUBLISH. A refused
+    /// exchange stays open until the PUBREC refusing it goes out, PUBREL or not
+    /// ([MQTT-4.3.3-9]), and a reserved identifier is published again. The backlog is bounded,
+    /// so following it costs little.
     fn arrives_as_repeat(&self, id: u16) -> bool {
-        let state = self.inbound.get(&id).map(|inbound| inbound.state);
-        let open = matches!(
-            state,
-            Some(
-                InboundState::Committing(_)
-                    | InboundState::AwaitingRelease
-                    | InboundState::Refusing(_)
-            )
-        ) || matches!(
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum Exchange {
+            Closed,
+            Open,
+            Refusing,
+        }
+        let authorizing = matches!(
             &self.authorizing,
             Some(Authorizing::Publish { publish, .. }) if exactly_once(publish, id)
-        ) || self.inbox.iter().any(|received| {
-            matches!(
-                received,
-                Received::Packet {
-                    packet: Packet::Publish(publish),
-                    arrival,
-                    ..
-                } if arrival.slot && exactly_once(publish, id)
-            )
-        });
-        let releasing = self.inbox.iter().any(|received| {
-            matches!(
-                received,
-                Received::Packet {
-                    packet: Packet::PubRel(pubrel),
-                    ..
-                } if pubrel.packet_id.get() == id
-            )
-        });
-        open && !releasing
+        );
+        let mut exchange = match self.inbound.get(&id).map(|inbound| inbound.state) {
+            _ if authorizing => Exchange::Open,
+            Some(InboundState::Committing(_) | InboundState::AwaitingRelease) => Exchange::Open,
+            Some(InboundState::Refusing(_)) => Exchange::Refusing,
+            Some(InboundState::Reserved | InboundState::Refused(_)) | None => Exchange::Closed,
+        };
+        for received in &self.inbox {
+            let Received::Packet {
+                packet, arrival, ..
+            } = received
+            else {
+                continue;
+            };
+            match packet {
+                Packet::Publish(publish) if arrival.slot && exactly_once(publish, id) => {
+                    exchange = Exchange::Open;
+                }
+                Packet::PubRel(pubrel)
+                    if pubrel.packet_id.get() == id && exchange == Exchange::Open =>
+                {
+                    exchange = Exchange::Closed;
+                }
+                _ => {}
+            }
+        }
+        exchange != Exchange::Closed
     }
 
     /// Whether a PUBLISH that arrived as a repeat of a refused exchange still waits: a QoS 2

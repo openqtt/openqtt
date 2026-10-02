@@ -332,6 +332,34 @@ fn a_publish_behind_a_pubrel_with_its_identifier_is_counted_as_a_new_message() {
 }
 
 #[test]
+fn a_repeat_of_a_new_publish_behind_a_pubrel_takes_no_slot() {
+    let mut harness = authorizing(2);
+    harness.send(publish2("t", 7, "first"));
+    pubrec_code(one(decide(&mut harness, Decision::Allow)));
+    // While a QoS 0 PUBLISH waits for its authorization, the client releases 7, sends a new
+    // message with it, and repeats that. The new message takes the second slot; its repeat
+    // belongs to the same exchange and takes none.
+    harness.send(publish0("held", "x"));
+    harness.send(pubrel(7));
+    assert!(harness.send(publish2("t", 7, "second")).is_empty());
+    let mut repeat = publish2("t", 7, "second");
+    repeat.dup = true;
+    assert!(harness.send(repeat).is_empty());
+    let packets = decide(&mut harness, Decision::Allow);
+    assert!(matches!(packets[..], [Packet::PubComp(_)]), "{packets:?}");
+    let packets = decide(&mut harness, Decision::Allow);
+    assert_eq!(packets.len(), 2, "{packets:?}");
+    for packet in packets {
+        assert_eq!(
+            pubrec_code(packet),
+            (7, PubRecReasonCode::NoMatchingSubscribers)
+        );
+    }
+    assert_eq!(harness.published().len(), 3);
+    assert!(harness.authorizations.is_empty());
+}
+
+#[test]
 fn a_qos_2_publish_repeated_while_it_commits_gets_its_pubrec_after_the_commit() {
     let mut harness = Harness::connected();
     harness.auto.loopback = false;
