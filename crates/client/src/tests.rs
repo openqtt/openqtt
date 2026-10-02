@@ -1907,3 +1907,55 @@ async fn calls_publications_and_the_keep_alive_get_their_turn_while_the_server_f
     }
     panic!("no PINGREQ was written while the server flooded the client");
 }
+
+#[tokio::test(start_paused = true)]
+async fn publications_whose_callers_gave_up_free_the_queue_on_their_own() {
+    let connack = ConnAck {
+        properties: ConnAckProperties {
+            receive_maximum: NonZeroU16::new(1),
+            ..ConnAckProperties::default()
+        },
+        ..ConnAck::default()
+    };
+    let (client, _events, mut server, _) =
+        connect_with(ConnectOptions::new("c").keep_alive(0), connack).await;
+    // The only slot is taken by a QoS 1 publication the server never acknowledges.
+    let publisher = client.clone();
+    tokio::spawn(async move { drop(publisher.publish(qos1("t", "first")).await) });
+    assert!(matches!(server.recv().await, Packet::Publish(_)));
+
+    // More than the client's queue holds wait behind it, and their callers give up. Nothing
+    // else happens on the connection: no Keep Alive, no packet from the server.
+    let callers: Vec<_> = (0..2 * crate::driver::QUEUE_LIMIT)
+        .map(|_| {
+            let publisher = client.clone();
+            tokio::spawn(async move { publisher.publish(qos1("t", "waits")).await })
+        })
+        .collect();
+    tokio::time::sleep(Duration::from_millis(1)).await;
+    for caller in &callers {
+        caller.abort();
+    }
+    for caller in callers {
+        assert!(caller.await.is_err());
+    }
+
+    // A QoS 0 publication needs no slot, and goes out.
+    let published = tokio::time::timeout(
+        Duration::from_secs(5),
+        client.publish(Publish {
+            topic: "t".into(),
+            payload: Bytes::from_static(b"zero"),
+            ..Publish::default()
+        }),
+    )
+    .await;
+    assert!(
+        matches!(published, Ok(Ok(Published::AtMostOnce))),
+        "{published:?}"
+    );
+    let Packet::Publish(sent) = server.recv().await else {
+        panic!("a PUBLISH");
+    };
+    assert_eq!(sent.payload, "zero");
+}

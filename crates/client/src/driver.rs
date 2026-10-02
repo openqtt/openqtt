@@ -475,7 +475,8 @@ impl Driver {
         let pending = !self.outbox.is_empty();
         let writing = !self.write_buf.is_empty();
         let taking = self.publications_open && self.queued.len() < QUEUE_LIMIT;
-        let (events, outbox) = (&self.events, &mut self.outbox);
+        let waiting = !self.queued.is_empty();
+        let (events, outbox, queued) = (&self.events, &mut self.outbox, &mut self.queued);
         // Hands one waiting event over as soon as the channel has room.
         let deliver = async move {
             let permit = events.reserve().await.map_err(drop)?;
@@ -484,6 +485,17 @@ impl Driver {
             }
             Ok::<(), ()>(())
         };
+        // Completes when the caller of a queued publication gives up, so that its place frees
+        // without anything else having to happen on the connection: with the queue full, the
+        // publication channel is not read, and nothing else may ever wake the task.
+        let abandoned = std::future::poll_fn(move |cx| {
+            for (_, reply) in queued.iter_mut() {
+                if reply.poll_closed(cx).is_ready() {
+                    return std::task::Poll::Ready(());
+                }
+            }
+            std::task::Poll::Pending
+        });
         tokio::select! {
             biased;
             delivered = deliver, if pending => {
@@ -496,6 +508,8 @@ impl Driver {
                 self.events_closed = true;
                 self.outbox.clear();
             }
+            // The next round drops it.
+            () = abandoned, if waiting => {}
             command = self.commands.recv(), if self.commands_open => match command {
                 Some(command) => self.command(command)?,
                 None => self.commands_open = false,
