@@ -4,7 +4,7 @@
 CARGO ?= cargo
 
 .PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance differential \
-	differential-bless tools need-nextest need-deny
+	differential-bless config-doc semver tools need-nextest need-deny need-semver-checks
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -98,8 +98,10 @@ layers:
 	if [ -n "$$users" ]; then echo "$$users"; \
 		echo "error: openqtt-testkit must only ever be a dev-dependency"; exit 1; fi
 	@# One TLS stack and one crypto provider: in the binary at most one rustls (exactly one once
-	@# QUIC lands there), and in the client and the test kit, which speak QUIC, exactly one.
+	@# QUIC lands there), and in the client listener, the client and the test kit, which speak
+	@# QUIC, exactly one.
 	$(call one_tls,openqtt,0)
+	$(call one_tls,openqtt-transport,1)
 	$(call one_tls,openqtt-client,1)
 	$(call one_tls,openqtt-testkit,1)
 
@@ -136,6 +138,34 @@ differential-bless: need-nextest
 	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
 		--no-capture -E 'test(bless_the_oracle_traces)'
 
+# --- Semver -------------------------------------------------------------------------------
+
+# The extension seam is public API for other builds (crates/ext/README.md): compare openqtt-ext
+# with SEMVER_BASE as a minor release, or as a major one when the major number of API_VERSION
+# differs from the base's. The workspace's version does not move between commits, so it cannot
+# say which; API_VERSION can, and a change that breaks the seam passes only by raising it. Not
+# part of check: it needs the base revision fetched.
+SEMVER_BASE ?= origin/main
+# The major number in the line that defines API_VERSION.
+API_MAJOR := s/^pub const API_VERSION: ApiVersion = ApiVersion::new[(]\([0-9][0-9]*\),.*/\1/p
+
+semver: need-semver-checks
+	@base=$$(git show $(SEMVER_BASE):crates/ext/src/lib.rs 2>/dev/null | sed -n '$(API_MAJOR)'); \
+	head=$$(sed -n '$(API_MAJOR)' crates/ext/src/lib.rs); \
+	if [ -z "$$head" ]; then echo "error: no API_VERSION in crates/ext/src/lib.rs"; exit 1; fi; \
+	release=minor; \
+	if [ -n "$$base" ] && [ "$$base" != "$$head" ]; then release=major; fi; \
+	echo "semver: API_VERSION major $${base:-absent} at $(SEMVER_BASE), $$head here: a $$release release"; \
+	$(CARGO) semver-checks check-release -p openqtt-ext --baseline-rev $(SEMVER_BASE) \
+		--release-type $$release
+
+# --- Configuration reference -------------------------------------------------------------
+
+# Rewrites the settings tables of docs/spec/config.md from the declarations in
+# crates/config/src/settings.rs. A test in openqtt-config fails while the two differ.
+config-doc:
+	$(CARGO) run --locked --quiet -p openqtt-config --example config-doc
+
 # --- Tools --------------------------------------------------------------------------------
 
 # The two cargo tools the gate needs beyond the toolchain.
@@ -151,3 +181,8 @@ need-deny:
 	@command -v cargo-deny >/dev/null 2>&1 || { \
 		echo "error: cargo-deny is not installed. Install it with"; \
 		echo "    cargo install --locked cargo-deny    (or: make tools)"; exit 1; }
+
+need-semver-checks:
+	@command -v cargo-semver-checks >/dev/null 2>&1 || { \
+		echo "error: cargo-semver-checks is not installed. Install it with"; \
+		echo "    cargo install --locked cargo-semver-checks"; exit 1; }

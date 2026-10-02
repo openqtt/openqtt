@@ -1,0 +1,89 @@
+# Converted from an acl.conf of OpenQTT 1.x by `openqtt convert acl`. Each rule follows
+# the 1.x rule it came from. The format is docs/spec/acl.md.
+version = 1
+
+# line 7: {allow, {username, {re, "^svc:"}}, all, ["#"]}.
+[[rule]]
+permission = "allow"
+username = { regex = "(?s:.*?)(?:^svc:)(?s:.*)" }
+action = "all"
+topics = ["#"]
+
+# line 8: {allow, {'and', [{username, "svc:bridge"}, {ipaddrs, ["10.0.0.0/8", "fd00::/8"]}]}, publish, ["ingest/+/commands/#"]}.
+[[rule]]
+permission = "allow"
+username = "svc:bridge"
+address = ["10.0.0.0/8", "fd00::/8"]
+action = "publish"
+topics = ["ingest/+/commands/#"]
+
+# line 12: {allow, {ipaddr, "127.0.0.1"}, subscribe, ["$SYS/#"]}.
+# Not converted (R2 rule 14): an allow rule on the client's address alone, which grants nothing by itself in 2.0: name the clients as well
+
+# line 15: {deny, all, publish, ["commands/#"]}.
+[[rule]]
+permission = "deny"
+action = "publish"
+topics = ["commands/#"]
+
+# line 16: {deny, all, {publish, [{retain, true}]}, ["#"]}.
+[[rule]]
+permission = "deny"
+action = "publish"
+retain = true
+topics = ["#"]
+
+# line 17: {allow, all, {publish, [{qos, [0, 1]}]}, ["telemetry/#", "events/+/state"]}.
+[[rule]]
+permission = "allow"
+action = "publish"
+qos = [0, 1]
+topics = ["telemetry/#", "events/+/state"]
+
+# line 18: {allow, all, subscribe, ["commands/#", {eq, "config/${clientid}"}]}.
+[[rule]]
+permission = "allow"
+action = "subscribe"
+topics = ["commands/#", { eq = "config/${clientid}" }]
+
+# line 21: {allow, {'or', [{username, "dashboard"}, {clientid, {re, "^dash-[0-9]+$"}}]}, subscribe, ["ingest/#", "eq #"]}.
+[[rule]]
+permission = "allow"
+username = "dashboard"
+action = "subscribe"
+topics = ["ingest/#", { eq = "#" }]
+
+[[rule]]
+permission = "allow"
+client_id = { regex = "dash-[0-9]+" }
+action = "subscribe"
+topics = ["ingest/#", { eq = "#" }]
+
+# line 23: {allow, {username, <<"ops">>}, all, all}.
+[[rule]]
+permission = "allow"
+username = "ops"
+action = "all"
+topics = [{ all = true }]
+
+# line 26: {allow, {clientid, {re, "legacy-\\d+"}}, {all, [{qos, 1}, {retain, false}]}, ["legacy/${clientid}/#", "a/#/b"]}.
+[[rule]]
+permission = "allow"
+client_id = { regex = '(?s:.*?)(?:legacy-\d+)(?s:.*)' }
+action = "all"
+qos = [1]
+retain = false
+topics = ["legacy/${clientid}/#"]
+
+# line 28: {deny, {ipaddr, "192.0.2.77/24"}, all, all}.
+[[rule]]
+permission = "deny"
+address = "192.0.2.0/24"
+action = "all"
+topics = [{ all = true }]
+
+# line 30: {deny, all}.
+[[rule]]
+permission = "deny"
+action = "all"
+topics = [{ all = true }]
