@@ -166,7 +166,10 @@ pub enum Decision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClaimResult {
     /// The claim committed, and the connection now owns the Client Identifier. With Clean
-    /// Start 0, `session` is the session it resumes, if the identifier had one.
+    /// Start 0, `session` is the session it resumes, if the identifier had one. Its
+    /// subscriptions keep the interest they have where they are held (report R3, Sessions), so
+    /// the machine asks for none again; it sends again what was in flight, then what waited.
+    /// A state for another Client Identifier, or built under another mount, is not resumed.
     Claimed {
         /// The session the claim found.
         session: Option<SessionState>,
