@@ -444,6 +444,9 @@ struct Driver {
     claimed: usize,
     releases: usize,
     sent_before_connack: Vec<PacketType>,
+    /// QoS 1 and 2 PUBLISH packets the client sent before it had a CONNACK, which are not held
+    /// to a Receive Maximum it could not know.
+    pipelined: u16,
     /// Data streams whose server side was finished.
     finished: Vec<u64>,
     /// What the server sent at QoS 1 and 2 and the client has not acknowledged in full, by
@@ -481,6 +484,7 @@ impl Driver {
             claimed: 0,
             releases: 0,
             sent_before_connack: Vec::new(),
+            pipelined: 0,
             finished: Vec::new(),
             out: BTreeMap::new(),
             releasable: Vec::new(),
@@ -533,6 +537,9 @@ impl Driver {
                 PacketType::PubRec
             };
             *self.owed.entry((kind, packet_id.get())).or_default() += 1;
+            if self.connacks == 0 {
+                self.pipelined = self.pipelined.saturating_add(1);
+            }
         }
         self.feed(Input::Packet {
             stream,
@@ -954,7 +961,9 @@ impl Driver {
             .map_or(u16::MAX, std::num::NonZeroU16::get)
             .min(Config::RECEIVE_MAXIMUM);
         assert!(self.session.in_flight_out() <= usize::from(receive_maximum));
-        assert!(self.session.in_flight_in() <= Config::RECEIVE_MAXIMUM);
+        assert!(
+            self.session.in_flight_in() <= Config::RECEIVE_MAXIMUM.saturating_add(self.pipelined)
+        );
         if let Some(state) = self.session.snapshot() {
             let mut ids: Vec<_> = state
                 .outbound

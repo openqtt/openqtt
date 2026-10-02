@@ -9,8 +9,8 @@ use openqtt_core::{Message, Timestamp, TopicName};
 
 use super::connect::deadline;
 use super::{
-    AckCode, Authorizing, Commit, Inbound, InboundState, Phase, Reply, ReplyKind, ReplyState,
-    Session,
+    AckCode, Arrival, Authorizing, Commit, Inbound, InboundState, Phase, Reply, ReplyKind,
+    ReplyState, Session,
 };
 use crate::convert::{core_format, core_qos};
 use crate::phrase::phrase;
@@ -25,7 +25,7 @@ impl Session {
         &mut self,
         stream: StreamId,
         mut publish: Publish,
-        received_at: Timestamp,
+        arrival: Arrival,
         now: Timestamp,
         fx: &mut Effects,
     ) {
@@ -71,8 +71,10 @@ impl Session {
                 self.push_reply(stream, packet_id, ReplyKind::PubRec, state, false);
                 return self.flush(stream, now, fx);
             }
-            if self.inbound_in_flight >= self.config.receive_maximum.get() {
-                // [MQTT-3.3.4-7], report R1 O3 and D13.
+            if self.inbound_in_flight >= self.config.receive_maximum.get() && !arrival.pipelined {
+                // [MQTT-3.3.4-7], report R1 O3 and D13. A PUBLISH sent behind the CONNECT,
+                // before the CONNACK announced the limit, is held to none: until then the
+                // client's Receive Maximum for the server was 65,535.
                 return self.close_with(
                     DisconnectReasonCode::ReceiveMaximumExceeded,
                     None,
@@ -80,7 +82,7 @@ impl Session {
                     fx,
                 );
             }
-            self.inbound_in_flight += 1;
+            self.inbound_in_flight = self.inbound_in_flight.saturating_add(1);
         }
         // Topic syntax refuses this PUBLISH alone (report R1, O25 and D32).
         let Ok(topic) = TopicName::new(&publish.topic) else {
@@ -119,7 +121,7 @@ impl Session {
         self.authorizing = Some(Authorizing::Publish {
             request,
             stream,
-            received_at,
+            received_at: arrival.at,
             publish: Box::new(publish),
             topic,
             response_topic,

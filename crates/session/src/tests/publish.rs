@@ -380,6 +380,33 @@ fn r1_d13_more_unacknowledged_publishes_than_receive_maximum_get_disconnect_0x93
 }
 
 #[test]
+fn publishes_sent_before_connack_are_not_held_to_a_limit_the_client_could_not_know() {
+    let mut harness = Harness::new();
+    harness.auto.claim = false;
+    harness.auto.loopback = false;
+    harness.send(super::harness::connect("c"));
+    // Forty QoS 1 PUBLISH packets behind the CONNECT: the client assumes 65,535 until the
+    // CONNACK says 32.
+    for packet_id in 1..=40 {
+        harness.send(publish1("t", packet_id, "x"));
+    }
+    let packets = harness.input(Input::Claimed(crate::ClaimResult::Claimed {
+        session: None,
+    }));
+    assert!(matches!(packets[..], [Packet::ConnAck(_)]), "{packets:?}");
+    assert!(harness.session.is_connected());
+    assert_eq!(harness.session.in_flight_in(), 40);
+    // Once the client has the CONNACK it is held to it.
+    let Packet::Disconnect(disconnect) = one(harness.send(publish1("t", 41, "x"))) else {
+        panic!("DISCONNECT");
+    };
+    assert_eq!(
+        disconnect.reason_code,
+        DisconnectReasonCode::ReceiveMaximumExceeded
+    );
+}
+
+#[test]
 fn a_slot_frees_with_the_puback_or_the_pubcomp() {
     let mut harness = Harness::connected();
     harness.send(publish1("t", 1, "x"));

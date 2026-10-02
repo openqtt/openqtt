@@ -213,7 +213,7 @@ enum Received {
         stream: StreamId,
         packet: Packet,
         early: bool,
-        at: Timestamp,
+        arrival: Arrival,
     },
     /// Bytes that did not decode.
     Error {
@@ -221,6 +221,16 @@ enum Received {
         error: codec::Error,
         packet_type: Option<PacketType>,
     },
+}
+
+/// When a packet arrived.
+#[derive(Debug, Clone, Copy)]
+struct Arrival {
+    /// The time.
+    at: Timestamp,
+    /// Whether it came before the CONNACK went out, when the client could not know the
+    /// server's Receive Maximum yet and assumed 65,535 (section 3.2.2.3.3).
+    pipelined: bool,
 }
 
 impl Received {
@@ -547,15 +557,21 @@ impl Session {
                 stream,
                 packet,
                 early,
-            } => self.receive(
-                Received::Packet {
-                    stream,
-                    packet,
-                    early,
+            } => {
+                let arrival = Arrival {
                     at: now,
-                },
-                now,
-            ),
+                    pipelined: self.phase != Phase::Connected,
+                };
+                self.receive(
+                    Received::Packet {
+                        stream,
+                        packet,
+                        early,
+                        arrival,
+                    },
+                    now,
+                );
+            }
             Input::DecodeError {
                 stream,
                 error,
@@ -611,7 +627,8 @@ impl Session {
     }
 
     /// QoS 1 and 2 PUBLISH packets from the client on this connection not yet answered in full,
-    /// which the server's Receive Maximum caps ([MQTT-3.3.4-7]).
+    /// which the server's Receive Maximum caps ([MQTT-3.3.4-7]) for every packet but those the
+    /// client sent before CONNACK announced it.
     pub fn in_flight_in(&self) -> u16 {
         self.inbound_in_flight
     }
@@ -661,14 +678,17 @@ impl Session {
 
     /// A packet, or an error, once the connection is accepted.
     fn connected(&mut self, received: Received, now: Timestamp, fx: &mut Effects) {
-        let (stream, packet, received_at) = match received {
+        let (stream, packet, arrival) = match received {
             Received::Error { error, .. } => {
                 // [MQTT-4.13.1-1]
                 return self.close_with(error.disconnect_reason_code(), None, now, fx);
             }
             Received::Packet {
-                stream, packet, at, ..
-            } => (stream, packet, at),
+                stream,
+                packet,
+                arrival,
+                ..
+            } => (stream, packet, arrival),
         };
         // Only the client's packets, with the client's reason codes and properties (Table 2-1,
         // [MQTT-3.3.4-6]); a decoder told the sender refuses these already.
@@ -683,7 +703,7 @@ impl Session {
         match packet {
             // [MQTT-3.1.0-2]
             Packet::Connect(_) => self.protocol_error(now, fx),
-            Packet::Publish(publish) => self.publish(stream, publish, received_at, now, fx),
+            Packet::Publish(publish) => self.publish(stream, publish, arrival, now, fx),
             Packet::PubAck(ack) => self.puback(&ack, now, fx),
             Packet::PubRec(rec) => self.pubrec(stream, &rec, now, fx),
             Packet::PubRel(rel) => self.pubrel(stream, &rel, now, fx),
