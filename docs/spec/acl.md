@@ -210,6 +210,80 @@ rule 3 (line 17): `address` "10.0.0.5/8" has bits set past its prefix; the netwo
 
 A file that is not TOML is reported by line and column, without the line itself.
 
+## Converting from 1.x
+
+`openqtt convert acl <acl.conf>` writes the 2.0 file for an `acl.conf` of OpenQTT 1.x to stdout,
+each rule under a comment with the line and the text of the 1.x rule it came from, and its notes
+to stderr as `<file>:<line>: <note>`. The converted rules decide as the 1.x rules did, read the
+way 1.x reads them, except where report R2 says **Changed** and in the cases below (R2 rule
+30).
+
+| 1.x | 2.0 |
+| --- | --- |
+| `{Permission, Who, Action, Topics}` | one rule, or one for each alternative of an `'or'` |
+| `{Permission, all}` | `action = "all"` and `topics = [{ all = true }]`, for every client |
+| `all` as the clients | no client key |
+| `{username, "n"}`, `{user, ...}` | `username = "n"` |
+| `{username, {re, "p"}}` | `username = { regex = ... }`, see below |
+| `{clientid, ...}`, `{client, ...}` | `client_id`, the same way |
+| `{ipaddr, "a/n"}`, `{ipaddrs, [...]}` | `address`; bits past the prefix are cleared, as 1.x reads them, with a warning |
+| `{client_attr, "k", v}` | `attributes = { k = v }` |
+| `{'and', [...]}`, `{'or', [...]}` | the keys of one rule, and one rule per alternative; two conditions on the same name in one `'and'` are refused |
+| `publish`, `subscribe`, `all` | `action` |
+| `{publish, [{qos, Q}, {retain, R}]}` | `qos` and `retain`; `retain` on a subscribe rule means nothing in 1.x and is left out, with a warning |
+| `all` as the topics | `[{ all = true }]` |
+| `"t/#"`, `<<"t/#">>` | a filter; `${username}` and `${clientid}` stay placeholders |
+| `{eq, "t"}`, `"eq t"` | `{ eq = "t" }` |
+
+A 1.x pattern is searched for anywhere in the name; a 2.0 pattern matches the whole name. So
+`{re, "^dashboard$"}` becomes `dashboard`, and any other pattern `p` becomes
+`(?s:.*?)(?:p)(?s:.*)`, which matches wherever `p` does. Two differences remain: PCRE's `$`
+also matches before a newline that ends a name, and `\d`, `\w`, `\s` and `\b` are ASCII in 1.x
+and Unicode here, for which the converter warns. A pattern 2.0 cannot read, one with a
+lookaround or a back reference, stops the conversion.
+
+Where 2.0 decides differently on purpose, always by refusing what 1.x allowed:
+
+- an allow rule's `+` does not allow a subscription's `#` ([Subscriptions](#subscriptions)),
+  where 1.x read `#` as one more word; a deny rule's `+` refuses it, as in 1.x;
+- a placeholder whose value is empty, holds `+`, `#` or U+0000, or would begin the filter with
+  `$` matches nothing, where 1.x put the value in as it was, so that a user named `+` turned
+  `${username}/t` into `+/t`;
+- an allow rule on the client's address alone is left out (R2 rule 14).
+
+What is left out, with a note:
+
+- a topic that matches nothing in 1.x either, such as `a/#/b`, and a rule left with no topic or
+  no client;
+- an allow rule on the client's address alone, as above.
+
+What stops the conversion, with every problem named by line: a term 1.x would not load, the
+placeholders `${cert_common_name}` (on a listener with certificate identity the CN is the user
+name: write `${username}`), `${client_attrs.*}` and `${zone}`, and a pattern 2.0 cannot read.
+
+Where no rule matches, 2.0 denies; 1.x applied `authorization.no_match`, which allows unless it
+was set to deny. When the last rule does not match everything, the converter says so.
+
+The converter also holds the result against R2 rules 13 to 16 and names every rule that
+conflicts: an allow rule that lets a device publish to its command topics (13) or set RETAIN
+(16) with no earlier deny for every client taking that away, an allow rule on an address alone
+(14), and an allow rule a client could claim by naming itself (15): by client identifier alone,
+by a prefix shorter than the reserved one, or by a pattern that matches reserved names. A
+device is any client whose name is not a service's. With `--strict` a conflict fails the
+conversion and nothing is written.
+
+| Option | Meaning |
+| --- | --- |
+| `--strict` | fail on any conflict with R2 rules 13 to 16 |
+| `--commands <filter>` | the filters devices receive commands on, before the mountpoint; `commands/#` without it |
+| `--service-prefix <prefix>` | the user name prefix reserved for service credentials |
+| `--service <name>` | a service credential named exactly |
+
+`openqtt convert authn <file.csv>` converts the user file of 1.x's built-in database, the header
+`user_id,password,is_superuser` and plain passwords, into a bootstrap file in the `hashed`
+format, read as 1.x reads it: fields split on commas and spaces. A superuser skips every rule in
+1.x and 2.0 has none, so a file that names one is refused.
+
 ## How it is decided
 
 The rules are compiled once: patterns, networks and filters parsed, and each rule's action,

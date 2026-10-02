@@ -567,6 +567,7 @@ name = "openqtt"
 version = "2.0.0-alpha.0"
 dependencies = [
  "clap",
+ "openqtt-auth",
  "openqtt-config",
  "tracing",
  "tracing-subscriber",

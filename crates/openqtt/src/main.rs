@@ -1,8 +1,8 @@
 //! The `openqtt` binary: one executable for every role.
 //!
 //! `openqtt run` will start the roles this process is configured for: edge, router, log and
-//! admin, any of them or all of them. The other subcommands are the operator's tools. None is
-//! implemented yet; each says so and exits with status 1.
+//! admin, any of them or all of them. The other subcommands are the operator's tools. Only
+//! `convert` is implemented yet; each of the others says so and exits with status 1.
 //!
 //! When rustls arrives with QUIC, `main` installs aws-lc-rs as the process-wide crypto provider
 //! before anything builds a TLS configuration. `make layers` already refuses ring in this
@@ -12,6 +12,8 @@
     clippy::print_stderr,
     reason = "a command line reports to its operator on stderr"
 )]
+
+mod convert;
 
 use std::process::ExitCode;
 
@@ -42,7 +44,8 @@ enum Command {
     /// Check or print the effective configuration.
     Config,
     /// Convert 1.x ACL and password files to their 2.0 formats.
-    Convert,
+    #[command(subcommand)]
+    Convert(convert::ConvertCommand),
     /// Migrate state, such as retained messages, from a 1.x broker.
     Migrate,
 }
@@ -53,7 +56,7 @@ impl Command {
             Self::Run => "run",
             Self::Ctl => "ctl",
             Self::Config => "config",
-            Self::Convert => "convert",
+            Self::Convert(_) => "convert",
             Self::Migrate => "migrate",
         }
     }
@@ -67,6 +70,9 @@ fn main() -> ExitCode {
     }
     let name = cli.command.name();
     tracing::debug!(command = name, "parsed the command line");
+    if let Command::Convert(command) = cli.command {
+        return convert::run(command);
+    }
     eprintln!("openqtt {name}: not implemented yet");
     ExitCode::FAILURE
 }
