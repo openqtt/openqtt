@@ -1,0 +1,12 @@
+[package]
+name = "openqtt-topic"
+description = "MQTT topic names and filters: validation, shared subscriptions, mountpoints and a matching trie"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

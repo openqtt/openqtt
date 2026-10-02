@@ -1,0 +1,14 @@
+# Only openqtt-config reads or changes the process environment. Settings are read once, where
+# the process starts, and passed down; a variable read anywhere else is a switch that nothing
+# documents and that the unknown-variable check cannot see. openqtt-config carries the one
+# expect(clippy::disallowed_methods).
+disallowed-methods = [
+    { path = "std::env::var", reason = "only openqtt-config reads the environment; take the setting from it" },
+    { path = "std::env::var_os", reason = "only openqtt-config reads the environment; take the setting from it" },
+    { path = "std::env::vars", reason = "only openqtt-config reads the environment; take the setting from it" },
+    { path = "std::env::vars_os", reason = "only openqtt-config reads the environment; take the setting from it" },
+    { path = "std::env::set_var", reason = "pass settings down instead of changing the environment" },
+    { path = "std::env::remove_var", reason = "pass settings down instead of changing the environment" },
+]
+
+allow-unwrap-in-tests = true
