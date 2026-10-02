@@ -115,8 +115,9 @@ mdlint:
 
 # --- Conformance --------------------------------------------------------------------------
 
-# The MQTT 5.0 statements in report R1 that no test names yet, one per line. Not part of
-# check: today it lists every statement. R1 says how a test names the statements it proves.
+# The MQTT 5.0 statements in report R1 that no test names yet, one per line, and a count. Not
+# part of check, since most statements wait on code not written yet. R1 says how a test names
+# the statements it proves.
 conformance:
 	@scripts/conformance-ids.sh
 

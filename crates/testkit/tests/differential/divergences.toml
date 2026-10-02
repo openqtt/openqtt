@@ -142,9 +142,9 @@ scenarios = []
 [[divergence]]
 id = "D17"
 statements = ["MQTT-4.8.2-1", "MQTT-3.10.4-1"]
-summary = "$queue/ and $exclusive/ filters."
-emqx = "$queue/t is the shared subscription $share/$queue/t, and $exclusive/t an exclusive subscription to t."
-openqtt = "Ordinary filters with no special meaning; $share/ is the one shared form."
+summary = "$queue/, $exclusive/ and nested $share/ filters."
+emqx = "$queue/t is the shared subscription $share/$queue/t, and $exclusive/t an exclusive subscription to t; a shared subscription whose filter begins with $share/ or $queue/ is refused."
+openqtt = "Ordinary filters with no special meaning; $share/ at the start is the one shared form, and whatever follows the ShareName is the filter."
 scenarios = []
 
 [[divergence]]

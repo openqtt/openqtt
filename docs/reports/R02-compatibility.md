@@ -33,7 +33,24 @@ places where 2.0 deliberately behaves differently marked **Changed**.
    publishes and every filter it subscribes, and removed from every topic delivered
    to it. A device publishing `temperature` is seen by others at
    `ingest/<cn>/temperature`; a retained `ingest/<cn>/commands/firmware` reaches
-   the device as `commands/firmware`.
+   the device as `commands/firmware`. A shared subscription keeps
+   `$share/<group>/` in front of the mountpoint.
+
+   **Changed**, so that every device keeps a namespace of its own. A mountpoint
+   must end with `/`, may name only `${username}` and `${clientid}`, and must not
+   begin with `$share/`, as configured or once its placeholders have values: behind
+   `$share/g/`, the filter `t` would read as a shared subscription. A connection is
+   refused when a value its mountpoint needs is missing or empty, holds `+`, `#` or
+   U+0000, or would begin the mountpoint with `$`; 1.x keeps a missing
+   `${username}` as literal text, so every client without a username shares one
+   namespace [emqx_mountpoint.erl L105-117][mp-lookup]. A topic outside the
+   device's namespace, the namespace's own parent level included, is never
+   delivered to it; 1.x delivers it unchanged. And a topic reaches a subscription
+   only if the device's own filter, before mounting, matches it once the mountpoint
+   is taken off: the mounted `ingest/<cn>/#` matches `ingest/<cn>/$SYS/x`, but the
+   device's `#` must not match `$SYS/x` (MQTT-4.7.2-1), so that topic is not
+   delivered to it; 1.x delivers it [emqx_mountpoint.erl L51-95][mp-mount]
+   [emqx_channel.erl L1440-1457][c-deliver].
 7. **Authorization sees the topic before mounting.** Rules for devices are written
    against the device's own relative topics.
 8. **Limits apply before mounting**: maximum packet size 1 MiB, maximum 128 topic
@@ -105,3 +122,8 @@ places where 2.0 deliberately behaves differently marked **Changed**.
     on any rule that conflicts with rules 13 to 16; the converted rules give the same
     decisions as the originals on the differential suite, except where this
     contract says **Changed**.
+
+<!-- EMQX 5.8.9 permalinks, at tag emqx-v5.8.9 (upstream a8319fe2390169e1f2483e3ec80dd01a6cdb233d) -->
+[c-deliver]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L1440-L1457
+[mp-lookup]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L105-L117
+[mp-mount]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L51-L95

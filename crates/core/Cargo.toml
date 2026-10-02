@@ -8,5 +8,14 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+bytes.workspace = true
+openqtt-topic.workspace = true
+thiserror.workspace = true
+twox-hash.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true
