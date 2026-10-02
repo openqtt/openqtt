@@ -1,10 +1,11 @@
-build text eol=lf
-* text=auto
-*.* text eol=lf
-./build text eol=lf
-scripts/* text eol=lf
-*.cmd text eol=crlf
-*.jpg -text
-*.png -text
-*.pdf -text
-scripts/erlfmt -text
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+
+Cargo.lock linguist-generated=true
