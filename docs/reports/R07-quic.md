@@ -282,7 +282,10 @@ rows are from the first run.
   here argues for changing it; how packets reach the right endpoint is S3's question.
 - **D8. Two changes go with the first crate that takes quinn,** `openqtt-transport`: the
   explicit clientAuth check of F4, and limiting `deny.toml` and `make layers` to the shipped
-  targets so that quinn-proto's ring for wasm (F5) does not fail the gate.
+  targets so that quinn-proto's ring for wasm (F5) does not fail the gate. The clientAuth check
+  is the edge's, not the transport's: the transport hands up the chain the handshake verified,
+  and the edge has `openqtt-auth` require the clientAuth extended key usage on every listener
+  that requires a client certificate, not only on those with `identity_from_cn`.
 
 ### Risks and what was not measured
 
