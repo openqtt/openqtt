@@ -1094,6 +1094,14 @@ version = "2.0.0-alpha.0"
 [[package]]
 name = "openqtt-session"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "bytes",
+ "openqtt-codec",
+ "openqtt-core",
+ "openqtt-topic",
+ "proptest",
+ "thiserror",
+]
 
 [[package]]
 name = "openqtt-testkit"
