@@ -1,0 +1,2198 @@
+{
+  "args": {
+    "minutes": "6",
+    "n": "1000000",
+    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-churn.json"
+  },
+  "experiment": "churn",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:40:48Z",
+    "memory_bytes": "17179869184",
+    "note": "laptop numbers: absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "rows": [
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 526,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 639.0985140270125,
+          "mean_apply_seconds_per_minute": 0.008318333399999999,
+          "mean_bytes_per_minute": 775434.6,
+          "mean_peak_records_in_one_second": 280.0,
+          "mean_records_per_minute": 13023.2,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 6134,
+              "apply_ns_per_record": 1299.9622626519424,
+              "apply_seconds": 0.016362625,
+              "bytes": 749572,
+              "minute": 1,
+              "peak_records_in_one_second": 291,
+              "records": 12587
+            },
+            {
+              "adds": 6478,
+              "apply_ns_per_record": 757.724609375,
+              "apply_seconds": 0.009698875,
+              "bytes": 762357,
+              "minute": 2,
+              "peak_records_in_one_second": 270,
+              "records": 12800
+            },
+            {
+              "adds": 6543,
+              "apply_ns_per_record": 629.2158355538637,
+              "apply_seconds": 0.00826475,
+              "bytes": 782163,
+              "minute": 3,
+              "peak_records_in_one_second": 290,
+              "records": 13135
+            },
+            {
+              "adds": 6331,
+              "apply_ns_per_record": 589.2450980392157,
+              "apply_seconds": 0.007512875,
+              "bytes": 759429,
+              "minute": 4,
+              "peak_records_in_one_second": 263,
+              "records": 12750
+            },
+            {
+              "adds": 6578,
+              "apply_ns_per_record": 603.9248395967003,
+              "apply_seconds": 0.007906584,
+              "bytes": 779504,
+              "minute": 5,
+              "peak_records_in_one_second": 282,
+              "records": 13092
+            },
+            {
+              "adds": 6646,
+              "apply_ns_per_record": 615.3821875702827,
+              "apply_seconds": 0.008208583,
+              "bytes": 793720,
+              "minute": 6,
+              "peak_records_in_one_second": 295,
+              "records": 13339
+            }
+          ],
+          "snapshot_bytes": 34702405,
+          "view_entries": 583923,
+          "view_heap_bytes": 137388992
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 510,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 885.1654920500538,
+          "mean_apply_seconds_per_minute": 0.0113319834,
+          "mean_bytes_per_minute": 763471.8,
+          "mean_peak_records_in_one_second": 275.6,
+          "mean_records_per_minute": 12820.8,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 5740,
+              "apply_ns_per_record": 2305.1166290443944,
+              "apply_seconds": 0.0214445,
+              "bytes": 554084,
+              "minute": 1,
+              "peak_records_in_one_second": 273,
+              "records": 9303
+            },
+            {
+              "adds": 6320,
+              "apply_ns_per_record": 1036.3124099279423,
+              "apply_seconds": 0.012943542,
+              "bytes": 743959,
+              "minute": 2,
+              "peak_records_in_one_second": 256,
+              "records": 12490
+            },
+            {
+              "adds": 6411,
+              "apply_ns_per_record": 822.9594877764843,
+              "apply_seconds": 0.010603833,
+              "bytes": 767226,
+              "minute": 3,
+              "peak_records_in_one_second": 308,
+              "records": 12885
+            },
+            {
+              "adds": 6462,
+              "apply_ns_per_record": 906.3048837209302,
+              "apply_seconds": 0.011691333,
+              "bytes": 768554,
+              "minute": 4,
+              "peak_records_in_one_second": 271,
+              "records": 12900
+            },
+            {
+              "adds": 6468,
+              "apply_ns_per_record": 923.6062309674397,
+              "apply_seconds": 0.011828625,
+              "bytes": 762774,
+              "minute": 5,
+              "peak_records_in_one_second": 274,
+              "records": 12807
+            },
+            {
+              "adds": 6453,
+              "apply_ns_per_record": 736.644447857472,
+              "apply_seconds": 0.009592584,
+              "bytes": 774846,
+              "minute": 6,
+              "peak_records_in_one_second": 269,
+              "records": 13022
+            }
+          ],
+          "snapshot_bytes": 34702405,
+          "view_entries": 583923,
+          "view_heap_bytes": 137388992
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 182,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 667.4048113018513,
+          "mean_apply_seconds_per_minute": 0.008016758399999999,
+          "mean_bytes_per_minute": 715530.0,
+          "mean_peak_records_in_one_second": 247.0,
+          "mean_records_per_minute": 12013.6,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 5363,
+              "apply_ns_per_record": 2039.0207408671902,
+              "apply_seconds": 0.023889167,
+              "bytes": 697889,
+              "minute": 1,
+              "peak_records_in_one_second": 266,
+              "records": 11716
+            },
+            {
+              "adds": 5745,
+              "apply_ns_per_record": 670.0702953586498,
+              "apply_seconds": 0.007940333,
+              "bytes": 705946,
+              "minute": 2,
+              "peak_records_in_one_second": 253,
+              "records": 11850
+            },
+            {
+              "adds": 5780,
+              "apply_ns_per_record": 757.5380367592517,
+              "apply_seconds": 0.009191209,
+              "bytes": 722906,
+              "minute": 3,
+              "peak_records_in_one_second": 244,
+              "records": 12133
+            },
+            {
+              "adds": 5719,
+              "apply_ns_per_record": 667.1266537456813,
+              "apply_seconds": 0.007916792,
+              "bytes": 706926,
+              "minute": 4,
+              "peak_records_in_one_second": 246,
+              "records": 11867
+            },
+            {
+              "adds": 5865,
+              "apply_ns_per_record": 659.003496794605,
+              "apply_seconds": 0.007915291,
+              "bytes": 715236,
+              "minute": 5,
+              "peak_records_in_one_second": 247,
+              "records": 12011
+            },
+            {
+              "adds": 5880,
+              "apply_ns_per_record": 583.2855738510691,
+              "apply_seconds": 0.007120167,
+              "bytes": 726636,
+              "minute": 6,
+              "peak_records_in_one_second": 245,
+              "records": 12207
+            }
+          ],
+          "snapshot_bytes": 34702405,
+          "view_entries": 583923,
+          "view_heap_bytes": 137388992
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 192,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 672.4540347717927,
+          "mean_apply_seconds_per_minute": 0.00800215,
+          "mean_bytes_per_minute": 709221.8,
+          "mean_peak_records_in_one_second": 250.4,
+          "mean_records_per_minute": 11907.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 5307,
+              "apply_ns_per_record": 2307.1937457511895,
+              "apply_seconds": 0.020363292,
+              "bytes": 525716,
+              "minute": 1,
+              "peak_records_in_one_second": 271,
+              "records": 8826
+            },
+            {
+              "adds": 5690,
+              "apply_ns_per_record": 796.5621538723694,
+              "apply_seconds": 0.00934925,
+              "bytes": 699267,
+              "minute": 2,
+              "peak_records_in_one_second": 228,
+              "records": 11737
+            },
+            {
+              "adds": 5731,
+              "apply_ns_per_record": 652.6576254264082,
+              "apply_seconds": 0.007844292,
+              "bytes": 715938,
+              "minute": 3,
+              "peak_records_in_one_second": 257,
+              "records": 12019
+            },
+            {
+              "adds": 5674,
+              "apply_ns_per_record": 632.6145251396648,
+              "apply_seconds": 0.007473708,
+              "bytes": 703858,
+              "minute": 4,
+              "peak_records_in_one_second": 271,
+              "records": 11814
+            },
+            {
+              "adds": 5812,
+              "apply_ns_per_record": 644.6863880496811,
+              "apply_seconds": 0.007682083,
+              "bytes": 709697,
+              "minute": 5,
+              "peak_records_in_one_second": 246,
+              "records": 11916
+            },
+            {
+              "adds": 5818,
+              "apply_ns_per_record": 635.7494813708406,
+              "apply_seconds": 0.007661417,
+              "bytes": 717349,
+              "minute": 6,
+              "peak_records_in_one_second": 250,
+              "records": 12051
+            }
+          ],
+          "snapshot_bytes": 34702405,
+          "view_entries": 583923,
+          "view_heap_bytes": 137388992
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 264,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 694.4005580282186,
+          "mean_apply_seconds_per_minute": 0.0116891252,
+          "mean_bytes_per_minute": 1002835.2,
+          "mean_peak_records_in_one_second": 438.6,
+          "mean_records_per_minute": 16787.2,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 8362,
+              "apply_ns_per_record": 1758.30815227044,
+              "apply_seconds": 0.029699583,
+              "bytes": 1009901,
+              "minute": 1,
+              "peak_records_in_one_second": 517,
+              "records": 16891
+            },
+            {
+              "adds": 9058,
+              "apply_ns_per_record": 800.6689862495128,
+              "apply_seconds": 0.014382417,
+              "bytes": 1073711,
+              "minute": 2,
+              "peak_records_in_one_second": 446,
+              "records": 17963
+            },
+            {
+              "adds": 8352,
+              "apply_ns_per_record": 712.7104276961513,
+              "apply_seconds": 0.011981375,
+              "bytes": 1003639,
+              "minute": 3,
+              "peak_records_in_one_second": 489,
+              "records": 16811
+            },
+            {
+              "adds": 7866,
+              "apply_ns_per_record": 659.0675910956348,
+              "apply_seconds": 0.010599125,
+              "bytes": 960971,
+              "minute": 4,
+              "peak_records_in_one_second": 430,
+              "records": 16082
+            },
+            {
+              "adds": 8698,
+              "apply_ns_per_record": 624.4734740104911,
+              "apply_seconds": 0.010476167,
+              "bytes": 1002472,
+              "minute": 5,
+              "peak_records_in_one_second": 450,
+              "records": 16776
+            },
+            {
+              "adds": 7822,
+              "apply_ns_per_record": 675.0823110893033,
+              "apply_seconds": 0.011006542,
+              "bytes": 973383,
+              "minute": 6,
+              "peak_records_in_one_second": 378,
+              "records": 16304
+            }
+          ],
+          "snapshot_bytes": 42061875,
+          "view_entries": 705533,
+          "view_heap_bytes": 137370464
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 255,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 833.2038297969436,
+          "mean_apply_seconds_per_minute": 0.0139640752,
+          "mean_bytes_per_minute": 1000663.2,
+          "mean_peak_records_in_one_second": 435.0,
+          "mean_records_per_minute": 16746.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 7136,
+              "apply_ns_per_record": 2335.775955819881,
+              "apply_seconds": 0.027492083,
+              "bytes": 703637,
+              "minute": 1,
+              "peak_records_in_one_second": 451,
+              "records": 11770
+            },
+            {
+              "adds": 8723,
+              "apply_ns_per_record": 912.2028728396475,
+              "apply_seconds": 0.015939833,
+              "bytes": 1044437,
+              "minute": 2,
+              "peak_records_in_one_second": 428,
+              "records": 17474
+            },
+            {
+              "adds": 8478,
+              "apply_ns_per_record": 747.8883854042451,
+              "apply_seconds": 0.012543584,
+              "bytes": 1002482,
+              "minute": 3,
+              "peak_records_in_one_second": 434,
+              "records": 16772
+            },
+            {
+              "adds": 8000,
+              "apply_ns_per_record": 881.5309424212599,
+              "apply_seconds": 0.014330167,
+              "bytes": 971711,
+              "minute": 4,
+              "peak_records_in_one_second": 412,
+              "records": 16256
+            },
+            {
+              "adds": 8555,
+              "apply_ns_per_record": 860.101506221349,
+              "apply_seconds": 0.014447125,
+              "bytes": 1003113,
+              "minute": 5,
+              "peak_records_in_one_second": 478,
+              "records": 16797
+            },
+            {
+              "adds": 8186,
+              "apply_ns_per_record": 764.295442098217,
+              "apply_seconds": 0.012559667,
+              "bytes": 981573,
+              "minute": 6,
+              "peak_records_in_one_second": 423,
+              "records": 16433
+            }
+          ],
+          "snapshot_bytes": 42061875,
+          "view_entries": 705533,
+          "view_heap_bytes": 137370464
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 58,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 777.1697236971618,
+          "mean_apply_seconds_per_minute": 0.0113198082,
+          "mean_bytes_per_minute": 867835.2,
+          "mean_peak_records_in_one_second": 333.4,
+          "mean_records_per_minute": 14545.6,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 6495,
+              "apply_ns_per_record": 1699.1038126813096,
+              "apply_seconds": 0.024599625,
+              "bytes": 864433,
+              "minute": 1,
+              "peak_records_in_one_second": 387,
+              "records": 14478
+            },
+            {
+              "adds": 6995,
+              "apply_ns_per_record": 899.5798341625207,
+              "apply_seconds": 0.013561166,
+              "bytes": 899184,
+              "minute": 2,
+              "peak_records_in_one_second": 373,
+              "records": 15075
+            },
+            {
+              "adds": 6917,
+              "apply_ns_per_record": 782.7502958579881,
+              "apply_seconds": 0.011244208,
+              "bytes": 857535,
+              "minute": 3,
+              "peak_records_in_one_second": 313,
+              "records": 14365
+            },
+            {
+              "adds": 6938,
+              "apply_ns_per_record": 742.7648311098495,
+              "apply_seconds": 0.010467042,
+              "bytes": 840631,
+              "minute": 4,
+              "peak_records_in_one_second": 298,
+              "records": 14092
+            },
+            {
+              "adds": 7136,
+              "apply_ns_per_record": 762.9808020769283,
+              "apply_seconds": 0.01116775,
+              "bytes": 873292,
+              "minute": 5,
+              "peak_records_in_one_second": 319,
+              "records": 14637
+            },
+            {
+              "adds": 7023,
+              "apply_ns_per_record": 697.7728552785219,
+              "apply_seconds": 0.010158875,
+              "bytes": 868534,
+              "minute": 6,
+              "peak_records_in_one_second": 364,
+              "records": 14559
+            }
+          ],
+          "snapshot_bytes": 42061875,
+          "view_entries": 705533,
+          "view_heap_bytes": 137370464
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 64,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 846.7109605747237,
+          "mean_apply_seconds_per_minute": 0.0122746246,
+          "mean_bytes_per_minute": 862136.2,
+          "mean_peak_records_in_one_second": 323.0,
+          "mean_records_per_minute": 14448.8,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 6431,
+              "apply_ns_per_record": 2281.3040313040315,
+              "apply_seconds": 0.02506925,
+              "bytes": 656371,
+              "minute": 1,
+              "peak_records_in_one_second": 386,
+              "records": 10989
+            },
+            {
+              "adds": 6922,
+              "apply_ns_per_record": 1065.6216162813673,
+              "apply_seconds": 0.016179333,
+              "bytes": 905991,
+              "minute": 2,
+              "peak_records_in_one_second": 317,
+              "records": 15183
+            },
+            {
+              "adds": 6857,
+              "apply_ns_per_record": 759.6702097705195,
+              "apply_seconds": 0.010791875,
+              "bytes": 847918,
+              "minute": 3,
+              "peak_records_in_one_second": 340,
+              "records": 14206
+            },
+            {
+              "adds": 6881,
+              "apply_ns_per_record": 833.0549356833203,
+              "apply_seconds": 0.011721916,
+              "bytes": 839515,
+              "minute": 4,
+              "peak_records_in_one_second": 307,
+              "records": 14071
+            },
+            {
+              "adds": 7057,
+              "apply_ns_per_record": 844.1032672515024,
+              "apply_seconds": 0.012220083,
+              "bytes": 863891,
+              "minute": 5,
+              "peak_records_in_one_second": 313,
+              "records": 14477
+            },
+            {
+              "adds": 6945,
+              "apply_ns_per_record": 731.1047738869086,
+              "apply_seconds": 0.010459916,
+              "bytes": 853366,
+              "minute": 6,
+              "peak_records_in_one_second": 338,
+              "records": 14307
+            }
+          ],
+          "snapshot_bytes": 42061875,
+          "view_entries": 705533,
+          "view_heap_bytes": 137370464
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 719.6155864409667,
+          "mean_apply_seconds_per_minute": 0.0116277916,
+          "mean_bytes_per_minute": 966665.0,
+          "mean_peak_records_in_one_second": 308.6,
+          "mean_records_per_minute": 16163.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 7461,
+              "apply_ns_per_record": 1646.1519727541447,
+              "apply_seconds": 0.025617417,
+              "bytes": 930767,
+              "minute": 1,
+              "peak_records_in_one_second": 307,
+              "records": 15562
+            },
+            {
+              "adds": 8050,
+              "apply_ns_per_record": 838.996090356212,
+              "apply_seconds": 0.013519583,
+              "bytes": 963631,
+              "minute": 2,
+              "peak_records_in_one_second": 296,
+              "records": 16114
+            },
+            {
+              "adds": 8034,
+              "apply_ns_per_record": 699.9834346693139,
+              "apply_seconds": 0.011282333,
+              "bytes": 964213,
+              "minute": 3,
+              "peak_records_in_one_second": 304,
+              "records": 16118
+            },
+            {
+              "adds": 8033,
+              "apply_ns_per_record": 743.8812250996016,
+              "apply_seconds": 0.011949708,
+              "bytes": 960962,
+              "minute": 4,
+              "peak_records_in_one_second": 309,
+              "records": 16064
+            },
+            {
+              "adds": 8178,
+              "apply_ns_per_record": 668.2497089282432,
+              "apply_seconds": 0.010905167,
+              "bytes": 975807,
+              "minute": 5,
+              "peak_records_in_one_second": 323,
+              "records": 16319
+            },
+            {
+              "adds": 8096,
+              "apply_ns_per_record": 646.9674731514627,
+              "apply_seconds": 0.010482167,
+              "bytes": 968712,
+              "minute": 6,
+              "peak_records_in_one_second": 311,
+              "records": 16202
+            }
+          ],
+          "snapshot_bytes": 48608301,
+          "view_entries": 812888,
+          "view_heap_bytes": 137365232
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 858.9380955065678,
+          "mean_apply_seconds_per_minute": 0.013731133400000001,
+          "mean_bytes_per_minute": 956078.4,
+          "mean_peak_records_in_one_second": 306.0,
+          "mean_records_per_minute": 15986.2,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 7389,
+              "apply_ns_per_record": 2334.667219120726,
+              "apply_seconds": 0.026764625,
+              "bytes": 685673,
+              "minute": 1,
+              "peak_records_in_one_second": 292,
+              "records": 11464
+            },
+            {
+              "adds": 7966,
+              "apply_ns_per_record": 944.5351246154812,
+              "apply_seconds": 0.0150455,
+              "bytes": 952610,
+              "minute": 2,
+              "peak_records_in_one_second": 296,
+              "records": 15929
+            },
+            {
+              "adds": 7969,
+              "apply_ns_per_record": 812.85580231467,
+              "apply_seconds": 0.0129935,
+              "bytes": 956176,
+              "minute": 3,
+              "peak_records_in_one_second": 309,
+              "records": 15985
+            },
+            {
+              "adds": 7969,
+              "apply_ns_per_record": 788.7198156100026,
+              "apply_seconds": 0.012490167,
+              "bytes": 947276,
+              "minute": 4,
+              "peak_records_in_one_second": 307,
+              "records": 15836
+            },
+            {
+              "adds": 8092,
+              "apply_ns_per_record": 830.2790094485272,
+              "apply_seconds": 0.013444708,
+              "bytes": 968477,
+              "minute": 5,
+              "peak_records_in_one_second": 310,
+              "records": 16193
+            },
+            {
+              "adds": 8008,
+              "apply_ns_per_record": 918.3007255441581,
+              "apply_seconds": 0.014681792,
+              "bytes": 955853,
+              "minute": 6,
+              "peak_records_in_one_second": 308,
+              "records": 15988
+            }
+          ],
+          "snapshot_bytes": 48608301,
+          "view_entries": 812888,
+          "view_heap_bytes": 137365232
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 729.0433000770784,
+          "mean_apply_seconds_per_minute": 0.011784758000000001,
+          "mean_bytes_per_minute": 966665.0,
+          "mean_peak_records_in_one_second": 308.6,
+          "mean_records_per_minute": 16163.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 7461,
+              "apply_ns_per_record": 1397.1426551857087,
+              "apply_seconds": 0.021742334,
+              "bytes": 930767,
+              "minute": 1,
+              "peak_records_in_one_second": 307,
+              "records": 15562
+            },
+            {
+              "adds": 8050,
+              "apply_ns_per_record": 793.6861114558769,
+              "apply_seconds": 0.012789458,
+              "bytes": 963631,
+              "minute": 2,
+              "peak_records_in_one_second": 296,
+              "records": 16114
+            },
+            {
+              "adds": 8034,
+              "apply_ns_per_record": 658.5856185630971,
+              "apply_seconds": 0.010615083,
+              "bytes": 964213,
+              "minute": 3,
+              "peak_records_in_one_second": 304,
+              "records": 16118
+            },
+            {
+              "adds": 8033,
+              "apply_ns_per_record": 727.5325572709163,
+              "apply_seconds": 0.011687083,
+              "bytes": 960962,
+              "minute": 4,
+              "peak_records_in_one_second": 309,
+              "records": 16064
+            },
+            {
+              "adds": 8178,
+              "apply_ns_per_record": 765.4472087750474,
+              "apply_seconds": 0.012491333,
+              "bytes": 975807,
+              "minute": 5,
+              "peak_records_in_one_second": 323,
+              "records": 16319
+            },
+            {
+              "adds": 8096,
+              "apply_ns_per_record": 699.9650043204542,
+              "apply_seconds": 0.011340833,
+              "bytes": 968712,
+              "minute": 6,
+              "peak_records_in_one_second": 311,
+              "records": 16202
+            }
+          ],
+          "snapshot_bytes": 48608301,
+          "view_entries": 812888,
+          "view_heap_bytes": 137365232
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 843.9162237626603,
+          "mean_apply_seconds_per_minute": 0.013488800200000001,
+          "mean_bytes_per_minute": 956078.4,
+          "mean_peak_records_in_one_second": 306.0,
+          "mean_records_per_minute": 15986.2,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 7389,
+              "apply_ns_per_record": 1884.0792044661548,
+              "apply_seconds": 0.021599084,
+              "bytes": 685673,
+              "minute": 1,
+              "peak_records_in_one_second": 292,
+              "records": 11464
+            },
+            {
+              "adds": 7966,
+              "apply_ns_per_record": 1031.059702429531,
+              "apply_seconds": 0.01642375,
+              "bytes": 952610,
+              "minute": 2,
+              "peak_records_in_one_second": 296,
+              "records": 15929
+            },
+            {
+              "adds": 7969,
+              "apply_ns_per_record": 901.1599624648107,
+              "apply_seconds": 0.014405042,
+              "bytes": 956176,
+              "minute": 3,
+              "peak_records_in_one_second": 309,
+              "records": 15985
+            },
+            {
+              "adds": 7969,
+              "apply_ns_per_record": 762.3716216216217,
+              "apply_seconds": 0.012072917,
+              "bytes": 947276,
+              "minute": 4,
+              "peak_records_in_one_second": 307,
+              "records": 15836
+            },
+            {
+              "adds": 8092,
+              "apply_ns_per_record": 784.1685913666399,
+              "apply_seconds": 0.012698042,
+              "bytes": 968477,
+              "minute": 5,
+              "peak_records_in_one_second": 310,
+              "records": 16193
+            },
+            {
+              "adds": 8008,
+              "apply_ns_per_record": 740.821240930698,
+              "apply_seconds": 0.01184425,
+              "bytes": 955853,
+              "minute": 6,
+              "peak_records_in_one_second": 308,
+              "records": 15988
+            }
+          ],
+          "snapshot_bytes": 48608301,
+          "view_entries": 812888,
+          "view_heap_bytes": 137365232
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "mean_apply_seconds_per_minute": 4.166666666666666e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "recompute each minute",
+          "minutes": [
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 1,
+              "records": 0
+            },
+            {
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 2,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 3,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "records": 0
+            },
+            {
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 5,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "records": 0
+            }
+          ],
+          "view_entries": 421,
+          "view_heap_bytes": 46178
+        },
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Uniform",
+        "result": {
+          "mean_apply_seconds_per_minute": 4.866666666666666e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "recompute each minute",
+          "minutes": [
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 1,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 2,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 4,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 5,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "records": 0
+            }
+          ],
+          "view_entries": 421,
+          "view_heap_bytes": 46178
+        },
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 776,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 374.7700710315095,
+          "mean_apply_seconds_per_minute": 0.0016932418000000001,
+          "mean_bytes_per_minute": 265080.0,
+          "mean_peak_records_in_one_second": 144.4,
+          "mean_records_per_minute": 4502.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 2183,
+              "apply_ns_per_record": 579.5947488584475,
+              "apply_seconds": 0.002538625,
+              "bytes": 257562,
+              "minute": 1,
+              "peak_records_in_one_second": 132,
+              "records": 4380
+            },
+            {
+              "adds": 2228,
+              "apply_ns_per_record": 372.71256415978576,
+              "apply_seconds": 0.001670125,
+              "bytes": 264128,
+              "minute": 2,
+              "peak_records_in_one_second": 142,
+              "records": 4481
+            },
+            {
+              "adds": 2154,
+              "apply_ns_per_record": 347.95252431681337,
+              "apply_seconds": 0.001502459,
+              "bytes": 254705,
+              "minute": 3,
+              "peak_records_in_one_second": 164,
+              "records": 4318
+            },
+            {
+              "adds": 2240,
+              "apply_ns_per_record": 399.2945511389013,
+              "apply_seconds": 0.001788041,
+              "bytes": 263164,
+              "minute": 4,
+              "peak_records_in_one_second": 143,
+              "records": 4478
+            },
+            {
+              "adds": 2225,
+              "apply_ns_per_record": 320.2093764223942,
+              "apply_seconds": 0.001407,
+              "bytes": 258805,
+              "minute": 5,
+              "peak_records_in_one_second": 130,
+              "records": 4394
+            },
+            {
+              "adds": 2423,
+              "apply_ns_per_record": 433.6813391196528,
+              "apply_seconds": 0.002098584,
+              "bytes": 284598,
+              "minute": 6,
+              "peak_records_in_one_second": 143,
+              "records": 4839
+            }
+          ],
+          "snapshot_bytes": 7156759,
+          "view_entries": 123298,
+          "view_heap_bytes": 25428048
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 41.6,
+          "mean_apply_seconds_per_minute": 4.16e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 7156759,
+          "view_entries": 123298,
+          "view_heap_bytes": 25428048
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 433.16261365734715,
+          "mean_apply_seconds_per_minute": 0.0010100084,
+          "mean_bytes_per_minute": 137384.4,
+          "mean_peak_records_in_one_second": 53.4,
+          "mean_records_per_minute": 2336.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 1031,
+              "apply_ns_per_record": 1345.7982209737827,
+              "apply_seconds": 0.002874625,
+              "bytes": 125344,
+              "minute": 1,
+              "peak_records_in_one_second": 55,
+              "records": 2136
+            },
+            {
+              "adds": 1156,
+              "apply_ns_per_record": 521.074026529739,
+              "apply_seconds": 0.00121775,
+              "bytes": 137376,
+              "minute": 2,
+              "peak_records_in_one_second": 52,
+              "records": 2337
+            },
+            {
+              "adds": 1097,
+              "apply_ns_per_record": 457.31261343012704,
+              "apply_seconds": 0.001007917,
+              "bytes": 129583,
+              "minute": 3,
+              "peak_records_in_one_second": 62,
+              "records": 2204
+            },
+            {
+              "adds": 1185,
+              "apply_ns_per_record": 423.1683673469388,
+              "apply_seconds": 0.000995292,
+              "bytes": 138515,
+              "minute": 4,
+              "peak_records_in_one_second": 49,
+              "records": 2352
+            },
+            {
+              "adds": 1190,
+              "apply_ns_per_record": 392.05073375262054,
+              "apply_seconds": 0.000935041,
+              "bytes": 140348,
+              "minute": 5,
+              "peak_records_in_one_second": 51,
+              "records": 2385
+            },
+            {
+              "adds": 1197,
+              "apply_ns_per_record": 372.2073272273106,
+              "apply_seconds": 0.000894042,
+              "bytes": 141100,
+              "minute": 6,
+              "peak_records_in_one_second": 53,
+              "records": 2402
+            }
+          ],
+          "snapshot_bytes": 7156759,
+          "view_entries": 123298,
+          "view_heap_bytes": 25428048
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 33.2,
+          "mean_apply_seconds_per_minute": 3.32e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 7156759,
+          "view_entries": 123298,
+          "view_heap_bytes": 25428048
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 224,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 444.80481717276126,
+          "mean_apply_seconds_per_minute": 0.0033273918,
+          "mean_bytes_per_minute": 444241.6,
+          "mean_peak_records_in_one_second": 288.6,
+          "mean_records_per_minute": 7494.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 3964,
+              "apply_ns_per_record": 1450.0682219419925,
+              "apply_seconds": 0.011499041,
+              "bytes": 469796,
+              "minute": 1,
+              "peak_records_in_one_second": 339,
+              "records": 7930
+            },
+            {
+              "adds": 3549,
+              "apply_ns_per_record": 457.1991020064543,
+              "apply_seconds": 0.003258458,
+              "bytes": 422880,
+              "minute": 2,
+              "peak_records_in_one_second": 259,
+              "records": 7127
+            },
+            {
+              "adds": 3643,
+              "apply_ns_per_record": 506.227248465439,
+              "apply_seconds": 0.003793667,
+              "bytes": 444136,
+              "minute": 3,
+              "peak_records_in_one_second": 267,
+              "records": 7494
+            },
+            {
+              "adds": 3569,
+              "apply_ns_per_record": 455.0033179457588,
+              "apply_seconds": 0.003154083,
+              "bytes": 410859,
+              "minute": 4,
+              "peak_records_in_one_second": 276,
+              "records": 6932
+            },
+            {
+              "adds": 3636,
+              "apply_ns_per_record": 383.8142991029589,
+              "apply_seconds": 0.002866709,
+              "bytes": 443464,
+              "minute": 5,
+              "peak_records_in_one_second": 221,
+              "records": 7469
+            },
+            {
+              "adds": 4328,
+              "apply_ns_per_record": 421.7801183431953,
+              "apply_seconds": 0.003564042,
+              "bytes": 499869,
+              "minute": 6,
+              "peak_records_in_one_second": 420,
+              "records": 8450
+            }
+          ],
+          "snapshot_bytes": 15528592,
+          "view_entries": 262370,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 25.0,
+          "mean_apply_seconds_per_minute": 2.5e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 83.0,
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 15528592,
+          "view_entries": 262370,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 472.66345290310994,
+          "mean_apply_seconds_per_minute": 0.0024721248,
+          "mean_bytes_per_minute": 310053.6,
+          "mean_peak_records_in_one_second": 109.2,
+          "mean_records_per_minute": 5229.2,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 2338,
+              "apply_ns_per_record": 1568.1803986028353,
+              "apply_seconds": 0.007632334,
+              "bytes": 288533,
+              "minute": 1,
+              "peak_records_in_one_second": 112,
+              "records": 4867
+            },
+            {
+              "adds": 2638,
+              "apply_ns_per_record": 550.1098963242224,
+              "apply_seconds": 0.002918333,
+              "bytes": 314433,
+              "minute": 2,
+              "peak_records_in_one_second": 108,
+              "records": 5305
+            },
+            {
+              "adds": 2533,
+              "apply_ns_per_record": 478.5480825958702,
+              "apply_seconds": 0.002433417,
+              "bytes": 301522,
+              "minute": 3,
+              "peak_records_in_one_second": 110,
+              "records": 5085
+            },
+            {
+              "adds": 2594,
+              "apply_ns_per_record": 447.8661767549797,
+              "apply_seconds": 0.002315916,
+              "bytes": 306794,
+              "minute": 4,
+              "peak_records_in_one_second": 108,
+              "records": 5171
+            },
+            {
+              "adds": 2656,
+              "apply_ns_per_record": 436.2233082706767,
+              "apply_seconds": 0.002320708,
+              "bytes": 315545,
+              "minute": 5,
+              "peak_records_in_one_second": 110,
+              "records": 5320
+            },
+            {
+              "adds": 2641,
+              "apply_ns_per_record": 450.5698005698006,
+              "apply_seconds": 0.00237225,
+              "bytes": 311974,
+              "minute": 6,
+              "peak_records_in_one_second": 110,
+              "records": 5265
+            }
+          ],
+          "snapshot_bytes": 15528592,
+          "view_entries": 262370,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 33.4,
+          "mean_apply_seconds_per_minute": 3.34e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 15528592,
+          "view_entries": 262370,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 64
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 24,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 493.73991384155227,
+          "mean_apply_seconds_per_minute": 0.004531808199999999,
+          "mean_bytes_per_minute": 545860.4,
+          "mean_peak_records_in_one_second": 406.2,
+          "mean_records_per_minute": 9197.4,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 4269,
+              "apply_ns_per_record": 1372.5754684045153,
+              "apply_seconds": 0.011794541,
+              "bytes": 509598,
+              "minute": 1,
+              "peak_records_in_one_second": 399,
+              "records": 8593
+            },
+            {
+              "adds": 4817,
+              "apply_ns_per_record": 495.4948464025869,
+              "apply_seconds": 0.004903417,
+              "bytes": 586750,
+              "minute": 2,
+              "peak_records_in_one_second": 412,
+              "records": 9896
+            },
+            {
+              "adds": 4269,
+              "apply_ns_per_record": 473.56244907461297,
+              "apply_seconds": 0.004068375,
+              "bytes": 509987,
+              "minute": 3,
+              "peak_records_in_one_second": 408,
+              "records": 8591
+            },
+            {
+              "adds": 4772,
+              "apply_ns_per_record": 417.9368232944392,
+              "apply_seconds": 0.003975833,
+              "bytes": 564588,
+              "minute": 4,
+              "peak_records_in_one_second": 399,
+              "records": 9513
+            },
+            {
+              "adds": 4617,
+              "apply_ns_per_record": 505.1191765980498,
+              "apply_seconds": 0.00466225,
+              "bytes": 548486,
+              "minute": 5,
+              "peak_records_in_one_second": 416,
+              "records": 9230
+            },
+            {
+              "adds": 4374,
+              "apply_ns_per_record": 576.5862738380724,
+              "apply_seconds": 0.005049166,
+              "bytes": 519491,
+              "minute": 6,
+              "peak_records_in_one_second": 396,
+              "records": 8757
+            }
+          ],
+          "snapshot_bytes": 24201544,
+          "view_entries": 407385,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 33.4,
+          "mean_apply_seconds_per_minute": 3.34e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 24201544,
+          "view_entries": 407385,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 0,
+          "mean_apply_ns_per_record": 644.3591549132236,
+          "mean_apply_seconds_per_minute": 0.005227791399999999,
+          "mean_bytes_per_minute": 482369.8,
+          "mean_peak_records_in_one_second": 164.0,
+          "mean_records_per_minute": 8117.6,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 3756,
+              "apply_ns_per_record": 1301.0153413449245,
+              "apply_seconds": 0.010176542,
+              "bytes": 464925,
+              "minute": 1,
+              "peak_records_in_one_second": 162,
+              "records": 7822
+            },
+            {
+              "adds": 4045,
+              "apply_ns_per_record": 754.7445967642336,
+              "apply_seconds": 0.006111167,
+              "bytes": 480971,
+              "minute": 2,
+              "peak_records_in_one_second": 155,
+              "records": 8097
+            },
+            {
+              "adds": 4012,
+              "apply_ns_per_record": 634.8220874086913,
+              "apply_seconds": 0.005127458,
+              "bytes": 480205,
+              "minute": 3,
+              "peak_records_in_one_second": 166,
+              "records": 8077
+            },
+            {
+              "adds": 4001,
+              "apply_ns_per_record": 652.2288295069627,
+              "apply_seconds": 0.005198916,
+              "bytes": 473700,
+              "minute": 4,
+              "peak_records_in_one_second": 169,
+              "records": 7971
+            },
+            {
+              "adds": 4103,
+              "apply_ns_per_record": 588.8756400877835,
+              "apply_seconds": 0.004829958,
+              "bytes": 487380,
+              "minute": 5,
+              "peak_records_in_one_second": 162,
+              "records": 8202
+            },
+            {
+              "adds": 4116,
+              "apply_ns_per_record": 591.1246207984468,
+              "apply_seconds": 0.004871458,
+              "bytes": 489593,
+              "minute": 6,
+              "peak_records_in_one_second": 168,
+              "records": 8241
+            }
+          ],
+          "snapshot_bytes": 24201544,
+          "view_entries": 407385,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "coarse_transitions": 0,
+          "grace_seconds": 30,
+          "mean_apply_ns_per_record": 25.2,
+          "mean_apply_seconds_per_minute": 2.5199999999999997e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_peak_records_in_one_second": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "events",
+          "minutes": [
+            {
+              "adds": 0,
+              "apply_ns_per_record": 41.0,
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 1,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 2,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 4,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 0.0,
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 5,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            },
+            {
+              "adds": 0,
+              "apply_ns_per_record": 42.0,
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "peak_records_in_one_second": 0,
+              "records": 0
+            }
+          ],
+          "snapshot_bytes": 24201544,
+          "view_entries": 407385,
+          "view_heap_bytes": 68681808
+        },
+        "rule": {
+          "floor": 3,
+          "hysteresis": true,
+          "policy": "+",
+          "t": 256
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "mean_apply_seconds_per_minute": 5.566666666666667e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "recompute each minute",
+          "minutes": [
+            {
+              "apply_seconds": 8.4e-8,
+              "bytes": 0,
+              "minute": 1,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 2,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 5,
+              "records": 0
+            },
+            {
+              "apply_seconds": 0.0,
+              "bytes": 0,
+              "minute": 6,
+              "records": 0
+            }
+          ],
+          "view_entries": 419,
+          "view_heap_bytes": 46073
+        },
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        }
+      },
+      {
+        "churn_per_minute": 0.01,
+        "edges": 100,
+        "n": 1000000,
+        "placement": "Prefix",
+        "result": {
+          "mean_apply_seconds_per_minute": 5.566666666666667e-8,
+          "mean_bytes_per_minute": 0.0,
+          "mean_records_per_minute": 0.0,
+          "method": "recompute each minute",
+          "minutes": [
+            {
+              "apply_seconds": 4.1e-8,
+              "bytes": 0,
+              "minute": 1,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.4e-8,
+              "bytes": 0,
+              "minute": 2,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 3,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 4,
+              "records": 0
+            },
+            {
+              "apply_seconds": 8.3e-8,
+              "bytes": 0,
+              "minute": 5,
+              "records": 0
+            },
+            {
+              "apply_seconds": 4.2e-8,
+              "bytes": 0,
+              "minute": 6,
+              "records": 0
+            }
+          ],
+          "view_entries": 898,
+          "view_heap_bytes": 218190
+        },
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        }
+      }
+    ]
+  },
+  "spike": "S2"
+}

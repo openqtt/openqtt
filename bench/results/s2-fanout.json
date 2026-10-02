@@ -1,0 +1,123 @@
+{
+  "args": {
+    "background": "1000000",
+    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-fanout.json"
+  },
+  "experiment": "fanout",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:18:21Z",
+    "memory_bytes": "17179869184",
+    "note": "laptop numbers: absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "background_filters": 1000000,
+    "rows": [
+      {
+        "bitmap_union_ns_per_destination": 230.8739165,
+        "bitmap_union_ns_per_publish": 230.8739165,
+        "checksum": 0,
+        "destinations_on_main_filter": 1,
+        "distinct_destinations": 1,
+        "matching_filters": 1,
+        "sort_dedup_ns_per_destination": 142.2210835,
+        "sort_dedup_ns_per_publish": 142.2210835
+      },
+      {
+        "bitmap_union_ns_per_destination": 227.2675,
+        "bitmap_union_ns_per_publish": 227.2675,
+        "checksum": 0,
+        "destinations_on_main_filter": 1,
+        "distinct_destinations": 1,
+        "matching_filters": 3,
+        "sort_dedup_ns_per_destination": 142.741792,
+        "sort_dedup_ns_per_publish": 142.741792
+      },
+      {
+        "bitmap_union_ns_per_destination": 67.75120849999999,
+        "bitmap_union_ns_per_publish": 677.512085,
+        "checksum": 0,
+        "destinations_on_main_filter": 10,
+        "distinct_destinations": 10,
+        "matching_filters": 1,
+        "sort_dedup_ns_per_destination": 14.321771000000002,
+        "sort_dedup_ns_per_publish": 143.21771
+      },
+      {
+        "bitmap_union_ns_per_destination": 84.66057291666667,
+        "bitmap_union_ns_per_publish": 1015.926875,
+        "checksum": 0,
+        "destinations_on_main_filter": 10,
+        "distinct_destinations": 12,
+        "matching_filters": 3,
+        "sort_dedup_ns_per_destination": 22.394843750000003,
+        "sort_dedup_ns_per_publish": 268.738125
+      },
+      {
+        "bitmap_union_ns_per_destination": 13.326729,
+        "bitmap_union_ns_per_publish": 1332.6729,
+        "checksum": 0,
+        "destinations_on_main_filter": 100,
+        "distinct_destinations": 100,
+        "matching_filters": 1,
+        "sort_dedup_ns_per_destination": 7.1132085,
+        "sort_dedup_ns_per_publish": 711.32085
+      },
+      {
+        "bitmap_union_ns_per_destination": 32.628033200000004,
+        "bitmap_union_ns_per_publish": 4078.50415,
+        "checksum": 0,
+        "destinations_on_main_filter": 100,
+        "distinct_destinations": 125,
+        "matching_filters": 3,
+        "sort_dedup_ns_per_destination": 15.5076,
+        "sort_dedup_ns_per_publish": 1938.45
+      },
+      {
+        "bitmap_union_ns_per_destination": 4.7938773773773775,
+        "bitmap_union_ns_per_publish": 4789.0835,
+        "checksum": 0,
+        "destinations_on_main_filter": 1000,
+        "distinct_destinations": 999,
+        "matching_filters": 1,
+        "sort_dedup_ns_per_destination": 4.223181181181181,
+        "sort_dedup_ns_per_publish": 4218.958
+      },
+      {
+        "bitmap_union_ns_per_destination": 9.50231865492394,
+        "bitmap_union_ns_per_publish": 11868.396,
+        "checksum": 0,
+        "destinations_on_main_filter": 1000,
+        "distinct_destinations": 1249,
+        "matching_filters": 3,
+        "sort_dedup_ns_per_destination": 20.33571857485989,
+        "sort_dedup_ns_per_publish": 25399.3125
+      },
+      {
+        "bitmap_union_ns_per_destination": 3.9997151612579125,
+        "bitmap_union_ns_per_publish": 39809.165,
+        "checksum": 600,
+        "destinations_on_main_filter": 10000,
+        "distinct_destinations": 9953,
+        "matching_filters": 1,
+        "sort_dedup_ns_per_destination": 4.650775143172913,
+        "sort_dedup_ns_per_publish": 46289.165
+      },
+      {
+        "bitmap_union_ns_per_destination": 12.825595190219577,
+        "bitmap_union_ns_per_publish": 159460.625,
+        "checksum": 800,
+        "destinations_on_main_filter": 10000,
+        "distinct_destinations": 12433,
+        "matching_filters": 3,
+        "sort_dedup_ns_per_destination": 28.25057307166412,
+        "sort_dedup_ns_per_publish": 351239.375
+      }
+    ],
+    "topic": "ingest/org-00000/production/00000000000000aa/telemetry"
+  },
+  "spike": "S2"
+}

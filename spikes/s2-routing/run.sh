@@ -21,7 +21,10 @@ run memory memory --workload a --n 100000,1000000,10000000 --out "$out/s2-memory
 run memory-mixed memory --workload b --n 1000000 --out "$out/s2-memory-mixed.json"
 run memory-shared memory --workload c --n 1000000 --out "$out/s2-memory-shared.json"
 run match match --n 1000000 --samples 1000000 --out "$out/s2-match.json"
+run match-1e5 match --n 100000 --samples 1000000 --out "$out/s2-match-1e5.json"
 run fanout fanout --background 1000000 --out "$out/s2-fanout.json"
+run coarsen-1e5 coarsen --n 100000 --samples 200000 --t 16,64,256 --floor 1,3 --full-view 0 \
+    --out "$out/s2-coarsen-1e5.json"
 run coarsen coarsen --n 1000000 --samples 200000 --out "$out/s2-coarsen-1e6.json"
 run coarsen-1e7 coarsen --n 10000000 --samples 200000 --full-view 0 --t 16,64,256,1024 --floor 1,3 \
     --out "$out/s2-coarsen-1e7.json"
