@@ -7,7 +7,7 @@ use std::num::NonZeroU16;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use openqtt_codec::{
     ConnAck, Connect, Decoder, Disconnect, DisconnectReasonCode, MAX_PACKET_SIZE, Packet, PubAck,
     PubComp, PubCompReasonCode, PubRec, PubRel, PubRelReasonCode, Publish, QoS, Sender, SubAck,
@@ -22,10 +22,15 @@ use crate::session::{Outbound, Stage};
 use crate::transport::{CloseCode, Link, LinkHandle};
 use crate::{Error, Session};
 
-/// How long the client waits after its DISCONNECT for the server to close the connection,
-/// and then for the close to reach the server. Closing a QUIC connection discards stream data
-/// not yet acknowledged, so closing at once could lose the DISCONNECT.
+/// How long the client waits after its DISCONNECT for it to be written, then for the server
+/// to close the connection, and then for the close to reach the server. Closing a QUIC
+/// connection discards stream data not yet acknowledged, so closing at once could lose the
+/// DISCONNECT.
 const LINGER: Duration = Duration::from_secs(1);
+
+/// How many bytes may wait to be written before publications wait too. A server that stops
+/// reading holds the client to about this much, besides what callers have in hand.
+pub(crate) const WRITE_LIMIT: usize = 64 * 1024;
 
 /// A call from a [`Client`](crate::Client) handle.
 pub(crate) enum Command {
@@ -139,18 +144,24 @@ enum Stop {
 }
 
 /// The task that owns an open connection.
+///
+/// It never waits on a write inside a handler: handlers encode into `write_buf`, and the
+/// serving loop writes it out while it goes on reading, taking calls and keeping time, so a
+/// server that stops reading cannot stop the client from noticing.
 pub(crate) struct Driver {
     reader: Box<dyn AsyncRead + Send + Unpin>,
     writer: Box<dyn AsyncWrite + Send + Unpin>,
     handle: Box<dyn LinkHandle>,
     decoder: Decoder,
     read_buf: BytesMut,
+    /// Encoded packets waiting to be written, in order.
     write_buf: BytesMut,
     session: Session,
     negotiated: Negotiated,
     /// How many outbound messages hold a slot of the server's Receive Maximum.
     in_flight: usize,
-    /// QoS 1 and 2 messages waiting for a slot ([MQTT-3.3.4-7]).
+    /// Publications waiting to be sent: for room in the write buffer, and at QoS 1 and 2 for a
+    /// slot of the server's Receive Maximum too ([MQTT-3.3.4-7]).
     queued: VecDeque<(Publish, oneshot::Sender<Result<Published, Error>>)>,
     /// Callers waiting for an acknowledgement, by Packet Identifier.
     replies: HashMap<u16, Reply>,
@@ -158,9 +169,9 @@ pub(crate) struct Driver {
     inbound_aliases: HashMap<u16, String>,
     /// Topic Aliases this client set on this connection.
     outbound_aliases: HashMap<u16, String>,
-    /// When the client last sent a packet.
+    /// When the client last wrote anything.
     last_sent: Instant,
-    /// When an unanswered PINGREQ went out.
+    /// When an unanswered PINGREQ was queued.
     ping_sent: Option<Instant>,
     commands: mpsc::Receiver<Command>,
     commands_open: bool,
@@ -227,6 +238,7 @@ impl Driver {
         };
         let (reason, code, reply) = match stop {
             Stop::Disconnected(reply) => {
+                self.drain().await;
                 self.linger().await;
                 (CloseReason::Disconnected, CloseCode::NoError, reply)
             }
@@ -237,6 +249,7 @@ impl Driver {
                 reason_code,
                 detail,
             } => {
+                self.drain().await;
                 self.linger().await;
                 (
                     CloseReason::ProtocolError {
@@ -309,12 +322,13 @@ impl Driver {
         if let Some(connack) = self.connack.take() {
             self.emit(Event::Received(connack));
         }
-        self.resume().await?;
+        self.resume()?;
         // Packets that came in the same read as the CONNACK.
-        self.decode_buffered().await?;
+        self.decode_buffered()?;
         loop {
             let ping_at = self.ping_deadline();
             let pending = !self.outbox.is_empty();
+            let writing = !self.write_buf.is_empty();
             let (events, outbox) = (&self.events, &mut self.outbox);
             // Hands one waiting event over as soon as the channel has room.
             let deliver = async move {
@@ -332,37 +346,47 @@ impl Driver {
                         self.events_closed = true;
                         self.outbox.clear();
                         if !self.commands_open {
-                            return Err(self.abandon().await);
+                            return Err(self.abandon());
                         }
                     }
                     // Packets that arrived while the application was behind.
-                    self.decode_buffered().await?;
+                    self.decode_buffered()?;
                 }
                 // The application dropped its Events, whether or not one was waiting.
                 () = self.events.closed(), if !self.events_closed => {
                     self.events_closed = true;
                     self.outbox.clear();
                     if !self.commands_open {
-                        return Err(self.abandon().await);
+                        return Err(self.abandon());
                     }
                 }
                 command = self.commands.recv(), if self.commands_open => match command {
-                    Some(command) => self.command(command).await?,
+                    Some(command) => self.command(command)?,
                     None => {
                         self.commands_open = false;
                         if self.events_closed {
-                            return Err(self.abandon().await);
+                            return Err(self.abandon());
                         }
                     }
+                },
+                // Whatever the server can take, while everything else goes on.
+                written = self.writer.write(&self.write_buf), if writing => match written {
+                    Ok(0) => return Err(Stop::Lost("the control stream takes no more data".into())),
+                    Ok(count) => {
+                        self.write_buf.advance(count);
+                        self.last_sent = Instant::now();
+                        self.pump();
+                    }
+                    Err(error) => return Err(Stop::Lost(error.to_string())),
                 },
                 // Nothing more is read while events wait for the application.
                 read = self.reader.read_buf(&mut self.read_buf), if !pending => match read {
                     Ok(0) => return Err(Stop::Lost("the server closed the control stream".into())),
-                    Ok(_) => self.decode_buffered().await?,
+                    Ok(_) => self.decode_buffered()?,
                     Err(error) => return Err(Stop::Lost(error.to_string())),
                 },
                 () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {
-                    self.keep_alive_due().await?;
+                    self.keep_alive_due()?;
                 }
             }
         }
@@ -376,20 +400,23 @@ impl Driver {
     }
 
     /// Nothing holds the connection any more: DISCONNECT as a normal close.
-    async fn abandon(&mut self) -> Stop {
-        if self
-            .encode(&Packet::Disconnect(Disconnect::default()))
-            .is_ok()
-        {
-            drop(self.flush().await);
-        }
+    fn abandon(&mut self) -> Stop {
+        drop(self.encode(&Packet::Disconnect(Disconnect::default())));
         Stop::Disconnected(None)
+    }
+
+    /// Writes out what waits to be written, the DISCONNECT last, for as long as the server
+    /// takes it within [`LINGER`].
+    async fn drain(&mut self) {
+        let (writer, pending) = (&mut self.writer, &self.write_buf);
+        drop(timeout(LINGER, writer.write_all(pending)).await);
+        self.write_buf.clear();
     }
 
     /// Waits a short while for the server to close the connection after a DISCONNECT, so the
     /// DISCONNECT is delivered before the close.
     async fn linger(&mut self) {
-        drop(self.writer.shutdown().await);
+        drop(timeout(LINGER, self.writer.shutdown()).await);
         let reader = &mut self.reader;
         let mut sink = [0; 256];
         drop(
@@ -414,12 +441,13 @@ impl Driver {
     }
 
     /// The Keep Alive passed with nothing sent: PINGREQ ([MQTT-3.1.2-20]), unless the last
-    /// one is still unanswered, in which case the server is gone (section 3.1.2.10).
-    async fn keep_alive_due(&mut self) -> Result<(), Stop> {
+    /// one is still unanswered, in which case the server is gone (section 3.1.2.10). A
+    /// PINGREQ the server never takes is unanswered too.
+    fn keep_alive_due(&mut self) -> Result<(), Stop> {
         if self.ping_sent.is_some() {
             return Err(Stop::Lost("the server did not answer PINGREQ".into()));
         }
-        self.send(&Packet::PingReq).await?;
+        self.send(&Packet::PingReq)?;
         self.ping_sent = Some(Instant::now());
         Ok(())
     }
@@ -427,7 +455,7 @@ impl Driver {
     /// Resends what a resumed session left in flight ([MQTT-4.4.0-1]): PUBREL for the
     /// messages waiting on PUBCOMP, then the PUBLISH packets in the order they were first sent
     /// ([MQTT-4.6.0-1]), with DUP set, as the server's Receive Maximum allows.
-    async fn resume(&mut self) -> Result<(), Stop> {
+    fn resume(&mut self) -> Result<(), Stop> {
         let mut releases = Vec::new();
         for outbound in &mut self.session.outbound {
             outbound.sent = outbound.stage == Stage::Completion;
@@ -437,80 +465,116 @@ impl Driver {
         }
         self.in_flight = releases.len();
         for id in releases {
-            self.encode_own(&Packet::PubRel(PubRel::new(id)))?;
+            self.send(&Packet::PubRel(PubRel::new(id)))?;
         }
-        self.flush().await?;
-        self.pump().await
+        self.pump();
+        Ok(())
     }
 
-    /// Sends queued QoS 1 and 2 messages while the server's Receive Maximum has room
-    /// ([MQTT-3.3.4-7]): resumed ones first, in their original order, then new ones.
-    async fn pump(&mut self) -> Result<(), Stop> {
+    /// Whether publications may be encoded: the write buffer is under [`WRITE_LIMIT`].
+    fn room(&self) -> bool {
+        self.write_buf.len() < WRITE_LIMIT
+    }
+
+    /// Sends the publications that can go, while the write buffer has room: resumed QoS 1 and 2
+    /// messages first, in their original order, then queued ones in the order they came, QoS
+    /// 1 and 2 only while the server's Receive Maximum has a slot ([MQTT-3.3.4-7]) and QoS 0
+    /// whatever it is.
+    fn pump(&mut self) {
         let maximum = usize::from(self.negotiated.server_receive_maximum);
-        while self.in_flight < maximum {
-            if let Some(index) = self.session.outbound.iter().position(|o| !o.sent) {
-                let mut publish = self.session.outbound[index].publish.clone();
-                publish.dup = true;
-                let refusal = self.forbidden(&publish).or_else(|| {
-                    self.encode(&Packet::Publish(publish))
-                        .err()
-                        .map(Discard::Invalid)
-                });
-                if let Some(reason) = refusal {
-                    // The server would refuse it now; it leaves the session unsent, and the
-                    // application hears of it.
-                    if let Some(outbound) = self.session.outbound.remove(index) {
-                        self.session.ids.release(outbound.id);
-                        self.emit(Event::Discarded {
-                            publish: outbound.publish,
-                            reason,
-                        });
-                    }
-                    continue;
-                }
-                self.session.outbound[index].sent = true;
-                self.in_flight += 1;
-                self.flush().await?;
+        while self.room() {
+            let quota = self.in_flight < maximum;
+            if quota && let Some(index) = self.session.outbound.iter().position(|o| !o.sent) {
+                self.resend(index);
                 continue;
             }
-            let Some((mut publish, reply)) = self.queued.pop_front() else {
+            let Some(position) = self
+                .queued
+                .iter()
+                .position(|(publish, _)| quota || publish.qos == QoS::AtMostOnce)
+            else {
                 break;
             };
-            let Some(id) = self.session.ids.allocate() else {
-                drop(reply.send(Err(Error::PacketIdsExhausted)));
-                continue;
+            let Some((publish, reply)) = self.queued.remove(position) else {
+                break;
             };
-            publish.packet_id = Some(id);
-            let stored = match self.encode_publish(&publish) {
-                Ok(stored) => stored,
-                Err(error) => {
-                    self.session.ids.release(id);
-                    drop(reply.send(Err(error)));
-                    continue;
-                }
-            };
-            let stage = if publish.qos == QoS::AtLeastOnce {
-                Stage::Acknowledgement
-            } else {
-                Stage::Receipt
-            };
-            self.session.outbound.push_back(Outbound {
-                id,
-                publish: stored,
-                stage,
-                sent: true,
-            });
-            self.in_flight += 1;
-            self.replies.insert(
-                id.get(),
-                Reply::Publish {
-                    reply,
-                    pubrec: None,
-                },
-            );
-            self.flush().await?;
+            self.send_publish(publish, reply);
         }
-        Ok(())
+    }
+
+    /// Sends a resumed message again, with DUP, or discards it when the server's CONNACK no
+    /// longer allows it.
+    fn resend(&mut self, index: usize) {
+        let mut publish = self.session.outbound[index].publish.clone();
+        publish.dup = true;
+        let refusal = self.forbidden(&publish).or_else(|| {
+            self.encode(&Packet::Publish(publish))
+                .err()
+                .map(Discard::Invalid)
+        });
+        match refusal {
+            // The server would refuse it now; it leaves the session unsent, and the
+            // application hears of it.
+            Some(reason) => {
+                if let Some(outbound) = self.session.outbound.remove(index) {
+                    self.session.ids.release(outbound.id);
+                    self.emit(Event::Discarded {
+                        publish: outbound.publish,
+                        reason,
+                    });
+                }
+            }
+            None => {
+                self.session.outbound[index].sent = true;
+                self.in_flight += 1;
+            }
+        }
+    }
+
+    /// Sends a new publication: QoS 0 as it is, QoS 1 and 2 with a Packet Identifier and a
+    /// place in the session until it is acknowledged.
+    fn send_publish(
+        &mut self,
+        mut publish: Publish,
+        reply: oneshot::Sender<Result<Published, Error>>,
+    ) {
+        if publish.qos == QoS::AtMostOnce {
+            let result = self.encode_publish(&publish).map(|_| Published::AtMostOnce);
+            drop(reply.send(result));
+            return;
+        }
+        let Some(id) = self.session.ids.allocate() else {
+            drop(reply.send(Err(Error::PacketIdsExhausted)));
+            return;
+        };
+        publish.packet_id = Some(id);
+        let stored = match self.encode_publish(&publish) {
+            Ok(stored) => stored,
+            Err(error) => {
+                self.session.ids.release(id);
+                drop(reply.send(Err(error)));
+                return;
+            }
+        };
+        let stage = if publish.qos == QoS::AtLeastOnce {
+            Stage::Acknowledgement
+        } else {
+            Stage::Receipt
+        };
+        self.session.outbound.push_back(Outbound {
+            id,
+            publish: stored,
+            stage,
+            sent: true,
+        });
+        self.in_flight += 1;
+        self.replies.insert(
+            id.get(),
+            Reply::Publish {
+                reply,
+                pubrec: None,
+            },
+        );
     }
 
     /// Removes a completed message from the session and frees its identifier and its slot.
@@ -549,29 +613,11 @@ impl Driver {
         }
     }
 
-    /// [`encode`](Self::encode) for a packet the client makes itself, which never fails
-    /// unless the server's limits leave no room for it.
-    fn encode_own(&mut self, packet: &Packet) -> Result<(), Stop> {
+    /// Queues a packet the client makes itself, which never fails to encode unless the
+    /// server's limits leave no room for it.
+    fn send(&mut self, packet: &Packet) -> Result<(), Stop> {
         self.encode(packet)
             .map_err(|error| Stop::Lost(format!("cannot send {}: {error}", packet.packet_type())))
-    }
-
-    /// Encodes and writes a packet the client makes itself.
-    async fn send(&mut self, packet: &Packet) -> Result<(), Stop> {
-        self.encode_own(packet)?;
-        self.flush().await
-    }
-
-    /// Writes the write buffer out.
-    async fn flush(&mut self) -> Result<(), Stop> {
-        if self.write_buf.is_empty() {
-            return Ok(());
-        }
-        let result = self.writer.write_all(&self.write_buf).await;
-        self.write_buf.clear();
-        result.map_err(|error| Stop::Lost(error.to_string()))?;
-        self.last_sent = Instant::now();
-        Ok(())
     }
 
     /// Encodes a PUBLISH, checking its Topic Alias against what this connection mapped, and
@@ -606,9 +652,12 @@ impl Driver {
     }
 
     /// Handles a call from a handle.
-    async fn command(&mut self, command: Command) -> Result<(), Stop> {
+    fn command(&mut self, command: Command) -> Result<(), Stop> {
         match command {
-            Command::Publish { publish, reply } => self.publish(publish, reply).await,
+            Command::Publish { publish, reply } => {
+                self.publish(publish, reply);
+                Ok(())
+            }
             Command::Subscribe {
                 subscriptions,
                 properties,
@@ -623,13 +672,16 @@ impl Driver {
                     properties,
                     subscriptions,
                 });
-                if let Err(error) = self.encode(&packet) {
-                    self.session.ids.release(id);
-                    drop(reply.send(Err(Error::Invalid(error))));
-                    return Ok(());
+                match self.encode(&packet) {
+                    Ok(()) => {
+                        self.replies.insert(id.get(), Reply::Subscribe(reply));
+                    }
+                    Err(error) => {
+                        self.session.ids.release(id);
+                        drop(reply.send(Err(Error::Invalid(error))));
+                    }
                 }
-                self.replies.insert(id.get(), Reply::Subscribe(reply));
-                self.flush().await
+                Ok(())
             }
             Command::Unsubscribe {
                 filters,
@@ -645,13 +697,16 @@ impl Driver {
                     properties,
                     filters,
                 });
-                if let Err(error) = self.encode(&packet) {
-                    self.session.ids.release(id);
-                    drop(reply.send(Err(Error::Invalid(error))));
-                    return Ok(());
+                match self.encode(&packet) {
+                    Ok(()) => {
+                        self.replies.insert(id.get(), Reply::Unsubscribe(reply));
+                    }
+                    Err(error) => {
+                        self.session.ids.release(id);
+                        drop(reply.send(Err(Error::Invalid(error))));
+                    }
                 }
-                self.replies.insert(id.get(), Reply::Unsubscribe(reply));
-                self.flush().await
+                Ok(())
             }
             Command::Disconnect { disconnect, reply } => {
                 // A Reason String or User Property that would take the DISCONNECT past the
@@ -666,19 +721,14 @@ impl Driver {
                     drop(reply.send(Err(Error::Invalid(error))));
                     return Ok(());
                 }
-                drop(self.flush().await);
                 Err(Stop::Disconnected(Some(reply)))
             }
         }
     }
 
-    /// Publishes: QoS 0 at once, QoS 1 and 2 through the queue that respects the server's
-    /// Receive Maximum.
-    async fn publish(
-        &mut self,
-        mut publish: Publish,
-        reply: oneshot::Sender<Result<Published, Error>>,
-    ) -> Result<(), Stop> {
+    /// Takes a publication: refused at once when it breaks a limit the server announced,
+    /// otherwise queued for [`pump`](Self::pump).
+    fn publish(&mut self, mut publish: Publish, reply: oneshot::Sender<Result<Published, Error>>) {
         let negotiated = &self.negotiated;
         let refusal = if publish.qos > negotiated.server_maximum_qos {
             // [MQTT-3.2.2-11]
@@ -702,36 +752,28 @@ impl Driver {
         };
         if let Some(error) = refusal {
             drop(reply.send(Err(error)));
-            return Ok(());
+            return;
         }
         publish.dup = false;
         if publish.qos == QoS::AtMostOnce {
             publish.packet_id = None;
-            match self.encode_publish(&publish) {
-                Ok(_) => {
-                    self.flush().await?;
-                    drop(reply.send(Ok(Published::AtMostOnce)));
-                }
-                Err(error) => drop(reply.send(Err(error))),
-            }
-            return Ok(());
         }
         self.queued.push_back((publish, reply));
-        self.pump().await
+        self.pump();
     }
 
     /// Handles the whole packets in the read buffer, until one of them leaves an event for
     /// the application: what follows waits until the application has taken it, so a slow
     /// application holds back the acknowledgements of what it has not yet been given room for.
-    async fn decode_buffered(&mut self) -> Result<(), Stop> {
+    fn decode_buffered(&mut self) -> Result<(), Stop> {
         while self.outbox.is_empty() {
             match self.decoder.decode(&mut self.read_buf) {
-                Ok(Some(packet)) => self.on_packet(packet).await?,
+                Ok(Some(packet)) => self.on_packet(packet)?,
                 Ok(None) => return Ok(()),
                 Err(error) => {
-                    return Err(self
-                        .protocol_error(error.disconnect_reason_code(), error.to_string())
-                        .await);
+                    return Err(
+                        self.protocol_error(error.disconnect_reason_code(), error.to_string())
+                    );
                 }
             }
         }
@@ -739,14 +781,11 @@ impl Driver {
     }
 
     /// Answers a server that broke the protocol with DISCONNECT, as section 4.13 asks.
-    async fn protocol_error(&mut self, reason_code: DisconnectReasonCode, detail: String) -> Stop {
-        let disconnect = Packet::Disconnect(Disconnect {
+    fn protocol_error(&mut self, reason_code: DisconnectReasonCode, detail: String) -> Stop {
+        drop(self.encode(&Packet::Disconnect(Disconnect {
             reason_code,
             ..Disconnect::default()
-        });
-        if self.encode(&disconnect).is_ok() {
-            drop(self.flush().await);
-        }
+        })));
         Stop::Protocol {
             reason_code,
             detail,
@@ -754,14 +793,17 @@ impl Driver {
     }
 
     /// Handles one packet from the server.
-    async fn on_packet(&mut self, packet: Packet) -> Result<(), Stop> {
+    fn on_packet(&mut self, packet: Packet) -> Result<(), Stop> {
         if self.packet_log {
             self.emit(Event::Received(packet.clone()));
         }
         match packet {
-            Packet::Publish(publish) => self.on_publish(publish).await,
-            Packet::PubAck(puback) => self.on_puback(puback).await,
-            Packet::PubRec(pubrec) => self.on_pubrec(pubrec).await,
+            Packet::Publish(publish) => self.on_publish(publish),
+            Packet::PubAck(puback) => {
+                self.on_puback(puback);
+                Ok(())
+            }
+            Packet::PubRec(pubrec) => self.on_pubrec(pubrec),
             Packet::PubRel(pubrel) => {
                 let known = self.session.inbound.remove(&pubrel.packet_id.get());
                 let reason_code = if known {
@@ -773,9 +815,11 @@ impl Driver {
                     reason_code,
                     ..PubComp::new(pubrel.packet_id)
                 }))
-                .await
             }
-            Packet::PubComp(pubcomp) => self.on_pubcomp(pubcomp).await,
+            Packet::PubComp(pubcomp) => {
+                self.on_pubcomp(pubcomp);
+                Ok(())
+            }
             Packet::SubAck(suback) => {
                 let id = suback.packet_id;
                 match self.replies.remove(&id.get()) {
@@ -811,37 +855,31 @@ impl Driver {
             Packet::Disconnect(disconnect) => Err(Stop::ByServer(disconnect)),
             // At most one CONNACK per connection ([MQTT-3.2.0-2]); no AUTH without an
             // Authentication Method ([MQTT-4.12.0-6]); the rest only a client sends.
-            other => Err(self
-                .protocol_error(
-                    DisconnectReasonCode::ProtocolError,
-                    format!("the server sent {}", other.packet_type()),
-                )
-                .await),
+            other => Err(self.protocol_error(
+                DisconnectReasonCode::ProtocolError,
+                format!("the server sent {}", other.packet_type()),
+            )),
         }
     }
 
     /// An Application Message from the server.
-    async fn on_publish(&mut self, mut publish: Publish) -> Result<(), Stop> {
+    fn on_publish(&mut self, mut publish: Publish) -> Result<(), Stop> {
         if let Some(alias) = publish.properties.topic_alias {
             if alias.get() > self.negotiated.topic_alias_maximum {
-                return Err(self
-                    .protocol_error(
-                        DisconnectReasonCode::TopicAliasInvalid,
-                        format!("Topic Alias {alias} is above the client's maximum"),
-                    )
-                    .await);
+                return Err(self.protocol_error(
+                    DisconnectReasonCode::TopicAliasInvalid,
+                    format!("Topic Alias {alias} is above the client's maximum"),
+                ));
             }
             if publish.topic.is_empty() {
                 // [MQTT-3.3.2-10]
                 match self.inbound_aliases.get(&alias.get()) {
                     Some(topic) => publish.topic.clone_from(topic),
                     None => {
-                        return Err(self
-                            .protocol_error(
-                                DisconnectReasonCode::ProtocolError,
-                                format!("Topic Alias {alias} was never set"),
-                            )
-                            .await);
+                        return Err(self.protocol_error(
+                            DisconnectReasonCode::ProtocolError,
+                            format!("Topic Alias {alias} was never set"),
+                        ));
                     }
                 }
             } else {
@@ -855,24 +893,22 @@ impl Driver {
                 // Acknowledged whether or not the application gets to it ([MQTT-4.5.0-2]),
                 // in the order the messages arrived ([MQTT-4.6.0-2]).
                 self.emit(Event::Message(publish));
-                self.send(&Packet::PubAck(PubAck::new(id))).await?;
+                self.send(&Packet::PubAck(PubAck::new(id)))?;
             }
             (QoS::ExactlyOnce, Some(id)) => {
                 if !self.session.inbound.contains(&id.get()) {
                     if self.session.inbound.len() >= usize::from(self.negotiated.receive_maximum) {
-                        return Err(self
-                            .protocol_error(
-                                DisconnectReasonCode::ReceiveMaximumExceeded,
-                                "more QoS 2 messages than the client's Receive Maximum".into(),
-                            )
-                            .await);
+                        return Err(self.protocol_error(
+                            DisconnectReasonCode::ReceiveMaximumExceeded,
+                            "more QoS 2 messages than the client's Receive Maximum".into(),
+                        ));
                     }
                     self.session.inbound.insert(id.get());
                     self.emit(Event::Message(publish));
                 }
                 // A repeat before PUBREL gets PUBREC again and is not delivered twice
                 // ([MQTT-4.6.0-3] keeps the order).
-                self.send(&Packet::PubRec(PubRec::new(id))).await?;
+                self.send(&Packet::PubRec(PubRec::new(id)))?;
             }
             // The codec gives every QoS 1 and 2 PUBLISH its identifier.
             (_, None) => {}
@@ -881,38 +917,36 @@ impl Driver {
     }
 
     /// PUBACK for a QoS 1 message.
-    async fn on_puback(&mut self, puback: PubAck) -> Result<(), Stop> {
+    fn on_puback(&mut self, puback: PubAck) {
         let id = puback.packet_id;
         let Some(index) = self.session.position(id) else {
-            return Ok(());
+            return;
         };
         if self.session.outbound[index].stage != Stage::Acknowledgement {
-            return Ok(());
+            return;
         }
         self.finish_outbound(index);
         if let Some(Reply::Publish { reply, .. }) = self.replies.remove(&id.get()) {
             drop(reply.send(Ok(Published::AtLeastOnce(puback))));
         }
-        self.pump().await
+        self.pump();
     }
 
     /// PUBREC for a QoS 2 message: PUBREL when it accepts the message ([MQTT-4.6.0-4] keeps
     /// the order), the end of the exchange when it refuses it ([MQTT-4.3.3-4],
     /// [MQTT-4.4.0-2]).
-    async fn on_pubrec(&mut self, pubrec: PubRec) -> Result<(), Stop> {
+    fn on_pubrec(&mut self, pubrec: PubRec) -> Result<(), Stop> {
         let id = pubrec.packet_id;
         let Some(index) = self.session.position(id) else {
-            return self
-                .send(&Packet::PubRel(PubRel {
-                    reason_code: PubRelReasonCode::PacketIdentifierNotFound,
-                    ..PubRel::new(id)
-                }))
-                .await;
+            return self.send(&Packet::PubRel(PubRel {
+                reason_code: PubRelReasonCode::PacketIdentifierNotFound,
+                ..PubRel::new(id)
+            }));
         };
         match self.session.outbound[index].stage {
             Stage::Receipt => {}
             // A repeated PUBREC: the PUBREL may not have arrived.
-            Stage::Completion => return self.send(&Packet::PubRel(PubRel::new(id))).await,
+            Stage::Completion => return self.send(&Packet::PubRel(PubRel::new(id))),
             Stage::Acknowledgement => return Ok(()),
         }
         if pubrec.reason_code.is_error() {
@@ -923,23 +957,24 @@ impl Driver {
                     pubcomp: None,
                 })));
             }
-            return self.pump().await;
+            self.pump();
+            return Ok(());
         }
         self.session.outbound[index].stage = Stage::Completion;
         if let Some(Reply::Publish { pubrec: kept, .. }) = self.replies.get_mut(&id.get()) {
             *kept = Some(pubrec);
         }
-        self.send(&Packet::PubRel(PubRel::new(id))).await
+        self.send(&Packet::PubRel(PubRel::new(id)))
     }
 
     /// PUBCOMP, the end of a QoS 2 exchange.
-    async fn on_pubcomp(&mut self, pubcomp: PubComp) -> Result<(), Stop> {
+    fn on_pubcomp(&mut self, pubcomp: PubComp) {
         let id = pubcomp.packet_id;
         let Some(index) = self.session.position(id) else {
-            return Ok(());
+            return;
         };
         if self.session.outbound[index].stage != Stage::Completion {
-            return Ok(());
+            return;
         }
         self.finish_outbound(index);
         if let Some(Reply::Publish { reply, pubrec }) = self.replies.remove(&id.get()) {
@@ -948,6 +983,6 @@ impl Driver {
                 pubcomp: Some(pubcomp),
             })));
         }
-        self.pump().await
+        self.pump();
     }
 }

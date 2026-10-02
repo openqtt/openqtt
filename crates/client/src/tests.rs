@@ -1233,3 +1233,101 @@ async fn dropping_every_handle_of_an_idle_connection_disconnects_it() {
         );
     }
 }
+
+/// A QoS 0 PUBLISH of `len` bytes of `byte`, larger than the test streams can buffer.
+fn large(byte: u8, len: usize) -> Publish {
+    Publish {
+        topic: "t".into(),
+        payload: Bytes::from(vec![byte; len]),
+        ..Publish::default()
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_server_that_stops_reading_leaves_the_client_responsive() {
+    let (client_end, server_end) = tokio::io::duplex(4 * 1024);
+    let (client, mut events, mut server, _) = connect_over(
+        client_end,
+        server_end,
+        ConnectOptions::new("c").keep_alive(0),
+        ConnAck::default(),
+    )
+    .await;
+    // The server reads nothing more, so this publication cannot be written in full.
+    let publisher = client.clone();
+    tokio::spawn(async move { drop(publisher.publish(large(1, 16 * 1024)).await) });
+
+    // What the server sends is still taken and handed to the application.
+    server
+        .send(Publish {
+            packet_id: Some(pid(1)),
+            ..qos1("in", "x")
+        })
+        .await;
+    let message = tokio::time::timeout(Duration::from_secs(5), events.next_message())
+        .await
+        .expect("a message is delivered while a write is blocked");
+    assert_eq!(message.map(|message| message.topic), Some("in".into()));
+
+    // And a disconnect completes, in bounded time.
+    let disconnected = tokio::time::timeout(Duration::from_secs(10), client.disconnect())
+        .await
+        .expect("the disconnect completes while a write is blocked");
+    assert!(disconnected.is_ok());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_server_that_stops_reading_is_given_up_at_the_ping_timeout() {
+    let (client_end, server_end) = tokio::io::duplex(4 * 1024);
+    let options = ConnectOptions::new("c")
+        .keep_alive(10)
+        .ping_timeout(Duration::from_secs(5));
+    let (client, mut events, _server, _) =
+        connect_over(client_end, server_end, options, ConnAck::default()).await;
+    let start = Instant::now();
+    let publisher = client.clone();
+    tokio::spawn(async move { drop(publisher.publish(large(1, 16 * 1024)).await) });
+    // The PINGREQ due at 10 s cannot be written, no PINGRESP comes, and at 15 s the client
+    // gives the connection up.
+    let closed = tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            if let Some(Event::Closed(reason)) = events.recv().await {
+                return reason;
+            }
+        }
+    })
+    .await
+    .expect("the client gives up on the server");
+    assert!(matches!(closed, CloseReason::Lost(_)), "{closed:?}");
+    assert_eq!(start.elapsed(), Duration::from_secs(15));
+}
+
+#[tokio::test(start_paused = true)]
+async fn publications_wait_for_room_to_be_written() {
+    let (client_end, server_end) = tokio::io::duplex(4 * 1024);
+    let (client, _events, mut server, _) = connect_over(
+        client_end,
+        server_end,
+        ConnectOptions::new("c").keep_alive(0),
+        ConnAck::default(),
+    )
+    .await;
+    // The first publication is taken at once, though it cannot all be written yet.
+    tokio::time::timeout(Duration::from_secs(5), client.publish(large(1, 80 * 1024)))
+        .await
+        .expect("the first publication is taken")
+        .unwrap();
+    // The second waits: what is waiting to be written is past the limit.
+    let publisher = client.clone();
+    let second = tokio::spawn(async move { publisher.publish(large(2, 80 * 1024)).await });
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert!(!second.is_finished());
+    // Once the server reads, both go out, in order.
+    for byte in [1, 2] {
+        let Packet::Publish(publish) = server.recv().await else {
+            panic!("a PUBLISH");
+        };
+        assert_eq!(publish.payload[0], byte);
+    }
+    assert_eq!(second.await.unwrap().unwrap(), Published::AtMostOnce);
+}

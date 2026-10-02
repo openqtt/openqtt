@@ -176,7 +176,7 @@ impl Events {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Published {
-    /// QoS 0: handed to the transport. Nothing comes back.
+    /// QoS 0: taken to be written, after everything published before it. Nothing comes back.
     AtMostOnce,
     /// QoS 1: the server's PUBACK. A reason code of 0x80 or above means it refused the message.
     AtLeastOnce(PubAck),
@@ -358,8 +358,9 @@ impl Client {
     ///
     /// The client assigns the Packet Identifier and clears DUP. At QoS 1 and 2 the call waits
     /// for the acknowledgement, and for a free slot of the server's Receive Maximum before
-    /// sending ([MQTT-3.3.4-7]). A Topic Alias is sent as given, after a check against the
-    /// server's Topic Alias Maximum.
+    /// sending ([MQTT-3.3.4-7]). At any QoS it also waits while more than 64 KiB wait to be
+    /// written, so a server that stops reading holds the client to that much. A Topic Alias is
+    /// sent as given, after a check against the server's Topic Alias Maximum.
     ///
     /// # Errors
     ///
