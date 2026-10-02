@@ -42,6 +42,23 @@ pub enum Error {
         /// What is wrong with it.
         reason: &'static str,
     },
+    /// An ACL file that is not valid TOML. The line itself is not repeated: a secret pasted
+    /// in the wrong place could be on it.
+    #[error("line {line}, column {column}: {reason}")]
+    AclSyntax {
+        /// The line, counted from 1.
+        line: usize,
+        /// The column, in characters, counted from 1.
+        column: usize,
+        /// What the TOML reader expected.
+        reason: String,
+    },
+    /// The rules of an ACL file that cannot be compiled: every problem, one per line.
+    #[error("{}", problems.join("\n"))]
+    Acl {
+        /// Each problem, naming its rule.
+        problems: Vec<String>,
+    },
     /// Not one thread of a pool could start.
     #[error("no thread could start: {reason}")]
     Threads {

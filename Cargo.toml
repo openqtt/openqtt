@@ -71,8 +71,9 @@ rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs
 rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 # JSON traces of test runs, written and compared by the test kit.
 serde_json = "1.0.151"
-# The differential harness reads its list of intended divergences from TOML. Without
-# `display`, since nothing writes TOML.
+# The differential harness reads its list of intended divergences from TOML, and openqtt-auth
+# its ACL files. Without `display`: the one writer, the ACL converter, writes its TOML by hand
+# so that each rule keeps a comment naming the line it came from.
 toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
 # The topic index's two tables, the level interner and the child table, store a 32-bit id and
 # compare against text and nodes kept elsewhere, which only hashbrown's HashTable allows. That
@@ -100,6 +101,9 @@ base64 = { version = "0.23.1", default-features = false, features = ["alloc"] }
 # identifiers (R2 rules 2 to 4). verify-aws checks a signature with aws-lc-rs, to find the CA
 # that really issued a leaf; its other feature, verify, would bring ring.
 x509-parser = { version = "0.18.1", default-features = false, features = ["verify-aws"] }
+# The user name and client identifier patterns of the ACL. Linear time in the input, whatever the
+# pattern, so a rule cannot be written that a client's name makes slow.
+regex = "1.12"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
