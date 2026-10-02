@@ -30,6 +30,11 @@ impl Authenticator for Anonymous {
                 .is_some_and(|prefix| prefix.reserves(name.as_str()))
         });
         let verdict = if claims_service {
+            tracing::debug!(
+                listener = &*connect.listener,
+                address = %connect.address,
+                "a client without credentials named itself with the reserved prefix; refused"
+            );
             Verdict::Deny(Refusal::NotAuthorized)
         } else {
             Verdict::Allow(Grant::new(Principal::new(connect.username.clone())))

@@ -591,6 +591,7 @@ dependencies = [
  "regex",
  "thiserror",
  "toml",
+ "tracing",
  "x509-parser",
 ]
 

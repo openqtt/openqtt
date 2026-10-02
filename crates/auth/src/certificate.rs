@@ -262,7 +262,16 @@ impl Authenticator for CertificateIdentity {
                 }
                 Err(_) => Verdict::Deny(Refusal::NotAuthorized),
             },
-            Err(_) => Verdict::Deny(Refusal::NotAuthorized),
+            Err(error) => {
+                // The client is told only 0x87; the operator learns which check failed.
+                tracing::debug!(
+                    listener = &*connect.listener,
+                    address = %connect.address,
+                    reason = %error,
+                    "client certificate refused"
+                );
+                Verdict::Deny(Refusal::NotAuthorized)
+            }
         };
         Box::pin(std::future::ready(verdict))
     }

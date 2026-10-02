@@ -84,6 +84,7 @@ impl Authenticator for PasswordAuthenticator {
             .run(move || list.check(name.as_str(), password.expose()));
         Box::pin(async move {
             let Ok(pending) = job else {
+                tracing::debug!("every password check is taken; CONNECT refused with 0x89");
                 return Verdict::Deny(Refusal::ServerBusy);
             };
             match pending.await {
