@@ -229,7 +229,7 @@ def scheme(r):
 def repl(rows):
     print("\n### Replication\n")
     print("| Scheme | Groups | One-way ms | Flush ms | Load | Done/s | p50 ms | p99 ms | Errors | "
-          "Msgs/s | Items/flush | CPU cores | Notes |")
+          "Msgs/s | Items/flush | CPU cores (3 nodes) | Notes |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         R = r["result"]
@@ -240,7 +240,7 @@ def repl(rows):
             note = f"{ex['misplaced_leaders']} leaders moved"
         print(f"| {scheme(r)} | {r['groups']} | {r['delay_us'] / 1000:g} | {r['flush_us'] / 1000:g} | {r['load']} | "
               f"{k(R['per_s'])} | {ms(L.get('p50'))} | {ms(L.get('p99'))} | {R['errors']} | "
-              f"{k(R['messages_per_s'])} | {R['disk_items_per_flush']} | {R['cpu_cores_total']} | {note} |")
+              f"{k(R['messages_per_s'])} | {R['disk_items_per_flush']} | {R.get('cpu_cores_protocol', R['cpu_cores_total'])} | {note} |")
 
 
 def idle(rows):

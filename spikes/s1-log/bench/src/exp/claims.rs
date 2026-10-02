@@ -22,9 +22,12 @@ use crate::util::{
     own_conn_gen, own_value, partition, round2, sess_value, usage,
 };
 
-/// Writes `n` sessions (`own` and `sess`) in client-id order, which is random key order.
+/// Writes `n` sessions (`own` and `sess`) in client-id order, which is random key order, in
+/// batches of 10,000 sessions with a sync every ten batches. Without the syncs redb keeps every
+/// non-durable commit's pages until the end, and its load slows by orders of magnitude.
 pub fn preload(eng: &dyn Engine, n: u64) -> Result<()> {
     let mut ops = Vec::with_capacity(20_000);
+    let mut batches = 0u64;
     for i in 0..n {
         let cid = client_id(i);
         let p = partition(&cid);
@@ -35,7 +38,8 @@ pub fn preload(eng: &dyn Engine, n: u64) -> Result<()> {
         ));
         ops.push(Op::Put(Space::State, key(p, TAG_SESS, &[&cid]), sess_value(&cid)));
         if ops.len() >= 20_000 {
-            eng.write(&ops, false)?;
+            batches += 1;
+            eng.write(&ops, batches % 10 == 0)?;
             ops.clear();
         }
     }

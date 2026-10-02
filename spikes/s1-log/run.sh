@@ -75,6 +75,19 @@ footprint)
         done
     done
     ;;
+footprint-reopen)
+    # Again, loading with a sync every 100,000 sessions (redb's load without them collapsed at
+    # ten million), and recording the disk once the database is reopened: fjall deletes the
+    # files a compaction made obsolete only later, so its size right after compaction
+    # overstates it.
+    for n in 1000000 10000000; do
+        for e in fjall rocksdb redb; do
+            b footprint --engine "$e" --sessions "$n" --phase load --cache-mb 1024
+            b footprint --engine "$e" --sessions "$n" --phase idle --cache-mb 64
+            b footprint --engine "$e" --sessions "$n" --phase remove
+        done
+    done
+    ;;
 churn)
     for e in fjall rocksdb redb; do
         b churn --engine "$e" --secs 600
@@ -100,8 +113,8 @@ recovery)
 window)
     # Windows interleaved with each other, not minutes apart, so drift in the machine's fsync
     # cost does not pass for an effect of the window.
-    for pass in 1 2 3; do
-        for load in c1 c64 o10000 o50000; do
+    for pass in 1 2; do
+        for load in c1 o10000 o50000; do
             for w in 0 1000 2000; do
                 b write --sizes 128 --windows-us "$w" --loads "$load" --warmup 2 --secs 8
             done

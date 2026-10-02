@@ -82,6 +82,8 @@ pub fn idle(data: &Path, out: &Path, kind: Kind, n: u64, cache_mb: u64, reads: u
     )?;
     let open_s = t.elapsed().as_secs_f64();
     let opened = usage();
+    // On disk once reopened: an engine may delete obsolete files only then.
+    let (reopened_apparent, reopened_allocated) = dir_size(&dir);
     let mut rng = Rng::new(7);
     let t = Instant::now();
     let mut missing = 0;
@@ -108,6 +110,8 @@ pub fn idle(data: &Path, out: &Path, kind: Kind, n: u64, cache_mb: u64, reads: u
                            "settled": settled.footprint },
             // Read right after the sample reads: on a machine under memory pressure the kernel
             // compresses idle pages within seconds, which `settled` shows.
+            "disk_reopened": { "apparent": reopened_apparent, "allocated": reopened_allocated,
+                               "per_session": round2(reopened_allocated as f64 / n as f64) },
             "rss_per_session": per(warm.rss, base.rss),
             "footprint_per_session": per(warm.footprint, base.footprint),
             "engine_stats": eng.stats(),
