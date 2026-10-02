@@ -18,7 +18,7 @@ EMQX or from a measured spike. They go in `reports/`.
 | R1 | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | to be written |
 | [R2](reports/R02-compatibility.md) | Compatibility contract with 1.x, as executable tests | draft |
 | [R3](reports/R03-roles-and-wire.md) | Roles, the message path, the wire protocol between roles and the extension traits | draft |
-| R4 | The log: storage engine, partitioning, what durable means before a PUBACK, data model | to be written |
+| [R4](reports/R04-log.md) | The log: storage engine, replication, what durable means before a PUBACK, data model (spike S1) | draft |
 | R5 | Sessions and handoff: takeover, drain, rolling upgrade, wills | to be written |
 | R6 | Routing at scale: interest aggregation, wildcard index, memory, fan-out | to be written |
 | R7 | QUIC in a cluster: migration, 0-RTT and load balancers | to be written |
