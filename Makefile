@@ -3,7 +3,8 @@
 
 CARGO ?= cargo
 
-.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint tools need-nextest need-deny
+.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance tools need-nextest \
+	need-deny
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -94,6 +95,13 @@ mdlint:
 	@if git ls-files -z -- '*.md' | LC_ALL=C xargs -0 grep -n -- '$(EM_DASH)'; then \
 		echo "error: em dash in Markdown; use a colon, a comma or a full stop"; exit 1; fi
 	@echo "mdlint: ok"
+
+# --- Conformance --------------------------------------------------------------------------
+
+# The MQTT 5.0 statements in report R1 that no test names yet, one per line. Not part of
+# check: today it lists every statement. R1 says how a test names the statements it proves.
+conformance:
+	@scripts/conformance-ids.sh
 
 # --- Tools --------------------------------------------------------------------------------
 

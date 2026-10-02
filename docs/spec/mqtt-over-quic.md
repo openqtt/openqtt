@@ -18,8 +18,10 @@ The key words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
   ALPN (`apps/emqx/src/emqx_listeners.erl`, `alpn => ["mqtt"]`).
 - Default UDP port 14567, as EMQX. Deployments facing the internet SHOULD also
   listen on UDP 443, which more firewalls admit.
-- Only MQTT 5.0 is spoken. A CONNECT with any other protocol level gets CONNACK
-  with reason code 0x84 (Unsupported Protocol Version) and the connection closes.
+- Only MQTT 5.0 is spoken. A CONNECT at any other protocol level is refused and the
+  connection closes, with the bytes report R1 gives (D1): an MQTT 3.1 or 3.1.1
+  client gets the CONNACK of its own version with return code 0x01, and any other
+  level gets CONNACK with reason code 0x84 (Unsupported Protocol Version).
 - QUIC datagrams (RFC 9221) are not used.
 
 ## 2. Streams
@@ -56,16 +58,46 @@ use against EMQX.
   acknowledges.
 - Messages delivered for a subscription travel on the stream that carried the
   SUBSCRIBE that created it. A subscription made on the control stream delivers on
-  the control stream.
+  the control stream. A message that matches subscriptions made on different
+  streams goes out once (report R1, O11), on the stream of the matching
+  subscription with the highest granted QoS, the oldest among equals.
 - Packet identifiers are scoped to the session, not to a stream. A client MUST NOT
   reuse an in-flight identifier on another stream.
 - Ordering is guaranteed only within a stream. MQTT's ordering rules (section 4.6
   of the MQTT 5.0 specification) apply per stream.
 - Receive Maximum and the inflight window are counted per session, across all
   streams.
-- A data stream closed or reset by the client ends nothing but that stream. Its
-  unacknowledged QoS 1 and 2 deliveries are redelivered on the control stream with
-  DUP set, as after a reconnect.
+- Topic Aliases travel on the control stream only, in both directions. A PUBLISH
+  carrying a Topic Alias on a data stream is a protocol error: the receiver sends
+  DISCONNECT 0x82 on the control stream and closes the connection. MQTT 5 scopes
+  an alias mapping to the connection and assumes one ordered stream; across
+  streams, a PUBLISH could use an alias before the PUBLISH that sets it arrives.
+
+### 2.4 Ending a data stream
+
+- A client ends a data stream by finishing or resetting its sending side, or by
+  stopping the server's (STOP_SENDING). QoS 1 and 2 packets are never
+  retransmitted on another stream of the same connection: MQTT allows
+  retransmission only when a session resumes on a new network connection
+  ([MQTT-4.4.0-1]).
+- If the stream still has an exchange that needs a packet from the client, the
+  server MUST send DISCONNECT 0x82 on the control stream and close the connection.
+  Such an exchange is a QoS 1 or 2 PUBLISH the server sent on the stream that the
+  client has not fully acknowledged, or a QoS 2 PUBLISH the client sent on the
+  stream whose PUBREL the server has not received. Retransmission then follows
+  the usual rules when the client reconnects.
+- An acknowledgement the server still owes on the stream (PUBACK, PUBREC,
+  PUBCOMP, SUBACK or UNSUBACK) is sent if the server's sending side is still
+  open. If the client has stopped that side, the acknowledgement can no longer
+  be delivered, and the client would hold the packet identifier, and for a
+  PUBLISH a slot of its send quota, for the rest of the connection. So the
+  server MUST then send DISCONNECT 0x82 on the control stream and close the
+  connection, and the exchange recovers when the client reconnects.
+- Otherwise only the stream ends, and the server finishes its side.
+  Subscriptions made on the stream deliver on the control stream from then on.
+- On a resumed session every subscription delivers on the control stream, and
+  retransmitted PUBLISH and PUBREL packets go there too, until a SUBSCRIBE on a
+  data stream replaces a subscription and moves its deliveries to that stream.
 
 ## 3. Identity and TLS
 

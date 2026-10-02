@@ -15,7 +15,7 @@ EMQX or from a measured spike. They go in `reports/`.
 
 | Report | Question | Status |
 | --- | --- | --- |
-| R1 | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | to be written |
+| [R1](reports/R01-conformance.md) | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | draft |
 | [R2](reports/R02-compatibility.md) | Compatibility contract with 1.x, as executable tests | draft |
 | [R3](reports/R03-roles-and-wire.md) | Roles, the message path, the wire protocol between roles and the extension traits | draft |
 | R4 | The log: storage engine, partitioning, what durable means before a PUBACK, data model | to be written |
