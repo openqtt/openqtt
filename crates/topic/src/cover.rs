@@ -71,7 +71,7 @@ pub fn shape_cover<'a>(
     filters: impl IntoIterator<Item = &'a TopicFilter>,
     rule: CoverRule,
 ) -> Vec<CoverEntry> {
-    let mut tree = Tree::default();
+    let mut tree = Tree::new();
     let mut out = Vec::new();
     for filter in filters {
         if filter.is_shared() {
@@ -80,8 +80,7 @@ pub fn shape_cover<'a>(
             tree.insert(filter.pattern());
         }
     }
-    let mut path = String::new();
-    walk(&tree, &mut path, 0, rule, &mut out);
+    walk(&tree, rule, &mut out);
 
     let mut entries: Vec<CoverEntry> = Vec::with_capacity(out.len());
     out.sort();
@@ -101,11 +100,20 @@ pub fn shape_cover<'a>(
     entries
 }
 
-/// One edge's filters, as a tree of levels.
-#[derive(Default)]
+/// The root of a [`Tree`].
+const ROOT: usize = 0;
+
+/// One edge's filters, as a tree of levels. The nodes live in one vector and name each other
+/// by index, so that neither walking the tree nor dropping it recurses: a filter can be 65,536
+/// levels deep, which would overflow any stack a recursion used.
 struct Tree<'a> {
-    kids: HashMap<&'a str, Tree<'a>, RandomState>,
-    plus: Option<Box<Tree<'a>>>,
+    nodes: Vec<Node<'a>>,
+}
+
+#[derive(Default)]
+struct Node<'a> {
+    kids: HashMap<&'a str, usize, RandomState>,
+    plus: Option<usize>,
     /// A filter ends here.
     exact: bool,
     /// A filter ends here with `/#`.
@@ -113,19 +121,40 @@ struct Tree<'a> {
 }
 
 impl<'a> Tree<'a> {
-    fn insert(&mut self, pattern: &'a str) {
-        let mut node = self;
-        for level in pattern.split('/') {
-            node = match level {
-                "#" => {
-                    node.hash = true;
-                    return;
-                }
-                "+" => node.plus.get_or_insert_with(Box::default),
-                _ => node.kids.entry(level).or_default(),
-            };
+    fn new() -> Self {
+        Self {
+            nodes: vec![Node::default()],
         }
-        node.exact = true;
+    }
+
+    fn insert(&mut self, pattern: &'a str) {
+        let mut node = ROOT;
+        for level in pattern.split('/') {
+            if level == "#" {
+                self.nodes[node].hash = true;
+                return;
+            }
+            let next = self.nodes.len();
+            let child = if level == "+" {
+                *self.nodes[node].plus.get_or_insert(next)
+            } else {
+                *self.nodes[node].kids.entry(level).or_insert(next)
+            };
+            if child == next {
+                self.nodes.push(Node::default());
+            }
+            node = child;
+        }
+        self.nodes[node].exact = true;
+    }
+
+    /// The children of `node`, each with the level leading to it.
+    fn children(&self, node: usize) -> impl Iterator<Item = (&'a str, usize)> + '_ {
+        let n = &self.nodes[node];
+        n.kids
+            .iter()
+            .map(|(&level, &kid)| (level, kid))
+            .chain(n.plus.map(|plus| ("+", plus)))
     }
 }
 
@@ -139,103 +168,133 @@ fn join(path: &str, depth: usize, rest: &str) -> String {
     }
 }
 
-fn walk(
-    node: &Tree<'_>,
-    path: &mut String,
-    depth: usize,
-    rule: CoverRule,
-    out: &mut Vec<(String, bool)>,
-) {
-    if node.hash {
-        // `prefix/#` matches the node itself and everything below it, except that `#` alone
-        // does not match the topics beginning with `$` [MQTT-4.7.2-1]: below the root, the
-        // filters under a `$` level still need covering.
-        out.push((join(path, depth, "#"), false));
-        if depth == 0 {
-            for (level, kid) in node.kids.iter().filter(|(l, _)| l.starts_with('$')) {
-                descend(kid, level, path, depth, rule, out);
+/// What the walk does next: enter a node, or leave one and take its level off the path.
+enum Step<'a> {
+    Enter {
+        node: usize,
+        depth: usize,
+        level: &'a str,
+    },
+    Leave {
+        len: usize,
+    },
+}
+
+/// Walks the tree depth first with a stack of its own, keeping the path to the current node.
+fn walk<'a>(tree: &Tree<'a>, rule: CoverRule, out: &mut Vec<(String, bool)>) {
+    let mut path = String::new();
+    let mut steps = vec![Step::Enter {
+        node: ROOT,
+        depth: 0,
+        level: "",
+    }];
+    while let Some(step) = steps.pop() {
+        let (node, depth, level) = match step {
+            Step::Leave { len } => {
+                path.truncate(len);
+                continue;
             }
+            Step::Enter { node, depth, level } => (node, depth, level),
+        };
+        steps.push(Step::Leave { len: path.len() });
+        if depth > 1 {
+            path.push('/');
         }
-        return;
-    }
-    if node.exact {
-        out.push((path.clone(), false));
-    }
-    let distinct = node.kids.len() + usize::from(node.plus.is_some());
-    if depth >= rule.floor.max(1) && distinct > rule.threshold {
-        shapes(node, path, depth, rule.threshold, out);
-        return;
-    }
-    for (level, kid) in &node.kids {
-        descend(kid, level, path, depth, rule, out);
-    }
-    if let Some(plus) = &node.plus {
-        descend(plus, "+", path, depth, rule, out);
+        path.push_str(level);
+        let n = &tree.nodes[node];
+        if n.hash {
+            // `prefix/#` matches the node itself and everything below it, except that `#`
+            // alone does not match the topics beginning with `$` [MQTT-4.7.2-1]: below the
+            // root, the filters under a `$` level still need covering.
+            out.push((join(&path, depth, "#"), false));
+            if depth == 0 {
+                for (level, kid) in tree.children(node).filter(|(l, _)| l.starts_with('$')) {
+                    steps.push(Step::Enter {
+                        node: kid,
+                        depth: 1,
+                        level,
+                    });
+                }
+            }
+            continue;
+        }
+        if n.exact {
+            out.push((path.clone(), false));
+        }
+        let distinct = n.kids.len() + usize::from(n.plus.is_some());
+        if depth >= rule.floor.max(1) && distinct > rule.threshold {
+            shapes(tree, node, &path, depth, rule.threshold, out);
+            continue;
+        }
+        for (level, kid) in tree.children(node) {
+            steps.push(Step::Enter {
+                node: kid,
+                depth: depth + 1,
+                level,
+            });
+        }
     }
 }
 
-/// Walks `kid`, the child of the node at `path` reached through `level`.
-fn descend(
-    kid: &Tree<'_>,
-    level: &str,
-    path: &mut String,
-    depth: usize,
-    rule: CoverRule,
-    out: &mut Vec<(String, bool)>,
-) {
-    let len = path.len();
-    if depth > 0 {
-        path.push('/');
+/// Every filter below `node`, as levels relative to it, found with a stack of its own.
+fn below<'a>(tree: &Tree<'a>, node: usize) -> Vec<Vec<&'a str>> {
+    enum Visit<'a> {
+        Enter { node: usize, level: &'a str },
+        Leave,
     }
-    path.push_str(level);
-    walk(kid, path, depth + 1, rule, out);
-    path.truncate(len);
-}
-
-/// Every filter below `node`, as levels relative to it.
-fn below<'a>(node: &Tree<'a>, levels: &mut Vec<&'a str>, out: &mut Vec<Vec<&'a str>>) {
-    if node.hash {
-        // `#` covers the node and everything further down.
-        levels.push("#");
-        out.push(levels.clone());
-        levels.pop();
-        return;
-    }
-    if node.exact && !levels.is_empty() {
-        out.push(levels.clone());
-    }
-    for (level, kid) in &node.kids {
+    let mut out = Vec::new();
+    let mut levels = Vec::new();
+    let mut steps: Vec<Visit<'a>> = tree
+        .children(node)
+        .map(|(level, node)| Visit::Enter { node, level })
+        .collect();
+    while let Some(step) = steps.pop() {
+        let Visit::Enter { node, level } = step else {
+            levels.pop();
+            continue;
+        };
         levels.push(level);
-        below(kid, levels, out);
-        levels.pop();
+        steps.push(Visit::Leave);
+        let n = &tree.nodes[node];
+        if n.hash {
+            // `#` covers the node and everything further down.
+            levels.push("#");
+            out.push(levels.clone());
+            levels.pop();
+            continue;
+        }
+        if n.exact {
+            out.push(levels.clone());
+        }
+        for (level, kid) in tree.children(node) {
+            steps.push(Visit::Enter { node: kid, level });
+        }
     }
-    if let Some(plus) = &node.plus {
-        levels.push("+");
-        below(plus, levels, out);
-        levels.pop();
-    }
+    out
 }
 
 /// The shapes of the filters below a coarsened node at `path`.
 fn shapes(
-    node: &Tree<'_>,
+    tree: &Tree<'_>,
+    node: usize,
     path: &str,
     depth: usize,
     threshold: usize,
     out: &mut Vec<(String, bool)>,
 ) {
-    let mut filters = Vec::new();
-    below(node, &mut Vec::new(), &mut filters);
+    let filters = below(tree, node);
     let positions = filters.iter().map(Vec::len).max().unwrap_or(0);
-    let mut values: Vec<HashSet<&str, RandomState>> = vec![HashSet::default(); positions];
+    // The distinct literal values at each position, counted through one set.
+    let mut seen: HashSet<(usize, &str), RandomState> = HashSet::default();
+    let mut distinct = vec![0usize; positions];
     for filter in &filters {
-        for (position, level) in filter.iter().enumerate() {
-            if *level != "+" && *level != "#" {
-                values[position].insert(level);
+        for (position, &level) in filter.iter().enumerate() {
+            if level != "+" && level != "#" && seen.insert((position, level)) {
+                distinct[position] += 1;
             }
         }
     }
-    let wild: Vec<bool> = values.iter().map(|v| v.len() > threshold).collect();
+    let wild: Vec<bool> = distinct.iter().map(|&n| n > threshold).collect();
     let mut groups: HashMap<Vec<&str>, Vec<usize>, RandomState> = HashMap::default();
     for (i, filter) in filters.iter().enumerate() {
         let shape = filter
