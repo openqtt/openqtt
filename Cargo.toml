@@ -95,6 +95,9 @@ quinn = { version = "0.11.12", default-features = false, features = ["runtime-to
 # listener's connection IDs refuse a packet meant for another node or endpoint. The version quinn
 # brings, without its defaults, which would add ring.
 quinn-proto = { version = "0.11.19", default-features = false }
+# The UDP sockets of the client listener, for SO_REUSEPORT: several endpoints on one port, one per
+# core (R7, D7). The version quinn brings, with `all` for set_reuse_port.
+socket2 = { version = "0.6.5", features = ["all"] }
 # TLS on aws-lc-rs, the one crypto provider (deny.toml bans ring): TLS 1.3 inside QUIC, and the
 # OTLP exporter's HTTPS, which may meet a collector that speaks only TLS 1.2. Without the
 # defaults, since logging would go through the log crate. With `prefer-post-quantum`, so every

@@ -17,11 +17,15 @@ openqtt-ext.workspace = true
 quinn.workspace = true
 quinn-proto.workspace = true
 rustls.workspace = true
+socket2.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["macros", "time"] }
+tracing.workspace = true
 
 [dev-dependencies]
+openqtt-client.workspace = true
 openqtt-testkit.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 
 [lints]
 workspace = true

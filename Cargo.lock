@@ -1120,6 +1120,7 @@ name = "openqtt-transport"
 version = "2.0.0-alpha.0"
 dependencies = [
  "bytes",
+ "openqtt-client",
  "openqtt-codec",
  "openqtt-config",
  "openqtt-core",
@@ -1128,8 +1129,10 @@ dependencies = [
  "quinn",
  "quinn-proto",
  "rustls",
+ "socket2",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -669,12 +669,4 @@ mod tests {
         .unwrap_err();
         assert!(error.to_string().contains("permission denied"), "{error}");
     }
-
-    #[test]
-    fn endpoints_name_their_node_in_their_connection_ids() {
-        let config = config().node(NodeId::new(7));
-        // quinn takes the generator through the endpoint configuration; the generator itself
-        // is tested in the cid module, and the IDs on the wire in the loopback tests.
-        let _endpoint = config.endpoint_config(2);
-    }
 }
