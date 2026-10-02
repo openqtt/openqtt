@@ -12,8 +12,10 @@ none = []
 fjall = ["dep:fjall"]
 redb = ["dep:redb"]
 rocksdb = ["dep:rocksdb"]
+openraft = ["dep:openraft"]
 
 [dependencies]
 fjall = { version = "=3.1.10", optional = true }
 redb = { version = "=4.3.0", optional = true }
 rocksdb = { version = "=0.25.0", optional = true, default-features = false, features = ["lz4", "bindgen-runtime"] }
+openraft = { version = "=0.9.25", optional = true, default-features = false, features = ["storage-v2"] }

@@ -37,19 +37,30 @@ impl Fjall {
 
 impl Engine for Fjall {
     fn write(&self, ops: &[Op], sync: bool) -> Result<()> {
-        let mut b = self.db.batch();
+        // Every item of a fjall batch gets the same sequence number, so a put and a tombstone for
+        // one key in one batch do not apply in order. Resolve the batch first: a range delete
+        // drops the puts before it that it covers, then tombstones every committed key in range.
+        let mut items: Vec<(Space, Vec<u8>, Option<&[u8]>)> = Vec::with_capacity(ops.len());
         for op in ops {
             match op {
-                Op::Put(s, k, v) => b.insert(self.ks(*s), k.as_slice(), v.as_slice()),
-                Op::Del(s, k) => b.remove(self.ks(*s), k.as_slice()),
+                Op::Put(s, k, v) => items.push((*s, k.clone(), Some(v.as_slice()))),
+                Op::Del(s, k) => items.push((*s, k.clone(), None)),
                 Op::DelRange(s, a, z) => {
+                    items.retain(|(is, k, _)| {
+                        !(is == s && k.as_slice() >= a.as_slice() && k.as_slice() < z.as_slice())
+                    });
                     // No range tombstone in fjall 3: a tombstone for every live key.
-                    let ks = self.ks(*s);
-                    for g in ks.range(a.as_slice()..z.as_slice()) {
-                        let k = g.key()?;
-                        b.remove(ks, k);
+                    for g in self.ks(*s).range(a.as_slice()..z.as_slice()) {
+                        items.push((*s, g.key()?.to_vec(), None));
                     }
                 }
+            }
+        }
+        let mut b = self.db.batch();
+        for (s, k, v) in items {
+            match v {
+                Some(v) => b.insert(self.ks(s), k, v),
+                None => b.remove(self.ks(s), k),
             }
         }
         // SyncData is fdatasync on Linux and F_FULLFSYNC on macOS.

@@ -15,6 +15,9 @@ redb = "=4.3.0" # candidate: copy-on-write B-tree, pure Rust
 # uses by default; bindgen-runtime loads libclang at build time.
 rocksdb = { version = "=0.25.0", default-features = false, features = ["lz4", "bindgen-runtime"] }
 openraft = { version = "=0.9.25", default-features = false, features = ["storage-v2"] } # replication candidate: one Raft group per partition
+# The next openraft release line, measured beside 0.9 because its log IO does not block the core.
+openraft10 = { package = "openraft", version = "=0.10.0-alpha.36", default-features = false, features = ["tokio-rt"] }
+futures-util = { version = "=0.3.34", default-features = false } # the stream 0.10 applies entries from
 tokio = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 hdrhistogram = { version = "=7.6.0", default-features = false } # latency percentiles
 serde = { version = "=1.0.229", features = ["derive"] }
