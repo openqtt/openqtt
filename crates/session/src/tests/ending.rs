@@ -66,9 +66,9 @@ fn mqtt_3_1_2_8_an_unclean_end_publishes_the_will_after_its_delay() {
     }
 }
 
+// covers: MQTT-3.14.4-3
 #[test]
 fn mqtt_3_1_2_10_disconnect_0x00_deletes_the_will() {
-    // covers: MQTT-3.14.4-3
     let mut harness = Harness::new();
     harness.connect(with_will(30, 600));
     harness.send(Disconnect::default());
@@ -90,9 +90,9 @@ fn mqtt_3_1_2_10_disconnect_0x00_deletes_the_will() {
     }
 }
 
+// covers: MQTT-3.1.2-15, MQTT-3.1.3-10
 #[test]
 fn mqtt_3_1_2_14_the_will_is_published_retained_only_with_will_retain() {
-    // covers: MQTT-3.1.2-15, MQTT-3.1.3-10
     for retain in [false, true] {
         let config = Config {
             mountpoint: Some(Mountpoint::parse("ingest/${clientid}/").unwrap()),
@@ -150,9 +150,9 @@ fn the_will_goes_with_the_claim() {
     assert_eq!((will.message.topic.as_str(), will.delay), ("gone", 30));
 }
 
+// covers: MQTT-3.1.4-3
 #[test]
 fn mqtt_3_1_3_9_a_takeover_within_the_will_delay_publishes_no_will() {
-    // covers: MQTT-3.1.4-3
     let mut harness = Harness::new();
     harness.connect(with_will(30, 600));
     let packets = harness.input(Input::StepDown {

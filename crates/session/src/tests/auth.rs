@@ -80,9 +80,9 @@ fn authentication_holds_back_what_the_client_sent_after_its_connect() {
     assert!(matches!(packets[2], Packet::PubAck(_)));
 }
 
+// covers: MQTT-4.12.0-5
 #[test]
 fn mqtt_4_12_0_2_another_step_is_an_auth_with_reason_code_0x18() {
-    // covers: MQTT-4.12.0-5
     let mut harness = authenticating(enhanced());
     let request = harness.authentications.remove(0);
     assert_eq!(request.method.as_deref(), Some(METHOD));
@@ -124,9 +124,9 @@ fn mqtt_4_12_0_2_another_step_is_an_auth_with_reason_code_0x18() {
     assert_eq!(connack.properties.authentication_data, data("server-final"));
 }
 
+// covers: MQTT-4.12.0-1
 #[test]
 fn mqtt_4_12_0_4_the_server_may_refuse_at_any_step() {
-    // covers: MQTT-4.12.0-1
     let mut harness = authenticating(enhanced());
     harness.input(Input::Authenticated(AuthResult::Continue { data: None }));
     harness.send(auth(

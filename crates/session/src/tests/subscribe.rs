@@ -46,9 +46,9 @@ fn with_retained() -> Harness {
     harness
 }
 
+// covers: MQTT-3.8.4-2, MQTT-2.2.1-6
 #[test]
 fn mqtt_3_8_4_1_every_subscribe_gets_a_suback_with_its_identifier() {
-    // covers: MQTT-3.8.4-2, MQTT-2.2.1-6
     let mut harness = Harness::connected();
     for packet_id in [1, 300, u16::MAX] {
         let packets = harness.send(subscribe1(packet_id, "t", QoS::AtMostOnce));
@@ -61,9 +61,9 @@ fn mqtt_3_8_4_1_every_subscribe_gets_a_suback_with_its_identifier() {
     }
 }
 
+// covers: MQTT-3.8.4-6, MQTT-3.8.4-7, MQTT-3.9.3-1
 #[test]
 fn mqtt_3_8_4_5_several_filters_are_answered_by_one_suback_in_order() {
-    // covers: MQTT-3.8.4-6, MQTT-3.8.4-7, MQTT-3.9.3-1
     let mut harness = Harness::new();
     harness.auto.authorize = Some(|action| match action {
         Action::Subscribe { filter, .. } if filter.as_str() == "secret" => Decision::Deny,
@@ -131,9 +131,9 @@ fn mqtt_3_3_1_9_retain_handling_0_sends_the_retained_messages_after_the_suback()
     assert_eq!(payloads(&packets), ["kept"]);
 }
 
+// covers: MQTT-3.3.1-10
 #[test]
 fn mqtt_3_8_4_4_a_replacement_with_retain_handling_0_sends_them_again() {
-    // covers: MQTT-3.3.1-10
     let mut harness = with_retained();
     let first = harness.send(subscribe(
         1,
@@ -230,9 +230,9 @@ fn mqtt_3_8_3_4_no_local_on_a_shared_subscription_is_a_protocol_error() {
     assert!(harness.interest.is_empty());
 }
 
+// covers: MQTT-4.7.1-1, MQTT-4.7.1-2, MQTT-4.7.3-1, MQTT-4.8.2-1, MQTT-4.8.2-2
 #[test]
 fn r1_d32_a_filter_that_breaks_sections_4_7_or_4_8_is_refused_alone() {
-    // covers: MQTT-4.7.1-1, MQTT-4.7.1-2, MQTT-4.7.3-1, MQTT-4.8.2-1, MQTT-4.8.2-2
     let mut harness = Harness::connected();
     let invalid = [
         "a/#/b",
@@ -407,9 +407,9 @@ fn r2_rule_11_a_subscription_is_authorized_as_sent_then_mounted() {
     );
 }
 
+// covers: MQTT-3.10.4-4, MQTT-3.10.4-5
 #[test]
 fn mqtt_3_10_4_1_an_exact_match_deletes_the_subscription() {
-    // covers: MQTT-3.10.4-4, MQTT-3.10.4-5
     let mut harness = Harness::connected();
     harness.send(subscribe1(1, "t/#", QoS::AtMostOnce));
     harness.send(subscribe1(2, "$queue/t", QoS::AtMostOnce));
@@ -440,9 +440,9 @@ fn mqtt_3_10_4_1_an_exact_match_deletes_the_subscription() {
     );
 }
 
+// covers: MQTT-3.11.3-1
 #[test]
 fn mqtt_3_10_4_6_several_filters_are_answered_by_one_unsuback_in_order() {
-    // covers: MQTT-3.11.3-1
     let mut harness = Harness::connected();
     harness.send(subscribe(
         1,

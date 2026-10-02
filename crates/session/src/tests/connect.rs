@@ -47,9 +47,9 @@ fn mqtt_3_1_0_1_a_first_packet_other_than_connect_is_closed_on_without_a_reply()
     assert_eq!(harness.closed(), Some(CloseCode::ProtocolError));
 }
 
+// covers: MQTT-3.2.0-2
 #[test]
 fn mqtt_3_1_0_2_a_second_connect_is_a_protocol_error() {
-    // covers: MQTT-3.2.0-2
     let mut harness = Harness::connected();
     let packets = harness.send(connect("client-1"));
     // DISCONNECT 0x82, never a second CONNACK.
@@ -108,17 +108,24 @@ fn r1_d1_an_older_protocol_gets_the_refusal_its_version_reads() {
     }
 }
 
+// covers: MQTT-3.1.2-3, MQTT-3.1.2-9, MQTT-3.1.2-11
 #[test]
 fn mqtt_3_1_4_1_a_malformed_connect_gets_connack_0x81_and_a_protocol_error_0x82() {
-    // covers: MQTT-3.1.2-3, MQTT-3.1.2-9, MQTT-3.1.2-11
     let cases = [
+        // The reserved flag set ([MQTT-3.1.2-3]).
         (
-            Error::InvalidConnectFlags { flags: 1 },
+            Error::InvalidConnectFlags { flags: 0b0000_0001 },
             ConnectReasonCode::MalformedPacket,
         ),
+        // Will QoS 1 without the Will Flag ([MQTT-3.1.2-11]).
+        (
+            Error::InvalidConnectFlags { flags: 0b0000_1000 },
+            ConnectReasonCode::MalformedPacket,
+        ),
+        // The Will Flag set and no Will Topic after it ([MQTT-3.1.2-9]).
         (
             Error::Truncated {
-                field: "Client Identifier",
+                field: "Will Topic",
             },
             ConnectReasonCode::MalformedPacket,
         ),
@@ -207,9 +214,9 @@ fn mqtt_3_2_0_1_connack_comes_before_any_other_packet() {
     assert_eq!(packets.len(), 3);
 }
 
+// covers: MQTT-3.1.3-2
 #[test]
 fn mqtt_3_1_3_5_identifiers_of_1_to_23_characters_and_up_to_256_bytes_are_accepted() {
-    // covers: MQTT-3.1.3-2
     for id in [
         "a".to_owned(),
         "0123456789abcdefghijklm".to_owned(),
@@ -238,9 +245,9 @@ fn mqtt_3_1_3_8_an_identifier_over_256_bytes_gets_connack_0x85() {
     assert_eq!(harness.closed(), Some(CloseCode::NoError));
 }
 
+// covers: MQTT-3.1.3-7
 #[test]
 fn mqtt_3_1_3_6_an_empty_identifier_is_assigned_one_with_either_clean_start() {
-    // covers: MQTT-3.1.3-7
     for clean_start in [true, false] {
         let mut harness = Harness::with_peer(Config::default(), Peer::new(1));
         let connack = harness.connect(connect_with("", |connect| {
@@ -298,9 +305,9 @@ fn an_identifier_the_client_chose_is_never_drawn_again() {
     );
 }
 
+// covers: MQTT-3.1.3-2, MQTT-3.2.2-16
 #[test]
 fn r1_d20_on_a_certificate_listener_the_cn_names_the_session() {
-    // covers: MQTT-3.1.3-2, MQTT-3.2.2-16
     let config = Config {
         identity: Identity::Certificate,
         ..Config::default()
@@ -490,9 +497,9 @@ fn mqtt_3_1_2_28_no_response_information_even_when_asked() {
     assert_eq!(connack.properties.response_information, None);
 }
 
+// covers: MQTT-3.2.2-10
 #[test]
 fn mqtt_3_2_2_9_maximum_qos_is_announced_only_when_lowered() {
-    // covers: MQTT-3.2.2-10
     let mut harness = Harness::new();
     let connack = harness.connect(connect("c"));
     assert_eq!(connack.properties.maximum_qos, None);
@@ -760,9 +767,9 @@ fn mqtt_3_1_2_29_without_problem_information_only_publish_connack_and_disconnect
     );
 }
 
+// covers: MQTT-3.14.0-1
 #[test]
 fn mqtt_4_13_1_1_a_malformed_packet_after_connack_gets_disconnect_and_closes() {
-    // covers: MQTT-3.14.0-1
     let mut harness = Harness::connected();
     let packets = harness.input(Input::DecodeError {
         stream: crate::StreamId::Control,

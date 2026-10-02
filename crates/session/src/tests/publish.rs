@@ -48,9 +48,9 @@ fn last_token(harness: &Harness) -> PublishToken {
         .expect("a publication waits for its commit")
 }
 
+// covers: MQTT-2.2.1-5
 #[test]
 fn mqtt_3_3_4_1_a_publish_gets_the_response_its_qos_calls_for() {
-    // covers: MQTT-2.2.1-5
     let mut harness = Harness::connected();
     assert!(harness.send(publish0("t", "zero")).is_empty());
     assert_eq!(
@@ -68,9 +68,9 @@ fn mqtt_3_3_4_1_a_publish_gets_the_response_its_qos_calls_for() {
     assert_eq!(harness.published().len(), 3);
 }
 
+// covers: MQTT-4.3.3-8
 #[test]
 fn mqtt_4_3_2_4_puback_waits_until_the_message_is_durable() {
-    // covers: MQTT-4.3.3-8
     let mut harness = Harness::connected();
     harness.auto.loopback = false;
     assert!(harness.send(publish1("t", 1, "x")).is_empty());
@@ -152,9 +152,9 @@ fn mqtt_4_3_2_5_after_its_puback_an_identifier_is_a_new_message() {
     );
 }
 
+// covers: MQTT-4.3.3-11, MQTT-4.3.3-12
 #[test]
 fn mqtt_4_3_3_10_a_qos_2_publish_repeated_before_pubrel_gets_pubrec_and_no_second_delivery() {
-    // covers: MQTT-4.3.3-11, MQTT-4.3.3-12
     let mut harness = Harness::connected();
     pubrec_code(one(harness.send(publish2("t", 4, "once"))));
     let mut repeat = publish2("t", 4, "once");
@@ -268,9 +268,9 @@ fn r1_d2_a_denied_publish_is_refused_visibly_and_a_denied_qos_0_one_is_counted()
     assert_eq!(one(harness.send(Packet::PingReq)), Packet::PingResp);
 }
 
+// covers: MQTT-3.3.2-2, MQTT-3.3.2-14, MQTT-4.7.0-1
 #[test]
 fn r1_d32_a_topic_name_that_breaks_section_4_7_refuses_that_publish_alone() {
-    // covers: MQTT-3.3.2-2, MQTT-3.3.2-14, MQTT-4.7.0-1
     let mut harness = Harness::connected();
     assert_eq!(
         puback_code(one(harness.send(publish1("a/+", 1, "x")))),
@@ -350,9 +350,9 @@ fn a_commit_that_fails_is_answered_with_0x80() {
     );
 }
 
+// covers: MQTT-3.3.4-7
 #[test]
 fn r1_d13_more_unacknowledged_publishes_than_receive_maximum_get_disconnect_0x93() {
-    // covers: MQTT-3.3.4-7
     let mut harness = Harness::connected();
     harness.auto.loopback = false;
     for packet_id in 1..=32 {
@@ -455,9 +455,9 @@ fn mqtt_3_3_2_12_every_alias_up_to_the_maximum_is_accepted() {
     assert_eq!(harness.published().last().unwrap().topic.as_str(), "u");
 }
 
+// covers: MQTT-3.3.2-9
 #[test]
 fn mqtt_3_2_2_17_an_alias_above_the_maximum_gets_disconnect_0x94() {
-    // covers: MQTT-3.3.2-9
     let mut harness = Harness::connected();
     let Packet::Disconnect(disconnect) = one(harness.send(aliased("t", 65, 1))) else {
         panic!("DISCONNECT");
@@ -519,55 +519,66 @@ fn mqtt_3_3_2_7_aliases_never_carry_over_to_another_connection() {
     assert_eq!(disconnect.reason_code, DisconnectReasonCode::ProtocolError);
 }
 
+// covers: MQTT-3.3.2-4, MQTT-3.3.2-15, MQTT-3.3.2-16, MQTT-3.3.2-17, MQTT-3.3.2-20,
+// covers: MQTT-3.3.1-3
 #[test]
-fn the_message_carries_what_subscribers_must_receive_unaltered() {
-    // covers: MQTT-3.3.2-4, MQTT-3.3.2-15, MQTT-3.3.2-16, MQTT-3.3.2-17, MQTT-3.3.2-20,
-    // covers: MQTT-3.3.1-3
+fn a_subscriber_receives_the_properties_unaltered_and_its_own_dup() {
     let mut harness = Harness::connected();
+    harness.send(subscribe1(1, "sensors/#", QoS::AtLeastOnce));
+    let user_properties: Vec<(String, String)> = vec![
+        ("b".into(), "2".into()),
+        ("a".into(), "1".into()),
+        ("b".into(), "3".into()),
+    ];
     let sent = Publish {
+        // A retransmission from the client's side.
         dup: true,
-        retain: true,
         properties: PublishProperties {
             payload_format_indicator: Some(openqtt_codec::PayloadFormat::Utf8),
             message_expiry_interval: Some(30),
             response_topic: Some("reply/to/me".into()),
             correlation_data: Some(Bytes::from_static(b"\x00\x01")),
-            user_properties: vec![
-                ("b".into(), "2".into()),
-                ("a".into(), "1".into()),
-                ("b".into(), "3".into()),
-            ],
+            user_properties: user_properties.clone(),
             content_type: Some("text/plain".into()),
             ..PublishProperties::default()
         },
         ..publish1("sensors/1", 1, "21.5")
     };
-    harness.send(sent);
+    let packets = harness.send(sent);
+    // What the broker was handed.
     let message = harness.published()[0].clone();
     assert_eq!(message.topic, name("sensors/1"));
-    assert_eq!(message.payload, Bytes::from_static(b"21.5"));
     assert_eq!(message.qos, openqtt_core::QoS::AtLeastOnce);
-    assert!(message.retain);
     assert_eq!(message.publisher.unwrap().as_str(), "client-1");
     assert_eq!(message.payload_format, Some(PayloadFormat::Utf8));
-    assert_eq!(message.response_topic, Some(name("reply/to/me")));
-    assert_eq!(
-        message.correlation_data,
-        Some(Bytes::from_static(b"\x00\x01"))
-    );
-    assert_eq!(
-        message.user_properties,
-        [
-            ("b".to_owned(), "2".to_owned()),
-            ("a".to_owned(), "1".to_owned()),
-            ("b".to_owned(), "3".to_owned())
-        ]
-    );
-    assert_eq!(message.content_type.as_deref(), Some("text/plain"));
     // Report R1, O8: the deadline is the moment of receipt plus the interval.
     let deadline = message.expiry.unwrap();
-    assert_eq!(deadline.at(), at(30));
-    assert_eq!(deadline.interval(), 30);
+    assert_eq!((deadline.at(), deadline.interval()), (at(30), 30));
+    // What the subscriber receives: every property as sent, User Properties in order, and a
+    // DUP of its own, which says only whether this PUBLISH is a retransmission.
+    let delivered = packets
+        .iter()
+        .find_map(|packet| match packet {
+            Packet::Publish(publish) => Some(publish.clone()),
+            _ => None,
+        })
+        .expect("the subscriber receives it");
+    assert!(!delivered.dup);
+    assert_eq!(delivered.topic, "sensors/1");
+    assert_eq!(delivered.payload, Bytes::from_static(b"21.5"));
+    let properties = delivered.properties;
+    assert_eq!(
+        properties.payload_format_indicator,
+        Some(openqtt_codec::PayloadFormat::Utf8)
+    );
+    assert_eq!(properties.response_topic.as_deref(), Some("reply/to/me"));
+    assert_eq!(
+        properties.correlation_data,
+        Some(Bytes::from_static(b"\x00\x01"))
+    );
+    assert_eq!(properties.user_properties, user_properties);
+    assert_eq!(properties.content_type.as_deref(), Some("text/plain"));
+    assert_eq!(properties.message_expiry_interval, Some(30));
 }
 
 #[test]

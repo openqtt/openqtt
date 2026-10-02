@@ -61,9 +61,9 @@ fn mqtt_4_3_1_1_a_qos_0_delivery_goes_out_at_qos_0_with_dup_0() {
     assert_eq!(harness.session.in_flight_out(), 0);
 }
 
+// covers: MQTT-4.3.2-1, MQTT-4.3.2-3, MQTT-2.2.1-4
 #[test]
 fn mqtt_4_3_2_2_a_qos_1_delivery_goes_out_with_dup_0_and_stays_until_its_puback() {
-    // covers: MQTT-4.3.2-1, MQTT-4.3.2-3, MQTT-2.2.1-4
     let mut harness = subscribed(32);
     let packets = deliver(&mut harness, "t/a", CoreQoS::AtLeastOnce, "one", &["t/#"]);
     let [first] = publishes(&packets)[..] else {
@@ -85,9 +85,9 @@ fn mqtt_4_3_2_2_a_qos_1_delivery_goes_out_with_dup_0_and_stays_until_its_puback(
     assert_eq!(harness.session.in_flight_out(), 1);
 }
 
+// covers: MQTT-4.3.3-1, MQTT-4.3.3-3, MQTT-4.3.3-4, MQTT-4.3.3-5, MQTT-2.2.1-5
 #[test]
 fn mqtt_4_3_3_2_a_qos_2_delivery_takes_pubrec_pubrel_and_pubcomp() {
-    // covers: MQTT-4.3.3-1, MQTT-4.3.3-3, MQTT-4.3.3-4, MQTT-4.3.3-5, MQTT-2.2.1-5
     let mut harness = subscribed(32);
     let packets = deliver(&mut harness, "t/a", CoreQoS::ExactlyOnce, "x", &["t/#"]);
     let [publish] = publishes(&packets)[..] else {
@@ -134,9 +134,9 @@ fn mqtt_3_6_2_1_a_repeated_pubrec_gets_pubrel_0x00_again() {
     );
 }
 
+// covers: MQTT-4.3.3-4
 #[test]
 fn mqtt_4_4_0_2_a_failure_acknowledgement_ends_the_exchange() {
-    // covers: MQTT-4.3.3-4
     let mut harness = subscribed(32);
     deliver(&mut harness, "t/a", CoreQoS::ExactlyOnce, "x", &["t/#"]);
     deliver(&mut harness, "t/b", CoreQoS::AtLeastOnce, "y", &["t/#"]);
@@ -156,9 +156,9 @@ fn mqtt_4_4_0_2_a_failure_acknowledgement_ends_the_exchange() {
     assert!(harness.session.snapshot().unwrap().outbound.is_empty());
 }
 
+// covers: MQTT-3.3.4-10, MQTT-4.9.0-1, MQTT-4.9.0-2, MQTT-4.9.0-3
 #[test]
 fn mqtt_3_3_4_9_no_more_qos_1_and_2_in_flight_than_the_clients_receive_maximum() {
-    // covers: MQTT-3.3.4-10, MQTT-4.9.0-1, MQTT-4.9.0-2, MQTT-4.9.0-3
     let mut harness = subscribed(2);
     let mut sent = Vec::new();
     for payload in ["1", "2", "3", "4"] {
@@ -201,9 +201,9 @@ fn r1_o3_the_window_is_the_clients_receive_maximum_capped_at_32() {
     assert_eq!(harness.session.queued(), 8);
 }
 
+// covers: MQTT-3.1.2-25
 #[test]
 fn mqtt_3_1_2_24_a_delivery_too_large_for_the_client_is_discarded_as_if_sent() {
-    // covers: MQTT-3.1.2-25
     let mut harness = Harness::new();
     harness.connect(connect_with("client-1", |connect| {
         connect.properties.maximum_packet_size = NonZeroU32::new(20);
@@ -237,9 +237,9 @@ fn mqtt_3_1_2_24_a_delivery_too_large_for_the_client_is_discarded_as_if_sent() {
     assert_eq!(publishes(&packets)[0].packet_id, Some(id(2)));
 }
 
+// covers: MQTT-3.3.2-11
 #[test]
 fn mqtt_3_1_2_26_aliases_go_up_to_the_clients_maximum_and_are_never_remapped() {
-    // covers: MQTT-3.3.2-11
     let mut harness = Harness::new();
     harness.connect(connect_with("client-1", |connect| {
         connect.properties.topic_alias_maximum = Some(2);
@@ -304,9 +304,9 @@ fn r1_o6_the_server_assigns_at_most_its_own_maximum() {
     assert_eq!(publishes(&packets)[0].properties.topic_alias, None);
 }
 
+// covers: MQTT-3.3.2-6
 #[test]
 fn mqtt_3_3_2_5_a_copy_expired_before_its_delivery_started_is_deleted() {
-    // covers: MQTT-3.3.2-6
     let mut harness = subscribed(1);
     // Received 10 s before now with an interval of 10: expired from its deadline on.
     let mut stale = message("t/a", CoreQoS::AtLeastOnce, "stale");
@@ -380,9 +380,9 @@ fn mqtt_3_8_3_3_no_local_holds_back_the_clients_own_messages() {
     assert_eq!(payloads(&packets), ["platform"]);
 }
 
+// covers: MQTT-3.3.1-13
 #[test]
 fn mqtt_3_3_1_12_retain_as_published_0_forwards_retain_0() {
-    // covers: MQTT-3.3.1-13
     let mut harness = Harness::connected();
     let as_published = SubscriptionOptions {
         retain_as_published: true,
@@ -401,9 +401,9 @@ fn mqtt_3_3_1_12_retain_as_published_0_forwards_retain_0() {
     }
 }
 
+// covers: MQTT-3.3.4-2, MQTT-3.3.4-3, MQTT-3.3.4-4
 #[test]
 fn r1_o11_overlapping_subscriptions_deliver_one_copy_at_the_highest_qos() {
-    // covers: MQTT-3.3.4-2, MQTT-3.3.4-3, MQTT-3.3.4-4
     let mut harness = Harness::connected();
     let mut identified = subscribe1(1, "t/+", QoS::AtLeastOnce);
     identified.properties.subscription_identifier = NonZeroU32::new(7);
@@ -432,9 +432,9 @@ fn r1_o11_overlapping_subscriptions_deliver_one_copy_at_the_highest_qos() {
     assert_eq!(ids, [7, 268_435_455]);
 }
 
+// covers: MQTT-3.3.2-3, MQTT-4.7.2-1
 #[test]
 fn r2_rule_6_a_delivery_is_stripped_and_checked_against_the_clients_own_filter() {
-    // covers: MQTT-3.3.2-3, MQTT-4.7.2-1
     let config = Config {
         mountpoint: Some(Mountpoint::parse("ingest/${username}/").unwrap()),
         ..Config::default()
@@ -476,9 +476,9 @@ fn r2_rule_6_a_delivery_is_stripped_and_checked_against_the_clients_own_filter()
     assert_eq!(harness.count(Counter::DeliveryOutsideNamespace), 3);
 }
 
+// covers: MQTT-3.10.4-3
 #[test]
 fn mqtt_3_10_4_2_after_unsubscribe_no_new_message_is_added() {
-    // covers: MQTT-3.10.4-3
     let mut harness = Harness::connected();
     harness.send(subscribe1(1, "t", QoS::ExactlyOnce));
     deliver(&mut harness, "t", CoreQoS::AtLeastOnce, "one", &["t"]);
@@ -575,9 +575,9 @@ fn interrupted() -> SessionState {
     }
 }
 
+// covers: MQTT-3.3.1-1, MQTT-4.3.3-6, MQTT-4.3.3-7
 #[test]
 fn mqtt_4_4_0_1_a_resumed_session_resends_what_was_in_flight_in_order() {
-    // covers: MQTT-3.3.1-1, MQTT-4.3.3-6, MQTT-4.3.3-7
     let state = interrupted();
     assert!(matches!(state.outbound[2], StoredOutbound::Release(packet_id) if packet_id == id(3)));
     let mut harness = Harness::new();
