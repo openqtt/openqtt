@@ -120,6 +120,43 @@ fn ending_a_stream_with_an_exchange_open_closes_the_connection() {
 }
 
 #[test]
+fn ending_a_stream_with_a_qos_2_publish_not_yet_processed_closes_the_connection() {
+    // Still being authorized: once published, it would wait for a PUBREL the stream can no
+    // longer carry, and hold its slot of Receive Maximum for good.
+    let mut harness = Harness::connected();
+    harness.auto.authorize = None;
+    harness.send_on(DATA, publish2("t", 1, "x"));
+    protocol_error(&harness.input_on(Input::StreamEnded {
+        stream: 4,
+        end: StreamEnd::ClientFinished,
+    }));
+
+    // Still queued behind another packet's authorization.
+    let mut harness = Harness::connected();
+    harness.auto.authorize = None;
+    harness.send(publish0("a", "x"));
+    harness.send_on(DATA, publish2("t", 1, "x"));
+    protocol_error(&harness.input_on(Input::StreamEnded {
+        stream: 4,
+        end: StreamEnd::ClientFinished,
+    }));
+
+    // A QoS 1 PUBLISH needs nothing more from the client: only the stream ends.
+    let mut harness = Harness::connected();
+    harness.auto.authorize = None;
+    harness.send_on(DATA, publish1("t", 1, "x"));
+    assert!(
+        harness
+            .input_on(Input::StreamEnded {
+                stream: 4,
+                end: StreamEnd::ClientFinished,
+            })
+            .is_empty()
+    );
+    assert!(harness.session.is_connected());
+}
+
+#[test]
 fn a_stream_ended_in_order_moves_its_subscriptions_to_the_control_stream() {
     let mut harness = Harness::connected();
     harness.send_on(DATA, subscribe1(1, "t", QoS::AtLeastOnce));

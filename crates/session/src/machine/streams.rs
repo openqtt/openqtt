@@ -3,7 +3,7 @@
 use openqtt_codec::{Packet, QoS};
 use openqtt_core::Timestamp;
 
-use super::{Phase, Received, Session};
+use super::{Authorizing, Phase, Received, Session};
 use crate::{Effect, Effects, StreamEnd, StreamId};
 
 impl Session {
@@ -27,8 +27,9 @@ impl Session {
         let (client_finished, server_stopped) = (state.client_finished, state.server_stopped);
         // An exchange on the stream that needs a packet from the client: a QoS 1 or 2 PUBLISH
         // the server sent and the client has not acknowledged in full, or a QoS 2 PUBLISH the
-        // client sent whose PUBREL has not come. It is never moved to another stream
-        // ([MQTT-4.4.0-1]), so the connection closes and the session recovers on the next.
+        // client sent whose PUBREL has not come, including one still being authorized or not
+        // processed yet. It is never moved to another stream ([MQTT-4.4.0-1]), so the
+        // connection closes and the session recovers on the next.
         let waiting_on_client = self
             .outbound
             .iter()
@@ -36,7 +37,8 @@ impl Session {
             || self
                 .inbound
                 .values()
-                .any(|inbound| inbound.stream == stream);
+                .any(|inbound| inbound.stream == stream)
+            || self.unprocessed_qos2(stream);
         if client_finished && waiting_on_client {
             return self.protocol_error(now, fx);
         }
@@ -51,6 +53,27 @@ impl Session {
             }
         }
         self.finish_stream_if_done(stream, fx);
+    }
+
+    /// Whether a QoS 2 PUBLISH from the client on `stream` is being authorized or waits to be
+    /// processed: its exchange will need a PUBREL on the stream.
+    fn unprocessed_qos2(&self, stream: StreamId) -> bool {
+        let authorizing = matches!(
+            &self.authorizing,
+            Some(Authorizing::Publish { stream: on, publish, .. })
+                if *on == stream && publish.qos == QoS::ExactlyOnce
+        );
+        authorizing
+            || self.inbox.iter().any(|received| {
+                matches!(
+                    received,
+                    Received::Packet {
+                        stream: on,
+                        packet: Packet::Publish(publish),
+                        ..
+                    } if *on == stream && publish.qos == QoS::ExactlyOnce
+                )
+            })
     }
 
     /// Whether the server owes the client an acknowledgement on `stream`: one waiting for a
