@@ -530,6 +530,17 @@ impl Session {
         let mut fx = Effects::new();
         match input {
             Input::Packet {
+                stream: StreamId::Data(id),
+                ..
+            } if self
+                .streams
+                .get(&id)
+                .is_some_and(|data| data.client_finished) =>
+            {
+                // The client said it would send nothing more on the stream.
+                self.protocol_error(now, &mut fx);
+            }
+            Input::Packet {
                 stream,
                 packet,
                 early,
@@ -737,9 +748,53 @@ impl Session {
         }
         // Reason Strings and User Properties go first ([MQTT-3.2.2-19] and the like).
         if packet.fit_within(self.limits.maximum_packet_size).is_ok() {
-            fx.push(Effect::Send { stream, packet });
-        } else {
-            fx.push(Effect::Count(Counter::PacketTooLarge));
+            return fx.push(Effect::Send { stream, packet });
+        }
+        fx.push(Effect::Count(Counter::PacketTooLarge));
+        match packet {
+            // The last packet of the connection goes with its reason code alone, if that fits.
+            Packet::Disconnect(disconnect) => {
+                let mut bare = Packet::Disconnect(Disconnect {
+                    reason_code: disconnect.reason_code,
+                    ..Disconnect::default()
+                });
+                if bare.fit_within(self.limits.maximum_packet_size).is_ok() {
+                    fx.push(Effect::Send {
+                        stream,
+                        packet: bare,
+                    });
+                }
+            }
+            Packet::ConnAck(connack) => {
+                let mut bare = Packet::from(ConnAck {
+                    session_present: false,
+                    reason_code: connack.reason_code,
+                    properties: ConnAckProperties::default(),
+                });
+                if bare.fit_within(self.limits.maximum_packet_size).is_ok() {
+                    fx.push(Effect::Send {
+                        stream,
+                        packet: bare,
+                    });
+                }
+            }
+            // A PUBLISH is discarded as if sent ([MQTT-3.1.2-25]); its caller measures it first.
+            Packet::Publish(_) => {}
+            // Any other packet completes an exchange the client waits on. One it can never
+            // receive leaves it waiting for ever, so the connection ends instead.
+            _ => self.fail_too_large(now, fx),
+        }
+    }
+
+    /// Ends the connection because the client's Maximum Packet Size cannot hold a packet the
+    /// server owes it: DISCONNECT 0x95 once accepted, CONNACK 0x95 before.
+    fn fail_too_large(&mut self, now: Timestamp, fx: &mut Effects) {
+        match self.phase {
+            Phase::Connected => {
+                self.close_with(DisconnectReasonCode::PacketTooLarge, None, now, fx);
+            }
+            Phase::Closed => {}
+            _ => self.refuse(ConnectReasonCode::PacketTooLarge, now, fx),
         }
     }
 

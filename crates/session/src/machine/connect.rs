@@ -577,6 +577,17 @@ impl Session {
             reason_code: ConnectReasonCode::Success,
             properties,
         };
+        // Only the Reason String and User Properties may be left out to fit ([MQTT-3.2.2-19],
+        // [MQTT-3.2.2-20]), and this CONNACK has neither. A client whose Maximum Packet Size
+        // cannot hold the limits it must be told, or the identifier it was assigned, cannot be
+        // served: it is refused with a CONNACK it can read.
+        let mut measured = Packet::from(connack.clone());
+        if measured
+            .fit_within(self.limits.maximum_packet_size)
+            .is_err()
+        {
+            return self.refuse(ConnectReasonCode::PacketTooLarge, now, fx);
+        }
         self.phase = Phase::Connected;
         self.send(StreamId::Control, connack, now, fx);
         if self.connect_timer {

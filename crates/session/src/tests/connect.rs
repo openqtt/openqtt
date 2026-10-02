@@ -425,6 +425,52 @@ fn mqtt_3_2_2_6_a_refusing_connack_has_session_present_0() {
 }
 
 #[test]
+fn mqtt_3_1_2_24_a_connack_the_client_cannot_receive_is_a_refusal_it_can() {
+    // An assigned identifier makes the CONNACK 44 bytes, and only its Reason String and User
+    // Properties may be left out to fit.
+    let mut harness = Harness::new();
+    let packets = harness.send(connect_with("", |connect| {
+        connect.properties.maximum_packet_size = std::num::NonZeroU32::new(20);
+    }));
+    let connack = refusal(&packets);
+    assert_eq!(connack.reason_code, ConnectReasonCode::PacketTooLarge);
+    // Even its Reason String went, to fit.
+    assert_eq!(connack.properties.reason_string, None);
+    assert!(!harness.session.is_connected());
+    // The claim was made and is given back.
+    assert_eq!(harness.releases().len(), 1);
+
+    // A limit nothing fits in gets no packet at all.
+    let mut harness = Harness::new();
+    let packets = harness.send(connect_with("", |connect| {
+        connect.properties.maximum_packet_size = std::num::NonZeroU32::new(4);
+    }));
+    assert!(packets.is_empty());
+    assert_eq!(harness.closed(), Some(CloseCode::NoError));
+}
+
+#[test]
+fn a_packet_the_client_can_never_receive_ends_the_connection() {
+    // 16 bytes hold the CONNACK, but not a SUBACK for twelve filters.
+    let mut harness = Harness::new();
+    let connack = harness.connect(connect_with("c", |connect| {
+        connect.properties.maximum_packet_size = std::num::NonZeroU32::new(16);
+    }));
+    assert_eq!(connack.reason_code, ConnectReasonCode::Success);
+    let filters: Vec<String> = (0..12).map(|n| format!("t/{n}")).collect();
+    let filters: Vec<(&str, openqtt_codec::SubscriptionOptions)> = filters
+        .iter()
+        .map(|filter| (filter.as_str(), super::harness::options(QoS::AtMostOnce)))
+        .collect();
+    let packets = harness.send(super::harness::subscribe(1, &filters));
+    let [Packet::Disconnect(disconnect)] = packets.as_slice() else {
+        panic!("{packets:?}");
+    };
+    assert_eq!(disconnect.reason_code, DisconnectReasonCode::PacketTooLarge);
+    assert!(harness.session.is_closed());
+}
+
+#[test]
 fn mqtt_3_1_2_28_no_response_information_even_when_asked() {
     let mut harness = Harness::new();
     let connack = harness.connect(connect_with("client-1", |connect| {

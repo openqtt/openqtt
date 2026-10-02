@@ -200,6 +200,45 @@ fn an_acknowledgement_owed_on_a_stopped_stream_closes_the_connection() {
 }
 
 #[test]
+fn a_qos_2_repeat_on_another_stream_gets_its_pubrec_with_the_first() {
+    let mut harness = Harness::connected();
+    harness.auto.loopback = false;
+    harness.send_on(DATA, publish2("t", 4, "x"));
+    // Identifiers are the session's, not a stream's: this is the same message again.
+    assert!(
+        harness
+            .send_on(StreamId::Control, publish2("t", 4, "x"))
+            .is_empty()
+    );
+    let token = harness.commits[0].token.unwrap();
+    let packets = harness.input_on(Input::Committed {
+        token,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    assert!(
+        matches!(
+            packets[..],
+            [
+                (DATA, Packet::PubRec(_)),
+                (StreamId::Control, Packet::PubRec(_))
+            ]
+        ),
+        "{packets:?}"
+    );
+    assert_eq!(harness.published().len(), 1);
+}
+
+#[test]
+fn a_packet_on_a_stream_the_client_finished_is_a_protocol_error() {
+    let mut harness = Harness::connected();
+    harness.input_on(Input::StreamEnded {
+        stream: 4,
+        end: StreamEnd::ClientFinished,
+    });
+    protocol_error(&harness.send_on(DATA, publish0("t", "x")));
+}
+
+#[test]
 fn a_data_stream_opened_before_connack_waits_for_it() {
     let mut harness = Harness::new();
     harness.auto.claim = false;

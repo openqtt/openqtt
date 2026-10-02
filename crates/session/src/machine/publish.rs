@@ -313,15 +313,23 @@ impl Session {
                 }
             }
         }
-        if let Some(replies) = self.replies.get_mut(&commit.stream) {
+        // The PUBLISH and every repeat of it wait on this commit, and a repeat may have come on
+        // another stream. The PUBLISH's own stream is answered first.
+        let mut streams = vec![commit.stream];
+        for (stream, replies) in &mut self.replies {
             for reply in replies
                 .iter_mut()
                 .filter(|reply| reply.state == ReplyState::Waiting(token))
             {
                 reply.state = ReplyState::Ready(code);
+                if !streams.contains(stream) {
+                    streams.push(*stream);
+                }
             }
         }
-        self.flush(commit.stream, now, fx);
+        for stream in streams {
+            self.flush(stream, now, fx);
+        }
     }
 
     /// Adds an acknowledgement to those owed on `stream`.
