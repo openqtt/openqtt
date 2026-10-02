@@ -14,9 +14,13 @@
 //!   ([MQTT-3.14.4-1]);
 //! - QoS 1 and 2 messages in flight to the client never exceed its Receive Maximum
 //!   ([MQTT-3.3.4-9]), and those from it never exceed the server's ([MQTT-3.3.4-7]);
-//! - a QoS 2 PUBLISH repeating one whose exchange is still open, as far as the server has
-//!   told the client, takes no slot of the server's Receive Maximum, however far the first one
-//!   got ([MQTT-4.3.3-10]);
+//! - the server answers the QoS 1 and 2 PUBLISH packets of each stream in the order they
+//!   arrived (report R1, O15);
+//! - the PUBLISH packets of one QoS 2 exchange are all answered alike, accepted or refused with
+//!   the same code, and a repeat takes no slot of the server's Receive Maximum, wherever the
+//!   first PUBLISH is: in the backlog, being authorized, committing or refused
+//!   ([MQTT-4.3.3-9], [MQTT-4.3.3-10]). The model follows the client's exchanges through the
+//!   acknowledgements and asserts only where the server cannot take another view;
 //! - Packet Identifiers in flight are never reused ([MQTT-2.2.1-4]);
 //! - every QoS 1 and 2 PUBLISH from the client is acknowledged at most once, and exactly once
 //!   when the connection is still open after every request is answered ([MQTT-3.3.4-1]);
@@ -415,6 +419,157 @@ fn calm_step() -> impl Strategy<Value = Step> {
     ]
 }
 
+/// Authorization answers that allow and deny one action (see [`Step::Authorize`]).
+const ALLOW: u8 = 32;
+const DENY: u8 = 33;
+
+/// The client sends a PUBLISH on `stream`, with `id` unless at QoS 0.
+fn client_publish(stream: StreamId, qos: QoS, id: u16, dup: bool) -> Step {
+    Step::Client {
+        stream,
+        packet: Packet::Publish(Publish {
+            dup: dup && qos != QoS::AtMostOnce,
+            qos,
+            topic: "t".to_owned(),
+            packet_id: (qos != QoS::AtMostOnce)
+                .then(|| openqtt_codec::PacketId::new(id))
+                .flatten(),
+            payload: Bytes::from_static(b"payload"),
+            ..Publish::default()
+        }),
+        early: false,
+    }
+}
+
+/// The client sends a PUBREL on `stream`.
+fn client_pubrel(stream: StreamId, id: u16) -> Step {
+    Step::Client {
+        stream,
+        packet: Packet::PubRel(PubRel::new(
+            openqtt_codec::PacketId::new(id).expect("non-zero"),
+        )),
+        early: false,
+    }
+}
+
+/// What a client does to its QoS 2 exchanges, densely: PUBLISH packets with two identifiers,
+/// repeated and spread over three streams, PUBREL packets in and out of turn, and QoS 0 and 1
+/// PUBLISH packets that hold the machine on their authorizations and commits, with the answers
+/// in any order.
+fn exchange_step() -> impl Strategy<Value = Step> {
+    let stream = || {
+        prop_oneof![
+            2 => Just(StreamId::Control),
+            1 => Just(StreamId::Data(4)),
+            1 => Just(StreamId::Data(8)),
+        ]
+    };
+    // QoS 1 keeps to identifiers of its own, so that every QoS 2 PUBLISH with 7 or 8 is one
+    // exchange's or another's.
+    let publish = (stream(), qos(), 0u16..2, any::<bool>()).prop_map(|(stream, qos, n, dup)| {
+        let id = if qos == QoS::ExactlyOnce {
+            7 + n
+        } else {
+            1 + n
+        };
+        client_publish(stream, qos, id, dup)
+    });
+    let pubrel = (stream(), 7u16..9).prop_map(|(stream, id)| client_pubrel(stream, id));
+    prop_oneof![
+        8 => publish,
+        2 => pubrel,
+        4 => (32u8..=255).prop_map(Step::Authorize),
+        3 => (any::<usize>(), 0u8..6).prop_map(|(pick, outcome)| Step::Commit { pick, outcome }),
+        2 => any::<usize>().prop_map(|pick| Step::Acknowledge { pick, failure: false }),
+    ]
+}
+
+/// Sequences reviews found the machine wrong on, each with the server's Receive Maximum, for a
+/// connected session.
+fn reviewed_sequences() -> Vec<(u16, Vec<Step>)> {
+    use StreamId::{Control, Data};
+    let accept = |pick| Step::Commit { pick, outcome: 3 };
+    vec![
+        // A repeat while its first PUBLISH is being authorized.
+        (
+            1,
+            vec![
+                client_publish(Control, QoS::ExactlyOnce, 7, false),
+                client_publish(Control, QoS::ExactlyOnce, 7, true),
+                Step::Authorize(ALLOW),
+                accept(0),
+            ],
+        ),
+        // A PUBLISH and its repeat queued behind another's authorization.
+        (
+            1,
+            vec![
+                client_publish(Control, QoS::AtMostOnce, 0, false),
+                client_publish(Control, QoS::ExactlyOnce, 7, false),
+                client_publish(Control, QoS::ExactlyOnce, 7, true),
+                Step::Authorize(ALLOW),
+                Step::Authorize(ALLOW),
+                accept(0),
+            ],
+        ),
+        // A new PUBLISH behind a PUBREL with its identifier, and a repeat of it.
+        (
+            2,
+            vec![
+                client_publish(Control, QoS::ExactlyOnce, 7, false),
+                Step::Authorize(ALLOW),
+                accept(0),
+                client_publish(Control, QoS::AtMostOnce, 0, false),
+                client_pubrel(Control, 7),
+                client_publish(Control, QoS::ExactlyOnce, 7, false),
+                client_publish(Control, QoS::ExactlyOnce, 7, true),
+                Step::Authorize(ALLOW),
+                Step::Authorize(ALLOW),
+                accept(0),
+            ],
+        ),
+        // An older exchange's refusal, held behind a commit on stream 4, goes out while a newer
+        // exchange with the identifier is refused behind one on stream 8; then the newer one's
+        // first PUBLISH is repeated.
+        (
+            8,
+            vec![
+                client_publish(Data(4), QoS::AtLeastOnce, 1, false),
+                Step::Authorize(ALLOW),
+                client_publish(Data(8), QoS::AtLeastOnce, 2, false),
+                Step::Authorize(ALLOW),
+                client_publish(Control, QoS::ExactlyOnce, 7, false),
+                client_publish(Data(4), QoS::ExactlyOnce, 7, true),
+                Step::Authorize(DENY),
+                client_publish(Data(8), QoS::ExactlyOnce, 7, false),
+                Step::Authorize(DENY),
+                accept(0),
+                client_publish(Control, QoS::ExactlyOnce, 7, true),
+                Step::Authorize(ALLOW),
+                accept(1),
+                accept(0),
+            ],
+        ),
+    ]
+}
+
+/// A sequence a review found, with random steps woven in, so that its neighbours are explored.
+fn neighbour() -> impl Strategy<Value = (u16, Vec<Step>)> {
+    let count = reviewed_sequences().len();
+    (
+        0..count,
+        vec((any::<proptest::sample::Index>(), exchange_step()), 0..12),
+    )
+        .prop_map(|(which, woven)| {
+            let (receive_maximum, mut steps) = reviewed_sequences().swap_remove(which);
+            for (at, step) in woven {
+                let at = at.index(steps.len() + 1);
+                steps.insert(at, step);
+            }
+            (receive_maximum, steps)
+        })
+}
+
 /// A script: whether the connection starts in 0-RTT, the first packet, then the steps.
 fn script() -> impl Strategy<Value = (bool, Packet, Vec<Step>)> {
     (
@@ -467,20 +622,58 @@ struct Driver {
     out: BTreeMap<u16, PacketType>,
     /// QoS 2 messages of the client's that the server acknowledged with PUBREC.
     releasable: Vec<u16>,
-    /// The client's QoS 2 exchanges the server has not ended, as far as it told the client: from
-    /// the arrival of a PUBLISH until a PUBREC refusing one with the identifier or a PUBCOMP
-    /// ending it went out. With each, whether a PUBLISH of it arrived outside early data, so
-    /// that it outlives early data being rejected.
-    exchanges: BTreeMap<u16, bool>,
-    /// PUBREL packets that arrived and are not answered, by identifier.
-    releasing: BTreeMap<u16, usize>,
-    /// Those of them that came in early data, which rejecting it drops.
-    early_releasing: BTreeMap<u16, usize>,
+    /// QoS 1 and 2 PUBLISH packets each stream has not answered, in the order they arrived.
+    unanswered: BTreeMap<StreamId, VecDeque<Unanswered>>,
+    /// PUBREL packets not answered by PUBCOMP, by identifier in the order they arrived, each
+    /// with the exchange that was the latest when it came.
+    pubrels: BTreeMap<u16, VecDeque<Option<u64>>>,
+    /// The client's latest QoS 2 exchange with each identifier.
+    exchanges: BTreeMap<u16, Exchange>,
+    next_exchange: u64,
+    /// How the server answered each exchange the model is sure of: accepted, or refused with
+    /// this code.
+    outcomes: BTreeMap<u64, Result<(), PubRecReasonCode>>,
+    /// Whether the PUBLISH going in certainly repeats an open exchange, so that it may not be
+    /// taken for one PUBLISH too many.
+    repeat_arriving: bool,
     /// Whether the handshake completed, so that no early data can be rejected any more.
     handshake_done: bool,
-    /// Whether the PUBLISH going in repeats an exchange that is open, with no PUBREL of it
-    /// waiting: it may not be taken for one PUBLISH too many.
-    repeat_arriving: bool,
+    /// Whether early data was rejected and the connection went on, after which the model no
+    /// longer knows which packets the server holds.
+    lost: bool,
+}
+
+/// A QoS 1 or 2 PUBLISH from the client that its stream has not answered. A stream's are
+/// answered in the order they arrived (report R1, O15), so every acknowledgement is matched to
+/// the PUBLISH it answers.
+#[derive(Debug, Clone, Copy)]
+struct Unanswered {
+    qos: QoS,
+    id: u16,
+    /// At QoS 2, the exchange the model puts it in, and whether the model is sure of it.
+    exchange: u64,
+    certain: bool,
+}
+
+/// The latest QoS 2 exchange of the client's with an identifier, as the model follows it from
+/// the client's packets and the server's answers. A PUBLISH with the identifier arriving while
+/// it is open repeats it.
+#[derive(Debug, Clone, Copy)]
+struct Exchange {
+    number: u64,
+    /// Whether the server certainly took its first PUBLISH for a new exchange: none came before
+    /// with the identifier, or the one before had certainly ended.
+    certain: bool,
+    /// Whether a PUBREC refusing one of its PUBLISH packets, or a PUBCOMP releasing it, went
+    /// out: a PUBLISH arriving now is a new message ([MQTT-4.3.3-9], [MQTT-4.3.3-12]).
+    ended: bool,
+    /// Whether a PUBREC accepting one of its PUBLISH packets went out.
+    accepted: bool,
+    /// Whether a PUBREL arrived since its first PUBLISH, which may end it before a PUBLISH
+    /// after it is processed, depending on its commit.
+    released: bool,
+    /// Whether one arrived once it was accepted, which certainly ends it first.
+    released_for_certain: bool,
 }
 
 impl Driver {
@@ -523,13 +716,28 @@ impl Driver {
             unread: VecDeque::new(),
             out: BTreeMap::new(),
             releasable: Vec::new(),
+            unanswered: BTreeMap::new(),
+            pubrels: BTreeMap::new(),
             exchanges: BTreeMap::new(),
-            releasing: BTreeMap::new(),
-            early_releasing: BTreeMap::new(),
-            handshake_done: !early,
+            next_exchange: 0,
+            outcomes: BTreeMap::new(),
             repeat_arriving: false,
+            handshake_done: !early,
+            lost: false,
         };
         driver.check(effects.into_vec());
+        driver
+    }
+
+    /// A driver whose client connected with `first` and is past authentication and the claim,
+    /// with pauses honoured.
+    fn connected(first: Connect, receive_maximum: u16) -> Self {
+        let mut driver = Self::new(false, receive_maximum);
+        driver.honour_pause = true;
+        driver.client(StreamId::Control, Packet::from(first), false);
+        driver.step(Step::Authenticate(7));
+        driver.step(Step::Claim(7));
+        assert!(driver.session.is_connected());
         driver
     }
 
@@ -581,27 +789,8 @@ impl Driver {
                 self.pipelined = self.pipelined.saturating_add(1);
             }
         }
-        // Early data still to be accepted or rejected.
-        let droppable = early && !self.handshake_done;
-        match &decoded {
-            Packet::Publish(publish) if publish.qos == QoS::ExactlyOnce => {
-                if let Some(packet_id) = publish.packet_id {
-                    let id = packet_id.get();
-                    self.repeat_arriving = self.exchanges.contains_key(&id)
-                        && self.releasing.get(&id).copied().unwrap_or(0) == 0;
-                    *self.exchanges.entry(id).or_default() |= !droppable;
-                }
-            }
-            Packet::PubRel(pubrel) => {
-                *self.releasing.entry(pubrel.packet_id.get()).or_default() += 1;
-                if droppable {
-                    *self
-                        .early_releasing
-                        .entry(pubrel.packet_id.get())
-                        .or_default() += 1;
-                }
-            }
-            _ => {}
+        if !self.session.is_closed() && !self.lost {
+            self.arrive(stream, &decoded);
         }
         self.feed(Input::Packet {
             stream,
@@ -611,20 +800,120 @@ impl Driver {
         self.repeat_arriving = false;
     }
 
-    /// The handshake completes. What came in early data is dropped if it is rejected.
-    fn handshake(&mut self, accepted: bool) {
-        if !self.handshake_done && !accepted {
-            self.exchanges.retain(|_, outlives| *outlives);
-            for (id, count) in std::mem::take(&mut self.early_releasing) {
-                if let Some(releasing) = self.releasing.get_mut(&id) {
-                    *releasing = releasing.saturating_sub(count);
-                }
+    /// Follows a packet from the client into the model as it arrives.
+    fn arrive(&mut self, stream: StreamId, packet: &Packet) {
+        match packet {
+            Packet::Publish(publish) => {
+                let Some(packet_id) = publish.packet_id else {
+                    return;
+                };
+                let id = packet_id.get();
+                let (exchange, certain) = if publish.qos == QoS::ExactlyOnce {
+                    self.arrive_exactly_once(id)
+                } else {
+                    (0, false)
+                };
+                self.unanswered
+                    .entry(stream)
+                    .or_default()
+                    .push_back(Unanswered {
+                        qos: publish.qos,
+                        id,
+                        exchange,
+                        certain,
+                    });
+            }
+            Packet::PubRel(pubrel) => {
+                let id = pubrel.packet_id.get();
+                let latest = self.exchanges.get_mut(&id).map(|exchange| {
+                    exchange.released = true;
+                    exchange.released_for_certain |= exchange.accepted;
+                    exchange.number
+                });
+                self.pubrels.entry(id).or_default().push_back(latest);
+            }
+            _ => {}
+        }
+    }
+
+    /// A QoS 2 PUBLISH arrives: a repeat of the latest exchange with its identifier while that
+    /// is open, else the first of a new one.
+    fn arrive_exactly_once(&mut self, id: u16) -> (u64, bool) {
+        let latest = self.exchanges.get(&id).copied();
+        if let Some(exchange) = latest
+            && !exchange.ended
+            && !exchange.released
+        {
+            self.repeat_arriving = exchange.certain;
+            return (exchange.number, exchange.certain);
+        }
+        let certain = latest.is_none_or(|exchange| exchange.ended || exchange.released_for_certain);
+        let number = self.next_exchange;
+        self.next_exchange += 1;
+        self.exchanges.insert(
+            id,
+            Exchange {
+                number,
+                certain,
+                ended: false,
+                accepted: false,
+                released: false,
+                released_for_certain: false,
+            },
+        );
+        (number, certain)
+    }
+
+    /// The server answered a QoS 1 or 2 PUBLISH on `stream`: the one that arrived first there.
+    fn answered(&mut self, stream: StreamId, qos: QoS, id: u16) -> Option<Unanswered> {
+        if self.lost {
+            return None;
+        }
+        let answered = self
+            .unanswered
+            .get_mut(&stream)
+            .and_then(VecDeque::pop_front)
+            .unwrap_or_else(|| {
+                panic!("an acknowledgement of {id} answering nothing on {stream:?}")
+            });
+        assert_eq!(
+            (answered.qos, answered.id),
+            (qos, id),
+            "acknowledgements on {stream:?} go in the order their PUBLISH packets arrived"
+        );
+        Some(answered)
+    }
+
+    /// The server answered a QoS 2 PUBLISH of an exchange: all of an exchange's alike.
+    fn exchange_answered(&mut self, answered: Unanswered, outcome: Result<(), PubRecReasonCode>) {
+        if answered.certain {
+            let first = *self.outcomes.entry(answered.exchange).or_insert(outcome);
+            assert_eq!(
+                first, outcome,
+                "the PUBLISH packets of one QoS 2 exchange are answered alike: {answered:?}"
+            );
+        }
+        if let Some(exchange) = self.exchanges.get_mut(&answered.id)
+            && exchange.number == answered.exchange
+        {
+            if outcome.is_err() {
+                exchange.ended = true;
+            } else {
+                exchange.accepted = true;
             }
         }
+    }
+
+    /// The handshake completes. What came in early data is dropped if it is rejected.
+    fn handshake(&mut self, accepted: bool) {
+        let rejected = !self.handshake_done && !accepted;
         self.handshake_done = true;
         self.feed(Input::HandshakeComplete {
             early_data_accepted: accepted,
         });
+        if rejected && !self.session.is_closed() {
+            self.lost = true;
+        }
     }
 
     fn step(&mut self, step: Step) {
@@ -1013,22 +1302,41 @@ impl Driver {
                 );
                 self.silenced = true;
             }
-            Packet::PubAck(ack) => self.acknowledged(PacketType::PubAck, ack.packet_id.get()),
+            Packet::PubAck(ack) => {
+                self.acknowledged(PacketType::PubAck, ack.packet_id.get());
+                self.answered(stream, QoS::AtLeastOnce, ack.packet_id.get());
+            }
             Packet::PubRec(rec) => {
-                self.acknowledged(PacketType::PubRec, rec.packet_id.get());
-                if rec.reason_code.is_error() {
-                    self.exchanges.remove(&rec.packet_id.get());
+                let id = rec.packet_id.get();
+                self.acknowledged(PacketType::PubRec, id);
+                let outcome = if rec.reason_code.is_error() {
+                    Err(rec.reason_code)
                 } else {
-                    self.releasable.push(rec.packet_id.get());
+                    Ok(())
+                };
+                if let Some(answered) = self.answered(stream, QoS::ExactlyOnce, id) {
+                    self.exchange_answered(answered, outcome);
+                }
+                if outcome.is_ok() {
+                    self.releasable.push(id);
                 }
             }
             Packet::PubComp(comp) => {
                 let id = comp.packet_id.get();
-                if let Some(releasing) = self.releasing.get_mut(&id) {
-                    *releasing = releasing.saturating_sub(1);
-                }
-                if comp.reason_code == PubCompReasonCode::Success {
-                    self.exchanges.remove(&id);
+                if !self.lost {
+                    let released = self
+                        .pubrels
+                        .get_mut(&id)
+                        .and_then(VecDeque::pop_front)
+                        .unwrap_or_else(|| panic!("PUBCOMP {id} answering no PUBREL"));
+                    // A PUBREL that released something released the latest exchange then.
+                    if comp.reason_code == PubCompReasonCode::Success
+                        && let Some(number) = released
+                        && let Some(exchange) = self.exchanges.get_mut(&id)
+                        && exchange.number == number
+                    {
+                        exchange.ended = true;
+                    }
                 }
             }
             Packet::PubRel(rel) => {
@@ -1144,12 +1452,60 @@ proptest! {
     }
 
     #[test]
+    fn qos_2_exchanges_are_answered_alike_and_counted_once(
+        first in calm_connect(),
+        steps in vec(exchange_step(), 0..150),
+        receive_maximum in select(&[1u16, 2, 4][..]),
+    ) {
+        let mut driver = Driver::connected(first, receive_maximum);
+        for step in steps {
+            driver.step(step);
+        }
+        driver.settle();
+        driver.check_settled();
+    }
+
+    #[test]
+    fn neighbours_of_the_reviewed_sequences_keep_the_invariants(
+        (receive_maximum, steps) in neighbour(),
+    ) {
+        let mut driver = Driver::connected(reviewed_connect(), receive_maximum);
+        for step in steps {
+            driver.step(step);
+        }
+        driver.settle();
+        driver.check_settled();
+    }
+
+    #[test]
     fn random_sequences_keep_the_invariants(
         (early, first, steps) in script(),
         receive_maximum in select(&[1u16, 2, Config::RECEIVE_MAXIMUM][..]),
     ) {
         let mut driver = Driver::new(early, receive_maximum);
         driver.client(StreamId::Control, first, early);
+        for step in steps {
+            driver.step(step);
+        }
+        driver.settle();
+        driver.check_settled();
+    }
+}
+
+/// The CONNECT of the reviewed sequences.
+fn reviewed_connect() -> Connect {
+    Connect {
+        clean_start: true,
+        keep_alive: 60,
+        client_id: "client-1".to_owned(),
+        ..Connect::default()
+    }
+}
+
+#[test]
+fn the_sequences_reviews_found_keep_the_invariants() {
+    for (receive_maximum, steps) in reviewed_sequences() {
+        let mut driver = Driver::connected(reviewed_connect(), receive_maximum);
         for step in steps {
             driver.step(step);
         }
