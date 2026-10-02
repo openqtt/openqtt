@@ -11,7 +11,8 @@
 ## Reports
 
 Each report answers one design question, from reading the specification and
-EMQX or from a measured spike. They go in `reports/`.
+EMQX or from a measured spike. They go in `reports/`; a spike's code is in
+`../spikes/` and its raw results in `../bench/results/`.
 
 | Report | Question | Status |
 | --- | --- | --- |
@@ -20,7 +21,7 @@ EMQX or from a measured spike. They go in `reports/`.
 | [R3](reports/R03-roles-and-wire.md) | Roles, the message path, the wire protocol between roles and the extension traits | draft |
 | R4 | The log: storage engine, partitioning, what durable means before a PUBACK, data model | to be written |
 | R5 | Sessions and handoff: takeover, drain, rolling upgrade, wills | to be written |
-| R6 | Routing at scale: interest aggregation, wildcard index, memory, fan-out | to be written |
+| [R6](reports/R06-routing.md) | Routing at scale: interest aggregation, wildcard index, memory, fan-out | draft |
 | R7 | QUIC in a cluster: migration, 0-RTT and load balancers | to be written |
 | R8 | Security model: authentication, authorization, revocation, admin API | to be written |
 | R9 | Operations contract: metrics, logs, health, admin API and CLI | to be written |
