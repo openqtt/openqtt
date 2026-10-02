@@ -149,8 +149,8 @@ timed on a trie holding the whole route view. Six minutes; the first is left out
 ### Rerunning
 
 `spikes/s2-routing/run.sh` builds the spike and writes every file under `bench/results/` that
-this report quotes; `./run.sh coarsen churn` reruns only those. It takes about half an hour and
-up to 3 GiB.
+this report quotes; `./run.sh coarsen churn` reruns only those. It takes about fifteen minutes
+and up to 3 GiB.
 
 ## Results
 

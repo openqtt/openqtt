@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs every S2 measurement and writes the JSON that report R6 quotes into bench/results/.
-# Run from anywhere; takes about half an hour and up to 3 GiB of memory on a laptop.
+# Run from anywhere; takes about fifteen minutes and up to 3 GiB of memory on a laptop.
 # Pass experiment names to run only those: ./run.sh match fanout
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
