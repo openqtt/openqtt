@@ -106,6 +106,7 @@ mod primitives;
 mod property;
 mod publish;
 mod reason;
+mod redact;
 mod subscribe;
 #[cfg(test)]
 mod test_util;

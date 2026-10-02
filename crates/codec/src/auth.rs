@@ -25,7 +25,7 @@ pub struct Auth {
 }
 
 /// The properties of an AUTH (section 3.15.2.2).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct AuthProperties {
     /// Authentication Method, required but in the bare form (section 3.15.2.2.2).
     pub authentication_method: Option<String>,
@@ -35,6 +35,22 @@ pub struct AuthProperties {
     pub reason_string: Option<String>,
     /// User Properties, name and value, in order (section 3.15.2.2.5).
     pub user_properties: Vec<(String, String)>,
+}
+
+/// Debug output that never shows authentication_data: a credential must not reach a log
+/// through `{:?}`.
+impl core::fmt::Debug for AuthProperties {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AuthProperties")
+            .field("authentication_method", &self.authentication_method)
+            .field(
+                "authentication_data",
+                &crate::redact::Redacted(&self.authentication_data),
+            )
+            .field("reason_string", &self.reason_string)
+            .field("user_properties", &self.user_properties)
+            .finish()
+    }
 }
 
 impl Auth {
