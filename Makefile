@@ -139,16 +139,23 @@ differential-bless: need-nextest
 # --- Semver -------------------------------------------------------------------------------
 
 # The extension seam is public API for other builds (crates/ext/README.md): compare openqtt-ext
-# with SEMVER_BASE and refuse a change bigger than SEMVER_RELEASE. Minor by default, since the
-# workspace's version does not move between commits and would let any change through; a change
-# that breaks the seam on purpose raises the major number of API_VERSION and passes
-# SEMVER_RELEASE=major. Not part of check: it needs the base revision fetched.
+# with SEMVER_BASE as a minor release, or as a major one when the major number of API_VERSION
+# differs from the base's. The workspace's version does not move between commits, so it cannot
+# say which; API_VERSION can, and a change that breaks the seam passes only by raising it. Not
+# part of check: it needs the base revision fetched.
 SEMVER_BASE ?= origin/main
-SEMVER_RELEASE ?= minor
+# The major number in the line that defines API_VERSION.
+API_MAJOR := s/^pub const API_VERSION: ApiVersion = ApiVersion::new[(]\([0-9][0-9]*\),.*/\1/p
 
 semver: need-semver-checks
+	@base=$$(git show $(SEMVER_BASE):crates/ext/src/lib.rs 2>/dev/null | sed -n '$(API_MAJOR)'); \
+	head=$$(sed -n '$(API_MAJOR)' crates/ext/src/lib.rs); \
+	if [ -z "$$head" ]; then echo "error: no API_VERSION in crates/ext/src/lib.rs"; exit 1; fi; \
+	release=minor; \
+	if [ -n "$$base" ] && [ "$$base" != "$$head" ]; then release=major; fi; \
+	echo "semver: API_VERSION major $${base:-absent} at $(SEMVER_BASE), $$head here: a $$release release"; \
 	$(CARGO) semver-checks check-release -p openqtt-ext --baseline-rev $(SEMVER_BASE) \
-		--release-type $(SEMVER_RELEASE)
+		--release-type $$release
 
 # --- Tools --------------------------------------------------------------------------------
 

@@ -25,7 +25,8 @@ git fetch origin main
 make semver
 ```
 
-`make semver` checks the change as a minor release, since the crate's own version
-(`2.0.0-alpha.0`, the workspace's) does not move from one commit to the next and would let any
-change through. A change that breaks the seam on purpose raises the major number of
-`API_VERSION` and runs `make semver SEMVER_RELEASE=major`, which then passes.
+`make semver` checks the change as a minor release, or as a major one when the major number of
+`API_VERSION` differs from `main`'s. The crate's own version (`2.0.0-alpha.0`, the
+workspace's) does not move from one commit to the next, so it cannot say which. A change that
+breaks the seam therefore passes only by raising the major number of `API_VERSION`. CI runs
+`make semver` after `make check`, against `main`.
