@@ -60,9 +60,20 @@ impl FakeServer {
     ///
     /// # Errors
     ///
-    /// When the handshake fails, as it does for a client certificate the server refuses.
+    /// [`Error::EndpointClosed`] when no connection will come any more. Any other error
+    /// concerns this one connection, such as a handshake that fails for a client certificate
+    /// the server refuses, and the next call accepts the next connection.
     pub async fn accept(&self) -> Result<RawConnection, Error> {
-        let incoming = self.endpoint.accept().await.ok_or(Error::EndpointClosed)?;
+        Self::establish(self.incoming().await?).await
+    }
+
+    /// The next connection attempt, before its handshake.
+    async fn incoming(&self) -> Result<quinn::Incoming, Error> {
+        self.endpoint.accept().await.ok_or(Error::EndpointClosed)
+    }
+
+    /// Completes the handshake of a connection attempt and takes its control stream.
+    async fn establish(incoming: quinn::Incoming) -> Result<RawConnection, Error> {
         let connection = incoming.await?;
         let (send, recv) = connection.accept_bi().await?;
         Ok(RawConnection::start(
@@ -105,14 +116,21 @@ struct Subscriber {
 }
 
 impl FakeBroker {
-    /// Serves every connection `server` accepts, each on a task of its own.
+    /// Serves every connection `server` accepts, each on a task of its own from its
+    /// handshake on: a handshake that fails, or a client that never sends, concerns that
+    /// connection alone, and the broker goes on accepting.
     pub fn start(server: FakeServer) -> Self {
         let addr = server.addr();
         let routes = Arc::new(Routes::default());
         let task = tokio::spawn(async move {
-            while let Ok(connection) = server.accept().await {
-                let id = routes.next_connection.fetch_add(1, Ordering::Relaxed);
-                tokio::spawn(serve(connection, Arc::clone(&routes), id));
+            while let Ok(incoming) = server.incoming().await {
+                let routes = Arc::clone(&routes);
+                tokio::spawn(async move {
+                    if let Ok(connection) = FakeServer::establish(incoming).await {
+                        let id = routes.next_connection.fetch_add(1, Ordering::Relaxed);
+                        serve(connection, routes, id).await;
+                    }
+                });
             }
         });
         Self { addr, task }

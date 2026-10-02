@@ -304,3 +304,36 @@ async fn a_failed_expectation_is_reported_and_the_run_goes_on() {
         outcome.failures[1]
     );
 }
+
+#[tokio::test]
+async fn the_fake_broker_keeps_accepting_after_a_handshake_fails() {
+    let (pki, identity, target) = setup();
+    let server =
+        FakeServer::bind(&identity, &ClientAuth::Required(vec![pki.ca_certificate()])).unwrap();
+    let target = target(&server);
+    let _broker = FakeBroker::start(server);
+
+    // A client without a certificate is refused: that concerns it alone.
+    let refused = async {
+        let mut client = RawConnection::connect(&target).await?;
+        client.send(packets::connect("{ns}-anonymous")).await?;
+        Ok::<_, openqtt_testkit::Error>(client.closed(WAIT).await)
+    };
+    assert!(
+        !matches!(refused.await, Ok(None)),
+        "the refusal closes the connection"
+    );
+
+    // The next client, with a certificate, is served.
+    let device = target.with_identity(pki.client("device-22").unwrap());
+    let served = tokio::time::timeout(WAIT, async {
+        let mut client = RawConnection::connect(&device).await?;
+        client.send(packets::connect("device-22")).await?;
+        Ok::<_, openqtt_testkit::Error>(client.recv_packet(WAIT).await)
+    })
+    .await;
+    assert!(
+        matches!(served, Ok(Ok(Some(Packet::ConnAck(_))))),
+        "the broker stopped accepting: {served:?}"
+    );
+}
