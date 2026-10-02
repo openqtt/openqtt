@@ -28,7 +28,7 @@ figures do not depend on the machine; allocator rounding comes on top.
   vectors and tables grow: 2.20 GB as built at 10^7 filters, 1.43 GB compacted.
 - **Changes.** On one thread, 0.85 to 2.3 million inserts and 0.55 to 1.6 million removals in
   random order per second, the lower figures at the larger sizes.
-- **Match.** At 10^6 filters a match takes 0.75 to 1.9 µs at the median and 5 to 7 µs at p99.
+- **Match.** At 10^6 filters a match takes 0.75 to 1.9 µs at the median and 4 to 7 µs at p99.
   It is bound by memory latency: at 10^5 filters, which fit in the caches, it takes 0.21 to
   0.42 µs.
 - **Fan-out.** 4 to 5 ns per destination read from one set. Overlapping sets cost 20 to 28 ns
@@ -42,7 +42,7 @@ figures do not depend on the machine; allocator rounding comes on top.
   10^7 devices; the price is that every command to a device reaches every edge. **T = 64.**
 - **Churn.** With that cover, 1% of devices churning per minute changes nothing in the route
   view. With the floor at the namespace it would cost 12,000 to 17,000 records a minute per
-  10^6 devices, applied in about 10 ms.
+  10^6 devices, applied in 6 to 11 ms.
 
 ## Method
 
@@ -144,7 +144,9 @@ children, and a grace period, where an edge withdraws a departed device's entry 
 floor 1, each edge's cover is recomputed once a minute and the difference counted, which is
 what a stream batched per minute would carry. A record is an operation byte, then a sequence
 number, the edge and the filter's length as varints, then the filter. Applying the records is
-timed on a trie holding the whole route view. Six minutes; the first is left out of the means.
+timed on a trie holding the whole route view, and the view's memory is that trie's alone. At
+the end of each run every device must hold exactly one membership and owe no withdrawal, which
+the model checks. Six minutes; the first is left out of the means.
 
 ### Rerunning
 
@@ -182,21 +184,23 @@ Per call, one thread, after warming on the same topics in another order. The tim
 | (a) command to a subscribed device (one match) | 1.00 | 1.0 | 1.67 µs | 6.71 µs | 12.92 µs | 1.71 µs | 1.21 µs | 5.88 µs |
 | (a) telemetry (no match) | 0.00 | 0.0 | 0.75 µs | 5.25 µs | 8.25 µs | 0.79 µs | 0.71 µs | 5.12 µs |
 | (b) mixed publish stream | 2.72 | 83.1 | 1.88 µs | 6.79 µs | 12.08 µs | 1.91 µs | 0.79 µs | 5.25 µs |
-| (c) telemetry into shared groups | 1.00 | 10.0 | 0.92 µs | 5.17 µs | 7.79 µs | 0.74 µs | 0.50 µs | 0.88 µs |
+| (c) telemetry into shared groups | 1.00 | 10.0 | 0.79 µs | 4.17 µs | 5.96 µs | 0.86 µs | 0.54 µs | 3.67 µs |
 
 "Trie walk" is the match without gathering destinations. Each topic level costs an interner
 probe and a child-table probe, and at 10^6 filters (150 MB) both miss the caches: a command
 walks six levels in 1.2 µs at the median. The walk is memory-latency bound, which is why its
-p99 is four to five times its median.
+p99 is five to seven times its median. The (c) rows here and below were timed again after a fix
+to how destinations are merged (section 4); each file's `reruns` entry says so, and the (a) and
+(b) rows are from the first run.
 
-At 10^5 filters (17 MB) the same streams take a fifth of the time or less:
+At 10^5 filters (17 MB) the same streams take a fifth to a third of the time:
 
 | Workload and stream | Matching filters | Destinations | p50 | p99 | p99.9 | Mean | Trie walk p50 | Trie walk p99 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | (a) command to a subscribed device (one match) | 1.00 | 1.0 | 0.29 µs | 1.42 µs | 5.33 µs | 0.31 µs | 0.25 µs | 0.54 µs |
 | (a) telemetry (no match) | 0.00 | 0.0 | 0.21 µs | 0.58 µs | 5.92 µs | 0.21 µs | 0.21 µs | 0.46 µs |
 | (b) mixed publish stream | 2.52 | 11.5 | 0.42 µs | 1.29 µs | 5.38 µs | 0.49 µs | 0.33 µs | 0.62 µs |
-| (c) telemetry into shared groups | 1.00 | 10.0 | 0.29 µs | 0.96 µs | 5.29 µs | 0.33 µs | 0.25 µs | 0.54 µs |
+| (c) telemetry into shared groups | 1.00 | 10.0 | 0.25 µs | 0.50 µs | 4.46 µs | 0.30 µs | 0.17 µs | 0.46 µs |
 
 The run at 10^6 had no swapping and 228 major page faults in 20 s (`/usr/bin/time -l`), so the
 difference is cache and TLB misses, not the machine's memory pressure. A repeat run at 10^6
@@ -227,14 +231,17 @@ a bitmap union costs 10 to 13. Below about 1,000 destinations sorting wins.
 
 ### 4. Shared subscriptions
 
-Picking one member from each of ten matching groups adds 0.4 µs to the 0.5 µs walk (workload
-(c), telemetry into shared groups), about 40 ns per group. R1 (O1) delivers round robin per
-publishing edge over the members whose sessions are connected. A publishing edge cannot see
-members on other edges, so the route view carries, for each group and filter, the edges that
-hold connected members and how many: one entry per (group, filter, edge), at most one per edge
-however many members it holds. The receiving edge then picks among its own members. That
-bounds a group's route-view cost by the edge count, at the cost of round robin that is fair
-across edges, weighted by member count, rather than across members.
+Picking one member from each of ten matching groups and merging the picks into one sorted list
+without duplicates adds 0.25 µs to the 0.54 µs walk at the median (workload (c), telemetry into
+shared groups), about 25 ns per group; at 10^5 filters it adds 0.08 µs. Every pick counts as a
+destination set of its own when merging: two groups on one filter can pick the same subscriber,
+which a first version of the spike delivered twice (18 duplicates per million publishes here).
+R1 (O1) delivers round robin per publishing edge over the members whose sessions are connected.
+A publishing edge cannot see members on other edges, so the route view carries, for each group
+and filter, the edges that hold connected members and how many: one entry per (group, filter,
+edge), at most one per edge however many members it holds. The receiving edge then picks among
+its own members. That bounds a group's route-view cost by the edge count, at the cost of round
+robin that is fair across edges, weighted by member count, rather than across members.
 
 ### 5. Coarsening
 
@@ -277,7 +284,7 @@ Placement by namespace:
 A route entry costs 195 bytes in a merged view of 705,554 entries (uniform placement, floor 3,
 T 64) and 262 bytes in one of 262,391 (by namespace), where entries share fewer levels. The 421
 entries of the shape cover from the first level are four shapes that every edge holds and the
-21 consumers' filters, each held by one edge: 46 KB in all.
+21 consumers' filters, each held by one edge: 7 KB in all.
 
 What the rows show:
 
@@ -324,13 +331,13 @@ form.
 | Placement | Cover | Floor | T | Hysteresis | Grace | Route entries | Records a minute | Bytes a minute | Most records in one second | Apply a minute |
 | --- | --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | uniform | shape | 1 | 16 or 64 | | | 421 | 0 | 0 | 0 | 0 |
-| uniform | `+` | 3 | 16 | no | none | 583,923 | 13,023 | 775 KB | 280 | 8.3 ms |
-| uniform | `+` | 3 | 16 | yes | none | 583,923 | 12,014 | 716 KB | 247 | 8.0 ms |
-| uniform | `+` | 3 | 64 | no | none | 705,533 | 16,787 | 1.00 MB | 439 | 11.7 ms |
-| uniform | `+` | 3 | 64 | yes | 30 s | 705,533 | 14,449 | 862 KB | 323 | 12.3 ms |
-| uniform | `+` | 3 | 256 | no | none | 812,888 | 16,163 | 967 KB | 309 | 11.6 ms |
-| by namespace | `+` | 3 | 16 | no | none | 123,298 | 4,502 | 265 KB | 144 | 1.7 ms |
-| by namespace | `+` | 3 | 16 | yes | none | 123,298 | 2,336 | 137 KB | 53 | 1.0 ms |
+| uniform | `+` | 3 | 16 | no | none | 583,923 | 13,023 | 775 KB | 280 | 5.6 ms |
+| uniform | `+` | 3 | 16 | yes | none | 583,923 | 12,014 | 716 KB | 247 | 6.2 ms |
+| uniform | `+` | 3 | 64 | no | none | 705,533 | 16,787 | 1.00 MB | 439 | 8.7 ms |
+| uniform | `+` | 3 | 64 | yes | 30 s | 705,533 | 14,444 | 862 KB | 321 | 11.2 ms |
+| uniform | `+` | 3 | 256 | no | none | 812,888 | 16,163 | 967 KB | 309 | 9.1 ms |
+| by namespace | `+` | 3 | 16 | no | none | 123,298 | 4,502 | 265 KB | 144 | 1.6 ms |
+| by namespace | `+` | 3 | 16 | yes | none | 123,298 | 2,336 | 137 KB | 53 | 1.1 ms |
 | by namespace | `+` | 3 | 16 to 256 | either | 30 s | 123,298 to 407,385 | 0 | 0 | 0 | 0 |
 | by namespace | shape | 1 | 16 or 64 | | | 419 or 898 | 0 | 0 | 0 | 0 |
 
@@ -338,8 +345,8 @@ form.
   go below shapes that stay.
 - Under uniform placement with the floor at the namespace, a churning device costs 1.2 to 1.7
   records (a withdrawal on the edge it left and an addition on the one it reaches, less those
-  under coarse nodes) of about 60 bytes: 12 to 17 KB a second per 10^6 devices, applied at 0.6
-  to 0.9 µs a record. A grace period barely helps there, because 99 reconnects in 100 land on
+  under coarse nodes) of about 60 bytes: 12 to 17 KB a second per 10^6 devices, applied at 0.4
+  to 0.8 µs a record. A grace period barely helps there, because 99 reconnects in 100 land on
   another edge. Hysteresis cuts transitions of coarse nodes by two thirds (526 to 182 at T 16)
   and records by 8 to 13%.
 - By namespace, a device comes back to its own edge, so a 30 s grace period absorbs every
