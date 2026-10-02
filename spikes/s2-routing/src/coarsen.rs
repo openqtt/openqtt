@@ -2,12 +2,17 @@
 //!
 //! An edge keeps an exact index of its local subscriptions and registers with the router only a
 //! cover set: filters that match at least every topic its subscribers want. A node with more
-//! than T distinct children is replaced by a coarser filter. Two forms are measured:
+//! than T distinct children is replaced by a coarser filter. Three forms are measured:
 //!
 //! - `#`-cover, as R3 writes it: the node becomes `prefix/#`.
 //! - `+`-cover: the node's children are merged under `prefix/+`, keeping what follows them,
 //!   so `ingest/o/n/<device>/commands/#` for many devices becomes `ingest/o/n/+/commands/#`
-//!   rather than `ingest/o/n/#`, which would also attract every device's telemetry.
+//!   rather than `ingest/o/n/#`, which would also attract every device's telemetry. Merging
+//!   every child also widens a filter only one child has.
+//! - shape cover: below the node, a level position with more than T distinct values becomes `+`,
+//!   and a resulting shape is registered only when more than T filters share it; every other
+//!   filter stays exact. Many devices' `<o>/<n>/<device>/commands/#` become one
+//!   `+/<n>/+/commands/#`, while one consumer's `acme/+/+/telemetry` stays as it is.
 //!
 //! A floor keeps nodes shallower than a given depth from ever being coarsened. Without one, the
 //! production shape collapses: an edge serves devices of more than T organisations, so the node
@@ -21,6 +26,8 @@ pub enum Policy {
     Hash,
     #[serde(rename = "+")]
     Plus,
+    #[serde(rename = "shape")]
+    Shape,
 }
 
 #[derive(Clone, Copy, Debug, serde::Serialize)]
@@ -141,6 +148,13 @@ fn walk(
                 push(c, join(path, "#"), true);
                 return;
             }
+            Policy::Shape => {
+                if n.exact {
+                    push(c, path.clone(), merged);
+                }
+                shapes(n, path, rule.t, c);
+                return;
+            }
             Policy::Plus => {
                 if n.exact {
                     push(c, path.clone(), merged);
@@ -182,6 +196,64 @@ fn walk(
         path.push('+');
         walk(p, path, depth + 1, rule, before, c, merged);
         path.truncate(len);
+    }
+}
+
+/// Every filter below `n`, as levels relative to it.
+fn below<'a>(n: &'a Tree, levels: &mut Vec<&'a str>, out: &mut Vec<Vec<&'a str>>) {
+    if n.exact && !levels.is_empty() {
+        out.push(levels.clone());
+    }
+    if n.hash {
+        levels.push("#");
+        out.push(levels.clone());
+        levels.pop();
+        // `#` covers everything further down.
+        return;
+    }
+    for (k, v) in &n.kids {
+        levels.push(k);
+        below(v, levels, out);
+        levels.pop();
+    }
+    if let Some(p) = &n.plus {
+        levels.push("+");
+        below(p, levels, out);
+        levels.pop();
+    }
+}
+
+/// The shape cover of the filters below a coarse node at `path`.
+fn shapes(n: &Tree, path: &str, t: usize, c: &mut Cover) {
+    let mut rel = Vec::new();
+    below(n, &mut Vec::new(), &mut rel);
+    let depth = rel.iter().map(Vec::len).max().unwrap_or(0);
+    let mut distinct: Vec<HashSet<&str>> = vec![HashSet::new(); depth];
+    for f in &rel {
+        for (p, l) in f.iter().enumerate() {
+            if *l != "+" && *l != "#" {
+                distinct[p].insert(l);
+            }
+        }
+    }
+    let wild: Vec<bool> = distinct.iter().map(|d| d.len() > t).collect();
+    let mut groups: HashMap<Vec<&str>, Vec<usize>> = HashMap::new();
+    for (i, f) in rel.iter().enumerate() {
+        let shape = f
+            .iter()
+            .enumerate()
+            .map(|(p, l)| if wild[p] && *l != "#" { "+" } else { *l })
+            .collect();
+        groups.entry(shape).or_default().push(i);
+    }
+    for (shape, members) in groups {
+        if members.len() > t {
+            push(c, join(path, &shape.join("/")), true);
+        } else {
+            for i in members {
+                push(c, join(path, &rel[i].join("/")), false);
+            }
+        }
     }
 }
 
@@ -257,6 +329,29 @@ mod tests {
         assert_eq!(sorted(&c), vec!["ingest/+/production/d/commands/#"]);
         let c = cover(&t, rule(4, Policy::Hash, 3), None);
         assert_eq!(c.filters.len(), 10);
+    }
+
+    #[test]
+    fn shape_cover_keeps_a_rare_filter_exact() {
+        let mut t = Tree::default();
+        for org in 0..10 {
+            for d in 0..3 {
+                t.insert(&format!("ingest/org{org}/production/d{org}x{d}/commands/#"));
+            }
+        }
+        t.insert("ingest/org3/+/+/telemetry");
+        let c = cover(&t, rule(4, Policy::Shape, 1), None);
+        assert_eq!(
+            sorted(&c),
+            vec![
+                "ingest/+/production/+/commands/#",
+                "ingest/org3/+/+/telemetry"
+            ]
+        );
+        assert_eq!(c.coarse.len(), 1);
+        // The +-cover widens the consumer to every organisation.
+        let c = cover(&t, rule(4, Policy::Plus, 1), None);
+        assert!(c.filters.iter().any(|f| f == "ingest/+/+/+/telemetry"));
     }
 
     #[test]

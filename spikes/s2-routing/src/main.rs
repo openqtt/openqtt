@@ -636,11 +636,27 @@ fn load_stats(members: &[Vec<u32>]) -> Value {
     json!({ "mean": mean, "max": max, "min": min, "max_over_mean": max as f64 / mean })
 }
 
+/// The consumer of all telemetry, on edge 0.
 const BACKEND: &str = "ingest/+/+/+/telemetry";
+/// Narrow consumers, each of one large organisation's telemetry.
+const NARROW: u32 = 20;
 
-/// Builds edge `e`'s exact interest: its devices' command filters, and on edge 0 the backend
-/// consumer of all telemetry.
-fn edge_tree(shape: &Shape, members: &[u32], e: usize, f: &mut String) -> Tree {
+/// The edge of narrow consumer `k`, which consumes organisation `k`'s telemetry.
+fn narrow_edge(k: u32, edges: u32) -> u32 {
+    u32::try_from(hash2(u64::from(k), 0x636f) % u64::from(edges)).unwrap_or(0)
+}
+
+fn narrow_filter(k: u32) -> String {
+    let mut f = String::from("ingest/");
+    Shape::org_name(k, &mut f);
+    f.push_str("/+/+/telemetry");
+    f
+}
+
+/// Builds edge `e`'s exact interest: its devices' command filters, on edge 0 the consumer of
+/// all telemetry, and the narrow consumers placed on this edge, which share it with devices as
+/// they would behind a load balancer.
+fn edge_tree(shape: &Shape, members: &[u32], e: usize, edges: u32, f: &mut String) -> Tree {
     let mut tree = Tree::default();
     for &i in members {
         Shape::command_filter(shape.device(u64::from(i)), f);
@@ -648,6 +664,11 @@ fn edge_tree(shape: &Shape, members: &[u32], e: usize, f: &mut String) -> Tree {
     }
     if e == 0 {
         tree.insert(BACKEND);
+    }
+    for k in 0..NARROW {
+        if narrow_edge(k, edges) as usize == e {
+            tree.insert(&narrow_filter(k));
+        }
     }
     tree
 }
@@ -682,7 +703,7 @@ fn coarsening(a: &Args) -> Value {
             }
             let mut rules = Vec::new();
             for &floor in &floors {
-                for policy in [Policy::Hash, Policy::Plus] {
+                for policy in [Policy::Hash, Policy::Plus, Policy::Shape] {
                     for &t in &ts {
                         rules.push(Rule {
                             t: usize::try_from(t).unwrap_or(1),
@@ -695,7 +716,7 @@ fn coarsening(a: &Args) -> Value {
             }
             let mut acc: Vec<RuleAcc> = rules.iter().map(|_| RuleAcc::default()).collect();
             for (e, m) in members.iter().enumerate() {
-                let tree = edge_tree(&shape, m, e, &mut f);
+                let tree = edge_tree(&shape, m, e, edges, &mut f);
                 for (r, rule) in rules.iter().enumerate() {
                     let c = cover(&tree, *rule, None);
                     let x = &mut acc[r];
@@ -710,24 +731,37 @@ fn coarsening(a: &Args) -> Value {
             let mut s = Scratch::default();
             let mut out = Vec::new();
             for (rule, x) in rules.iter().zip(&acc) {
-                // Deliveries are to edges other than the publisher's. The backend publishes
-                // commands from edge 0 and consumes telemetry there; a device publishes its
-                // telemetry from its own edge. Exact entries only ever reach the edge that wants
-                // the message, so the coarse entries alone decide the false positives.
+                // Commands come from the platform through the admin API (R2 rule 21), not from
+                // an edge, so every edge that gets one counts. Telemetry comes from the device's
+                // own edge, which delivers locally without a lane, so that edge does not count.
+                // Exact entries only reach an edge that wants the message, so the coarse
+                // entries alone decide the false positives.
                 let (mut cmd_fp, mut cmd_del, mut tel_fp, mut tel_del) = (0u64, 0u64, 0u64, 0u64);
+                let mut wants = Vec::new();
                 for j in 0..samples {
                     let d = shape.device(hash2(j, 0x5350) % n);
                     let home = placer.home(d, 0);
                     Shape::command_topic(d, &mut f);
                     x.view.collect(&f, 0, &mut s, &mut out);
-                    let fp = out.iter().filter(|&&e| e != home && e != 0).count() as u64;
+                    let fp = out.iter().filter(|&&e| e != home).count() as u64;
                     cmd_fp += fp;
-                    cmd_del += fp + u64::from(home != 0);
+                    cmd_del += fp + 1;
+                    wants.clear();
+                    wants.push(0);
+                    if d.org < NARROW {
+                        wants.push(narrow_edge(d.org, edges));
+                    }
+                    wants.retain(|&e| e != home);
+                    wants.sort_unstable();
+                    wants.dedup();
                     Shape::telemetry_topic(d, &mut f);
                     x.view.collect(&f, 0, &mut s, &mut out);
-                    let fp = out.iter().filter(|&&e| e != 0 && e != home).count() as u64;
+                    let fp = out
+                        .iter()
+                        .filter(|&&e| e != home && !wants.contains(&e))
+                        .count() as u64;
                     tel_fp += fp;
-                    tel_del += fp + u64::from(home != 0);
+                    tel_del += fp + wants.len() as u64;
                 }
                 let mut examples: Vec<String> = Vec::new();
                 x.view.for_each_entry(|flt, _| {
@@ -765,8 +799,8 @@ fn coarsening(a: &Args) -> Value {
                         hysteresis: false,
                     },
                     Rule {
-                        t: 16,
-                        policy: Policy::Plus,
+                        t: 64,
+                        policy: Policy::Shape,
                         floor: 1,
                         hysteresis: false,
                     },
@@ -774,7 +808,7 @@ fn coarsening(a: &Args) -> Value {
                     let h0 = alloc::now();
                     let mut view = Trie::new();
                     for (e, m) in members.iter().enumerate() {
-                        let tree = edge_tree(&shape, m, e, &mut f);
+                        let tree = edge_tree(&shape, m, e, edges, &mut f);
                         let c = cover(&tree, rule, None);
                         for flt in &c.filters {
                             view.insert(flt, u32::try_from(e).unwrap_or(0));
@@ -791,7 +825,11 @@ fn coarsening(a: &Args) -> Value {
             }
         }
     }
-    json!({ "backend_filter_on_edge_0": BACKEND, "rows": rows })
+    let narrow: Vec<Value> = (0..NARROW)
+        .map(|k| json!({ "filter": narrow_filter(k), "edge_of_100": narrow_edge(k, 100) }))
+        .collect();
+    json!({ "consumer_of_all_telemetry_on_edge_0": BACKEND, "narrow_consumers": narrow,
+        "rows": rows })
 }
 
 // --- churn ---------------------------------------------------------------------------------
@@ -839,7 +877,7 @@ impl Covers<'_> {
         let mut s = String::new();
         Shape::ns_prefix(key.0, key.1, &mut s);
         s.push_str(match self.rule.policy {
-            Policy::Plus => "/+/commands/#",
+            Policy::Plus | Policy::Shape => "/+/commands/#",
             Policy::Hash => "/#",
         });
         s
@@ -1119,7 +1157,7 @@ fn churn_recompute(
     let mut view = Trie::new();
     let mut states: Vec<HashSet<String>> = Vec::new();
     for (e, m) in members.iter().enumerate() {
-        let c = cover(&edge_tree(shape, m, e, &mut f), rule, None);
+        let c = cover(&edge_tree(shape, m, e, placer.edges, &mut f), rule, None);
         for flt in &c.filters {
             view.insert(flt, u32::try_from(e).unwrap_or(0));
         }
@@ -1152,7 +1190,7 @@ fn churn_recompute(
         let mut records: Vec<Record> = Vec::new();
         let mut bytes = 0usize;
         for (e, m) in members.iter().enumerate() {
-            let c = cover(&edge_tree(shape, m, e, &mut f), rule, None);
+            let c = cover(&edge_tree(shape, m, e, placer.edges, &mut f), rule, None);
             let next: HashSet<String> = c.filters.into_iter().collect();
             let e32 = u32::try_from(e).unwrap_or(0);
             for x in states[e].difference(&next) {
@@ -1226,22 +1264,24 @@ fn churn(a: &Args) -> Value {
                 }
             }
         }
-        let rule = Rule {
-            t: 16,
-            policy: Policy::Plus,
-            floor: 1,
-            hysteresis: false,
-        };
-        let r = churn_recompute(&shape, &placer, rule, minutes, per_mille);
-        let row = json!({ "n": n, "edges": edges, "placement": kind, "rule": rule,
-            "churn_per_minute": per_mille as f64 / 1000.0, "result": r });
-        eprintln!(
-            "{}",
-            json!({ "placement": kind, "rule": rule,
-            "records": row["result"]["mean_records_per_minute"],
-            "bytes": row["result"]["mean_bytes_per_minute"] })
-        );
-        rows.push(row);
+        for t in [16, 64] {
+            let rule = Rule {
+                t,
+                policy: Policy::Shape,
+                floor: 1,
+                hysteresis: false,
+            };
+            let r = churn_recompute(&shape, &placer, rule, minutes, per_mille);
+            let row = json!({ "n": n, "edges": edges, "placement": kind, "rule": rule,
+                "churn_per_minute": per_mille as f64 / 1000.0, "result": r });
+            eprintln!(
+                "{}",
+                json!({ "placement": kind, "rule": rule,
+                "records": row["result"]["mean_records_per_minute"],
+                "bytes": row["result"]["mean_bytes_per_minute"] })
+            );
+            rows.push(row);
+        }
     }
     json!({ "rows": rows })
 }
