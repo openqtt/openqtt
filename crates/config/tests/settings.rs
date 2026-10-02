@@ -557,6 +557,35 @@ fn a_file_that_cannot_be_read_or_parsed_is_reported_with_where() {
     assert!(error.to_string().contains("line 2"), "{error}");
 }
 
+#[test]
+fn a_file_that_is_not_toml_is_refused_by_line_and_column_without_repeating_the_line() {
+    for (text, place) in [
+        (
+            "[auth]\npassword = \"hunter2\" trailing\n",
+            "line 2, column 22",
+        ),
+        (
+            "[auth]\n\npassword_bootstrap_file = \"/x\nhunter2\n",
+            "line 4, column 8",
+        ),
+        (
+            "[a\u{e9}uth]]\npassword = \"hunter2\"\n",
+            "line 1, column 8",
+        ),
+    ] {
+        let path = file("syntax.toml", text);
+        let error = load(Some(&path), &[]).unwrap_err();
+        let message = error.to_string();
+        assert!(matches!(error, Error::Syntax { .. }), "{message}");
+        assert!(
+            message.starts_with(&format!("{} is not valid TOML: {place}: ", path.display())),
+            "{message}"
+        );
+        assert!(!message.contains("hunter2"), "{message}");
+        assert_eq!(message.lines().count(), 1, "{message}");
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn a_variable_that_is_not_unicode_is_refused() {

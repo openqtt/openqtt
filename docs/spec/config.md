@@ -100,8 +100,8 @@ No setting's value is a secret. A setting that needs one, a private key or a tok
 file that holds it, and its key ends in `_file`. The file is read when the secret is needed. So a
 secret never appears in the configuration file, in a variable, in the printed settings, or in an
 error about the configuration. The value of an unknown key or variable is never repeated, in
-case it is a secret set by mistake, and a URL carrying a password is refused without repeating
-it.
+case it is a secret set by mistake, a URL carrying a password is refused without repeating it,
+and a file that is not valid TOML is reported by line and column without quoting the line.
 
 ## Checking and printing
 

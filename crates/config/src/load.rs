@@ -247,8 +247,27 @@ fn read_file(path: &Path) -> Result<toml::Table, Error> {
     })?;
     toml::from_str(&text).map_err(|error| Error::Syntax {
         path: path.to_owned(),
-        message: error.to_string().trim_end().to_owned(),
+        message: syntax_message(&text, &error),
     })
+}
+
+/// Where the parser stopped and why, without the line it stopped on: toml's own message shows
+/// that line, and a secret set in the wrong place would be on it.
+fn syntax_message(text: &str, error: &toml::de::Error) -> String {
+    let reason = schema::first_line(error.message());
+    let Some(start) = error.span().map(|span| span.start) else {
+        return reason;
+    };
+    let before = text.get(..start).unwrap_or(text);
+    let line = before.matches('\n').count() + 1;
+    let column = before
+        .rsplit('\n')
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .count()
+        + 1;
+    format!("line {line}, column {column}: {reason}")
 }
 
 /// Checks every key and value of a table from the file against `fields`, adding a problem for
