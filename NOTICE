@@ -1,9 +1,10 @@
-EMQX, highly scalable, highly available distributed MQTT messaging platform for IoT.
-Copyright (c) 2017-2025 EMQ Technologies Co., Ltd. All Rights Reserved.
+OpenQTT
+Copyright 2026 SCADABLE IoT
 
-This product contains code developed at EMQ Technologies Co., Ltd.
-Visit https://www.emqx.come to learn more.
+Portions of this software are derived from EMQX 5.8.9
+(https://github.com/emqx/emqx), Copyright (c) 2017-2025 EMQ Technologies Co.,
+Ltd., licensed under the Apache License, Version 2.0. Files containing such
+portions identify themselves in their header.
 
-OpenQTT is a continuation of the Apache 2.0 source of EMQX 5.8.9, maintained
-by SCADABLE IoT (https://github.com/openqtt/OpenQTT). EMQX is a trademark
-of EMQ Technologies Co., Ltd.; OpenQTT is not affiliated with or endorsed by EMQ.
+EMQX is a trademark of EMQ Technologies Co., Ltd. OpenQTT is not affiliated
+with or endorsed by EMQ.

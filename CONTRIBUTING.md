@@ -4,6 +4,23 @@ You are welcome to submit bugs, issues and fixes on this repository. Everything
 contributed is licensed under the Apache License 2.0; code from EMQX 5.9 or later
 cannot be accepted, because it is not.
 
+Anything that takes behaviour, logic or tests from another project follows the
+porting policy in [ADR 0003](docs/adr/0003-porting-policy.md): implement from the
+MQTT 5.0 specification, cite EMQX by permalink rather than paste it, mark a file
+that translates EMQX logic in its header, and never copy Eclipse Paho test code.
+
+## Before you open a pull request
+
+- **Branch** from `main` as `<issue>/<slug>`, for example `12/codec-properties`.
+  `release/N.x` is the only long-lived exception: `release/1.x` carries the 1.x
+  line, and a fix for 1.x branches from it.
+- **Run `make check`** and get it green. It is what CI runs.
+- **No AI co-author trailers.** Do not add a `Co-authored-by` trailer naming a
+  model or a tool, or a "generated with" footer, to a commit, a pull request or
+  a release note.
+- **No em dashes** in anything a reader sees. `make check` refuses them in
+  Markdown.
+
 ## Commit Message Guidelines
 
 We have very precise rules over how our git commit messages can be formatted. This leads to **more readable messages** that are easy to follow when looking through the **project history**.
@@ -20,24 +37,27 @@ Each commit message consists of a **header**, a **body** and a **footer**. The h
 <footer>
 ```
 
-The **header** with **type** is mandatory. The **scope** of the header is optional. This repository has no predefined scopes. A custom scope can be used for clarity if desired.
+The **header** with **type** is mandatory. The **scope** of the header is optional. This repository has no predefined scopes. A custom scope can be used for clarity if desired; a crate's short name (`codec`, `session`, `edge`) is the usual one.
 
-Any line of the commit message cannot be longer 100 characters! This allows the message to be easier to read on GitHub as well as in various git tools.
+No line of the commit message may be longer than 100 characters. This allows the message to be easier to read on GitHub as well as in various git tools.
 
 The footer should contain a [closing reference to an issue](https://help.github.com/articles/closing-issues-via-commit-messages/) if any.
 
 Example 1:
 
 ```
-feat: add Fuji release compose files
+feat(codec): decode the AUTH packet
 ```
 
+Example 2:
+
 ```
-fix(script): correct run script to use the right ports
+fix(session): send DISCONNECT 0x8E to the old connection on takeover
 
-Previously device services used wrong port numbers. This commit fixes the port numbers to use the latest port numbers.
+Previously the old connection was closed without a reason code, so its client
+could not tell a takeover from a network failure.
 
-Closes: #123, #245, #992
+Closes: #123
 ```
 
 ### Revert
@@ -53,11 +73,11 @@ Must be one of the following:
 - **docs**: Documentation only changes
 - **style**: Formatting, missing semi colons, etc; no production code change
 - **refactor**: Refactoring production code, eg. renaming a variable
-- **chore**: Updating grunt tasks etc; no production code change
+- **chore**: Maintenance that changes no production code
 - **perf**: A code change that improves performance
 - **test**: Adding missing tests, refactoring tests; no production code change
-- **build**: Changes that affect the CI/CD pipeline or build system or external dependencies (example scopes: jenkins, makefile)
-- **ci**: Changes provided by DevOps for CI purposes.
+- **build**: Changes that affect the build system or external dependencies (example scopes: cargo, docker, makefile)
+- **ci**: Changes to the CI workflows.
 - **revert**: Reverts a previous commit.
 
 ### Scope
@@ -81,14 +101,3 @@ Just as in the **subject**, use the imperative, present tense: "change" not "cha
 The footer should contain any information about **Breaking Changes** and is also the place to reference GitHub issues that this commit **Closes**.
 
 **Breaking Changes** should start with the word `BREAKING CHANGE:` with a space or two newlines. The rest of the commit message is then used for this.
-
-## Changelog
-
-Changes affecting EMQX functionality shall be described in a separate markdown file under `changes` directory.
-
-File name pattern: `changes/(ce|ee)/(feat|perf|fix)-<PR-id>.en.md`, where:
-
-- `ce,ee`: Indicates whether given change affects community and enterprise edition (`ce`), or enterprise edition only (`ee`); for any change only one file is needed as enterprise edition absorbs all changes from the community edition automatically. When in doubts, one could consult [documentation](https://www.emqx.io/docs/en/latest/). Enterprise features have a corresponding "Tip" banner, see for example [here](https://www.emqx.io/docs/en/v5.1/data-integration/data-bridge-influxdb.html).
-- `feat|perf|fix`: Whether the change is a new functionality (`feat`), performance improvement (`perf`), or a bug fix (`fix`).
-- `PR-id`: Github pull request id. Since pull request id cannot be known before the PR is actually created, it's common to add change log entry in a separate commit.
-- `en`: ISO 639-1 language code indicating the language the change log entry is written in. Right now we are only accepting entries in English.

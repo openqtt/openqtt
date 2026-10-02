@@ -1,113 +1,79 @@
 # OpenQTT
 
-OpenQTT is a maintained continuation of EMQX 5.8.9 under the Apache License 2.0.
+**For production, use OpenQTT 1.0.x** (branch `release/1.x`, image tags
+`1.0.N`). This branch, `main`, is OpenQTT 2.0: a pre-release rewrite that does
+not run as a broker yet.
 
-EMQX moved to the Business Source License at 5.9 and, from that version on, a
-cluster of more than one node needs a paid license. The Apache 2.0 line, 5.8,
-reached end of life on 28 February 2026. This repository begins where that line
-stopped: the Apache-licensed source of EMQX v5.8.9, upstream commit
-`a8319fe2390169e1f2483e3ec80dd01a6cdb233d`, imported as one commit and tagged
-`emqx-v5.8.9`.
+## What 2.0 is
 
-It is an MQTT 3.1, 3.1.1 and 5.0 broker that clusters, with TLS, WebSocket and
-mutual TLS listeners, a REST API, and an Erlang runtime. Nothing about how it
-speaks MQTT has changed.
+- An MQTT 5.0 broker written in Rust, which clients reach over QUIC.
+- One binary, `openqtt`, with four roles. **edge** holds client connections,
+  **router** holds subscription interest, **log** holds durable state
+  (sessions, queues, retained messages) and **admin** serves the REST API. Each
+  role runs as its own set of pods and scales with what loads it. An
+  all-in-one mode runs every role in one process.
+- Distributed from the start: sessions are sharded by client id, and no
+  cluster-wide structure holds an entry per device.
+- Extended at compile time, through the traits in `openqtt-ext`. Nothing is
+  loaded at runtime.
+- Apache License 2.0.
 
-## What is here, and what is not
+## What it deliberately is not
 
-Everything in this tree is Apache 2.0. Upstream's 5.8.9 tree also carried 59
-directories under `apps/` licensed under the Business Source License 1.1: every
-enterprise bridge and the license, enterprise, file transfer and durable storage
-applications among them. None of them is here, and nothing from EMQX 5.9 onward
-will be, because that code is not Apache. The community build already excluded
-those directories by name, so the broker that comes out of this tree is the one
-`emqx/emqx:5.8.9` was.
+- **Not MQTT 3.1 or 3.1.1.** A CONNECT at any other protocol level gets
+  CONNACK 0x84, unsupported protocol version. See
+  [ADR 0001](docs/adr/0001-mqtt5-only.md).
+- **No TCP, TLS or WebSocket listener yet.** QUIC is the only client
+  transport. Sessions sit behind a transport seam, so an MQTT 5 over TLS/TCP
+  listener can be added later without touching them. See
+  [ADR 0002](docs/adr/0002-quic-only-tcp-seam-reserved.md).
+- No rule engine, no protocol gateways, no runtime plugins and no dashboard
+  web UI.
 
-There is no dashboard web UI. Upstream downloaded it at build time as a prebuilt
-zip from a repository that carries no license, so it cannot be part of an Apache
-distribution. The dashboard application itself is Apache and is untouched: the
-REST API on port 18083 is complete, and `openqtt ctl` works. Requests for `/`
-answer 404.
+## Status
 
-## What maintained means here
+| Milestone | Scope | Status |
+| --- | --- | --- |
+| M1 | Rust workspace and CI; the complete MQTT 5 codec, fuzzed | in progress |
+| M2 | Conformance and design reports, specifications, test tooling, measured spikes | not started |
+| M3 | Distributed walking skeleton: QoS 0 and 1, retained messages, takeover, chart 2.0.0; `v2.0.0-alpha.1` | not started |
+| M4 | Persistent sessions, QoS 2, wills, drain, replication | not started |
+| M5 | The rest of MQTT 5, security and operations; `v2.0.0-beta.1` | not started |
+| M6 | QUIC in production, the client library, load and soak tests; `v2.0.0-rc.1` | not started |
+| M7 | Migration from 1.x; `v2.0.0` | not started |
 
-- Rebuild against a current Erlang/OTP and a current base image.
-- Bump dependencies, and take security fixes in them.
-- Run upstream's test suite.
-- Fix what breaks in the above.
+## Building from source
 
-It does not mean feature work, and it does not mean backports from EMQX 5.9 or
-later.
+`rust-toolchain.toml` pins the compiler, and `rustup` installs it on first
+use. The gate needs two cargo tools:
 
-## Running it
-
-Images are published to `ghcr.io/openqtt/openqtt` for `linux/amd64` and
-`linux/arm64`, and mirrored to `docker.io/openqtt/openqtt`. The Helm chart goes
-to `oci://ghcr.io/openqtt/charts/openqtt`. All of it comes from a tagged release.
-
-Prefer the GHCR reference. Docker Hub rate limits anonymous pulls in a way GHCR
-does not, and a Kubernetes cluster pulls again on every scale up and node
-replacement; the mirror exists because people search Docker Hub. Deploy by the
-digest recorded in the release notes rather than by tag. The chart's README
-covers the value you must set before installing it.
-
-```
-docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
+```console
+cargo install --locked cargo-nextest cargo-deny
+make check
 ```
 
-The version the broker reports is the EMQX version inside, `5.8.9`. OpenQTT's
-own version is the image tag and the chart version.
+`make check` is what CI runs: formatting, clippy, the tests, the crate
+layering rules, cargo-deny, and a refusal of em dashes in Markdown. The image:
 
-## Upgrading from EMQX
+```console
+docker build -f deploy/docker/Dockerfile -t openqtt:dev .
+```
 
-This is a clean break. Nothing reads the old names, and nothing warns you: a
-node started with an EMQX environment comes up on its config file's defaults
-instead, which is a different cluster with a different cookie. Update the
-configuration before you upgrade.
+## Relation to EMQX
 
-| Was | Is |
-| --- | --- |
-| `emqx`, `emqx ctl` | `openqtt`, `openqtt ctl` |
-| `EMQX_*` environment variables | `OPENQTT_*` |
-| `/opt/emqx` in the image | `/opt/openqtt` |
-| chart value `emqxConfig` | `openqttConfig` |
+OpenQTT 1.x is the source of EMQX 5.8.9, where EMQX's last Apache 2.0 line
+stopped, with the product surface renamed. It is maintained on `release/1.x`:
+rebuilds, dependency bumps and security fixes, no features. Tag `emqx-v5.8.9`
+marks the import and tag `v1.0.0` the first OpenQTT release.
 
-- **The binary.** `bin/emqx` is `bin/openqtt`, and `emqx_ctl`,
-  `emqx_cluster_rescue` and `emqx_fw` follow the same rule. The release is named
-  `openqtt`, so a wrapper that calls the old path finds nothing.
-- **The environment.** The hocon override prefix is `OPENQTT_`. Every variable
-  moves with it: `OPENQTT_NODE__COOKIE`, `OPENQTT_NODE__NAME`,
-  `OPENQTT_CLUSTER__DISCOVERY_STRATEGY`, `OPENQTT_DASHBOARD__DEFAULT_PASSWORD`
-  and the rest. There is no `EMQX_` fallback, so a stale variable is not an
-  error, it is silence.
-- **The container.** The image installs to `/opt/openqtt` and runs as unix user
-  `openqtt`. uid and gid stay 1000, so an existing volume's ownership still
-  matches, but a mount of `/opt/emqx/data` now mounts an empty directory and the
-  node starts with no state.
-- **The chart.** `emqxConfig` is `openqttConfig` and every key under it takes
-  the `OPENQTT_` prefix. Helm does not reject unknown top level values, so a
-  values file that still says `emqxConfig` is ignored rather than refused. The
-  data volume is `openqtt-data`, which changes PVC names: persisted state does
-  not follow the upgrade, so back it up or plan on losing it.
-
-What did not change: the config keys (`node.name`, `listeners.tcp.default.bind`
-and the rest), the REST API and its `/api/v5` paths, `etc/emqx.conf`, the MQTT
-wire behaviour, and the Erlang module and application names.
-
-## Building it
-
-`deploy/docker/Dockerfile` builds the community profile from this tree using a
-mirror of upstream's builder image under this organisation. `.tool-versions`
-names the Erlang and Elixir versions. Pull requests build the image without
-pushing it; a `v*` tag builds, publishes, and creates the release.
-
-## Trademarks
+2.0 is a new codebase. It is written from the OASIS MQTT 5.0 specification.
+Where EMQX's behaviour informs a decision, it is cited by permalink rather than
+copied, and nothing is taken from EMQX 5.9 or later, which is not Apache 2.0.
+[ADR 0003](docs/adr/0003-porting-policy.md) is the policy, and a file that does
+carry derived portions says so in its header.
 
 EMQX is a trademark of EMQ Technologies Co., Ltd. OpenQTT is not affiliated
-with, sponsored by, or endorsed by EMQ. The product, the binary and the
-environment variables are named for OpenQTT. The Erlang modules, applications
-and config keys are still `emqx`, because renaming them would change nothing
-about the software and would make upstream fixes harder to apply.
+with or endorsed by EMQ.
 
 ## License
 
