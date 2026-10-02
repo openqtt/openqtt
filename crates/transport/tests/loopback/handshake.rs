@@ -193,3 +193,23 @@ async fn a_client_that_stalls_its_handshake_is_dropped_in_time() {
     assert!(started.elapsed() < Duration::from_secs(2));
     client.abort();
 }
+
+#[tokio::test]
+async fn only_quic_version_1_is_spoken() {
+    let pki = TestPki::new("Handshake CA").unwrap();
+    let endpoint = bind(config(&pki));
+    let target = target(&endpoint, &pki);
+    // A client of draft 29, which quinn would otherwise accept too.
+    let mut config = target.quic_config().unwrap();
+    config.version(0xff00_001d);
+    let client =
+        quinn::Endpoint::client(std::net::SocketAddr::from((Ipv4Addr::LOCALHOST, 0))).unwrap();
+    let connecting = client
+        .connect_with(config, endpoint.local_address(), "localhost")
+        .unwrap();
+    let error = tokio::time::timeout(crate::WAIT, connecting)
+        .await
+        .expect("refused at once, by version negotiation")
+        .unwrap_err();
+    assert_eq!(error, quinn::ConnectionError::VersionMismatch);
+}

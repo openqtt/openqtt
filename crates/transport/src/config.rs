@@ -28,6 +28,9 @@ const DEFAULT_MAX_PACKET_SIZE: NonZeroU32 = match NonZeroU32::new(1 << 20) {
     None => NonZeroU32::MIN,
 };
 
+/// QUIC version 1 (RFC 9000), the one version MQTT over QUIC runs on for now.
+const QUIC_V1: u32 = 0x0000_0001;
+
 /// How long a handshake may take by default: msquic's, and so EMQX's, handshake idle timeout.
 const DEFAULT_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -254,6 +257,11 @@ impl ListenerConfig {
     /// with `SO_REUSEPORT`. Linux then spreads clients across them by a hash of their addresses;
     /// macOS and the BSDs deliver every datagram to one of them, so the others stay idle there.
     /// Windows has no `SO_REUSEPORT`, and refuses more than one.
+    ///
+    /// The hash knows nothing of connections: once a client's address changes, its packets may
+    /// reach another endpoint, which drops them, and the connection does not survive the move.
+    /// Steering by the endpoint index its connection IDs carry takes a reuseport BPF program,
+    /// which nothing installs yet.
     #[must_use]
     pub fn endpoints(mut self, endpoints: NonZeroU8) -> Self {
         self.endpoints = endpoints;
@@ -447,11 +455,13 @@ impl ListenerConfig {
         Ok(server)
     }
 
-    /// The configuration of endpoint `index`: its connection IDs name the node and the index
-    /// when a node is set (`CidRoute`), and its stateless reset key is its own, so that one
-    /// endpoint cannot reset another's connections.
+    /// The configuration of endpoint `index`: QUIC version 1 only, where quinn would also take
+    /// the drafts before it (docs/spec/mqtt-over-quic.md, section 1); connection IDs that name
+    /// the node and the index when a node is set (`CidRoute`); and a stateless reset key of its
+    /// own, so that one endpoint cannot reset another's connections.
     pub fn endpoint_config(&self, index: u8) -> quinn::EndpointConfig {
         let mut endpoint = quinn::EndpointConfig::default();
+        endpoint.supported_versions(vec![QUIC_V1]);
         if let Some(node) = self.node {
             endpoint.cid_generator(move || Box::new(NodeConnectionIds::new(node, index)));
         }

@@ -58,8 +58,9 @@ pub enum StreamEnd {
 #[non_exhaustive]
 pub enum Event {
     /// The handshake is complete, so nothing the client sends from now on can be a replay. It
-    /// comes once, and nothing the server queues leaves before it: CONNACK must not be sent
-    /// earlier (docs/spec/mqtt-over-quic.md, section 4).
+    /// comes once, first unless 0-RTT data came before it, and nothing the server queues leaves
+    /// before the handshake completes: CONNACK must not be sent earlier
+    /// (docs/spec/mqtt-over-quic.md, section 4).
     ///
     /// Packets delivered before it arrived in 0-RTT data, which an attacker can replay, so the
     /// session acts on no PUBLISH, SUBSCRIBE or UNSUBSCRIBE among them until it comes. Whatever
@@ -79,7 +80,9 @@ pub enum Event {
     /// [`Finished`](StreamEnd::Finished) or [`Reset`](StreamEnd::Reset), after which no packet
     /// arrives on the stream, and the server's with [`Stopped`](StreamEnd::Stopped), after which
     /// nothing can be sent on it. Either end of the control stream ends the MQTT connection
-    /// (section 2.1); section 2.4 says what follows the end of a data stream.
+    /// (section 2.1); section 2.4 says what follows the end of a data stream, which the session
+    /// then [`finish`](MqttConnection::finish)es or [`reset`](MqttConnection::reset)s so that the
+    /// connection lets it go.
     StreamEnded {
         /// The stream.
         stream: StreamTag,
@@ -96,8 +99,8 @@ pub enum Event {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Peer {
-    /// The address the client connected from: its own, since nothing stands between it and the
-    /// listener that rewrites it (R2 rule 27).
+    /// The address the client connected from, its own: QUIC carries no proxy header, and a
+    /// passthrough load balancer leaves the address as it is (R2 rule 27).
     pub address: SocketAddr,
     /// The certificate chain the client presented, leaf first, verified against the listener's
     /// client CAs and nothing else; empty when it presented none. On a resumed TLS session it
@@ -218,7 +221,7 @@ pub trait MqttConnection: Send {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<Event, Error>>;
 
     /// Queues `packet` on `stream`, encoded at once. It goes out after everything queued on that
-    /// stream before it, and never before [`Event::HandshakeComplete`].
+    /// stream before it, and never before the handshake is complete.
     ///
     /// The caller holds the packet to the client's Maximum Packet Size and Topic Alias Maximum;
     /// the connection holds it to what `stream` may carry.
