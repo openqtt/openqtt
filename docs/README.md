@@ -34,4 +34,5 @@ Normative specifications go in `spec/`.
 | Specification | Status |
 | --- | --- |
 | [`spec/mqtt-over-quic.md`](spec/mqtt-over-quic.md): MQTT 5 over QUIC, compatible with EMQX and NanoMQ | draft |
+| [`spec/config.md`](spec/config.md): every setting, the configuration file and the `OPENQTT_` variables | draft |
 | `spec/wire.md`: the protocol between roles | to be written |

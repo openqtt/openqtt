@@ -58,6 +58,12 @@ bytes = "1.12"
 # must never panic the decoder. Without the fork and timeout features, which run each case in
 # a child process and bring tempfile and rusty-fork for it.
 proptest = { version = "1.11", default-features = false, features = ["std"] }
+# The settings types derive their reading from TOML and their writing back to it. Never in the
+# codec, which stays free of any serialization framework.
+serde = { version = "1.0.229", features = ["derive"] }
+# The configuration file's format. Without `preserve_order`, tables keep their keys sorted, so
+# errors about a file come out in the same order every time.
+toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
