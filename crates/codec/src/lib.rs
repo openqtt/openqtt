@@ -12,8 +12,17 @@
 
 mod error;
 mod primitives;
+mod property;
+mod reason;
+mod types;
 
 pub use error::Error;
 pub use primitives::{
     MAX_STRING_LEN, MAX_VARIABLE_BYTE_INTEGER, disallowed_code_point, is_disallowed_code_point,
 };
+pub use property::{DataType, PropertyContext, PropertyId};
+pub use reason::{
+    AuthReasonCode, ConnectReasonCode, DisconnectReasonCode, PubAckReasonCode, PubCompReasonCode,
+    PubRecReasonCode, PubRelReasonCode, ReasonCode, SubAckReasonCode, UnsubAckReasonCode,
+};
+pub use types::{PacketId, PacketType, QoS, Sender, SubscriptionId};
