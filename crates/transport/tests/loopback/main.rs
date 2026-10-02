@@ -4,6 +4,7 @@
 
 mod backpressure;
 mod control;
+mod early_data;
 mod handshake;
 mod streams;
 
