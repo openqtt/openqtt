@@ -127,6 +127,10 @@ jobs:
   # does not, and a Kubernetes cluster re-pulls on every scale-up and node
   # replacement. Docker Hub is here because people search it; the chart default
   # and the docs point at GHCR.
+  #
+  # THIS IS THE 1.x LINE, SO IT DOES NOT MOVE `latest`. The 2.0 line on main
+  # owns docker.io/openqtt/openqtt:latest; a 1.x patch release tagging it would
+  # pull everyone on `latest` back onto 1.x.
   manifest:
     needs: [version, image]
     runs-on: ubuntu-latest
@@ -162,7 +166,6 @@ jobs:
             $SOURCES
           docker buildx imagetools create \
             --tag "docker.io/openqtt/openqtt:${VERSION}" \
-            --tag "docker.io/openqtt/openqtt:latest" \
             $SOURCES
       - id: digest
         name: The digest deployments pin

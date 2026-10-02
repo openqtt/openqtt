@@ -1,11 +1,12 @@
 # Every pull request builds the community image the same way a release does,
 # without pushing it. Thirty to forty minutes on a standard runner: EMQX is a
 # large Erlang release and the builder image alone is several gigabytes.
+# release/1.x is the 1.x maintenance line; its pull requests build too.
 name: build
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/1.x]
 
 permissions:
   contents: read
