@@ -632,6 +632,11 @@ version = "2.0.0-alpha.0"
 [[package]]
 name = "openqtt-ext"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "bytes",
+ "openqtt-core",
+ "thiserror",
+]
 
 [[package]]
 name = "openqtt-log"
