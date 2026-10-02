@@ -74,6 +74,20 @@ serde_json = "1.0.151"
 # The differential harness reads its list of intended divergences from TOML. Without
 # `display`, since nothing writes TOML.
 toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
+# The topic index's two tables, the level interner and the child table, store a 32-bit id and
+# compare against text and nodes kept elsewhere, which only hashbrown's HashTable allows. That
+# is what keeps a filter near 150 bytes (report R6). Without its default hasher: foldhash is
+# named below.
+hashbrown = { version = "0.17", default-features = false, features = ["inline-more"] }
+# The hasher for those tables, seeded at random per index, so that levels chosen to collide in
+# one process do not collide in another. Fast on short keys, which topic levels are.
+foldhash = "0.2"
+# Destination sets above 64 entries, as R3 specifies. Without std, which adds only
+# serialization and two dependencies for it.
+roaring = { version = "0.11", default-features = false }
+# xxh3-64, which places a session on its log partition (openqtt-core's partition_of, R3). Only
+# that hash: the default features add four others and a random seed source.
+twox-hash = { version = "2.1", default-features = false, features = ["xxhash3_64"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

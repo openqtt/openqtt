@@ -318,6 +318,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 
 [[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -611,6 +617,13 @@ dependencies = [
 [[package]]
 name = "openqtt-core"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "bytes",
+ "openqtt-topic",
+ "proptest",
+ "thiserror",
+ "twox-hash",
+]
 
 [[package]]
 name = "openqtt-edge"
@@ -658,6 +671,13 @@ dependencies = [
 [[package]]
 name = "openqtt-topic"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "foldhash",
+ "hashbrown",
+ "proptest",
+ "roaring",
+ "thiserror",
+]
 
 [[package]]
 name = "openqtt-transport"
@@ -914,6 +934,12 @@ dependencies = [
  "untrusted 0.9.0",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "roaring"
+version = "0.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18bd8a37d17a58532776dcdf6041ce64929adca78e8489d5cacbafe99229d3e1"
 
 [[package]]
 name = "rustc-hash"
@@ -1263,6 +1289,12 @@ dependencies = [
  "tracing",
  "tracing-core",
 ]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5283634e518fe9e82c7b20520bb4bc209009fd16c82077c802f8111ecbb0117a"
 
 [[package]]
 name = "unarray"
