@@ -29,8 +29,9 @@ use crate::{Error, Session};
 /// DISCONNECT.
 const LINGER: Duration = Duration::from_secs(1);
 
-/// How many bytes may wait to be written before publications wait too. A server that stops
-/// reading holds the client to about this much, besides what callers have in hand.
+/// How many bytes may wait to be written before publications wait too, and how many bytes of
+/// acknowledgements before the client stops reading. A server that stops reading holds the
+/// client to about twice this much, besides what callers have in hand.
 pub(crate) const WRITE_LIMIT: usize = 64 * 1024;
 
 /// How many events a round hands to the application at most.
@@ -159,8 +160,9 @@ enum Stop {
 /// The task that owns an open connection.
 ///
 /// It never waits on a write inside a handler: handlers encode into `write_buf`, and the
-/// serving loop writes it out while it goes on reading, taking calls and keeping time, so a
-/// server that stops reading cannot stop the client from noticing.
+/// serving loop writes it out while it goes on taking calls, keeping time and reading, until
+/// the acknowledgements the server leaves unread reach [`WRITE_LIMIT`], so a server that stops
+/// reading can neither stop the client from noticing nor make it buffer without limit.
 pub(crate) struct Driver {
     reader: Box<dyn AsyncRead + Send + Unpin>,
     writer: Box<dyn AsyncWrite + Send + Unpin>,
@@ -169,6 +171,14 @@ pub(crate) struct Driver {
     read_buf: BytesMut,
     /// Encoded packets waiting to be written, in order.
     write_buf: BytesMut,
+    /// How many bytes the client has written, which places what `write_buf` holds in the
+    /// stream.
+    written: u64,
+    /// The acknowledgements of the server's packets that wait in `write_buf`, in runs: where
+    /// each run ends in the stream, and how many of its bytes are still to go.
+    acks: VecDeque<(u64, usize)>,
+    /// How many bytes of acknowledgements wait to be written, every run together.
+    ack_bytes: usize,
     session: Session,
     negotiated: Negotiated,
     /// How many outbound messages hold a slot of the server's Receive Maximum.
@@ -235,6 +245,9 @@ impl Driver {
             decoder,
             read_buf,
             write_buf: BytesMut::new(),
+            written: 0,
+            acks: VecDeque::new(),
+            ack_bytes: 0,
             session,
             negotiated,
             in_flight: 0,
@@ -400,14 +413,14 @@ impl Driver {
         progressed |= self.deliver_now();
         self.track_pause();
 
-        // Reads, unless events still wait for the application: first the packets that arrived
-        // while it was behind, then whatever the server has sent since.
-        if self.outbox.is_empty() {
+        // Reads, while the client reads at all: first the packets that arrived while it did
+        // not, then whatever the server has sent since.
+        if self.reading() {
             let buffered = self.read_buf.len();
             self.decode_buffered()?;
             progressed |= self.read_buf.len() != buffered;
         }
-        if self.outbox.is_empty() {
+        if self.reading() {
             match self.read_now().await {
                 Some(Ok(0)) => {
                     return Err(Stop::Lost("the server closed the control stream".into()));
@@ -473,6 +486,7 @@ impl Driver {
     async fn wait(&mut self) -> Result<(), Stop> {
         let ping_at = self.ping_deadline();
         let pending = !self.outbox.is_empty();
+        let reading = self.reading();
         let writing = !self.write_buf.is_empty();
         let taking = self.publications_open && self.queued.len() < QUEUE_LIMIT;
         let waiting = !self.queued.is_empty();
@@ -523,7 +537,7 @@ impl Driver {
                 Ok(count) => self.wrote(count),
                 Err(error) => return Err(Stop::Lost(error.to_string())),
             },
-            read = self.reader.read_buf(&mut self.read_buf), if !pending => match read {
+            read = self.reader.read_buf(&mut self.read_buf), if reading => match read {
                 Ok(0) => return Err(Stop::Lost("the server closed the control stream".into())),
                 Ok(_) => self.decode_buffered()?,
                 Err(error) => return Err(Stop::Lost(error.to_string())),
@@ -589,8 +603,31 @@ impl Driver {
     /// `count` bytes of the write buffer went out.
     fn wrote(&mut self, count: usize) {
         self.write_buf.advance(count);
+        self.written += count as u64;
+        // What went of the acknowledgements, oldest run first.
+        while let Some((end, left)) = self.acks.front_mut() {
+            let to_go = usize::try_from(end.saturating_sub(self.written))
+                .unwrap_or(usize::MAX)
+                .min(*left);
+            self.ack_bytes -= *left - to_go;
+            if to_go > 0 {
+                *left = to_go;
+                break;
+            }
+            self.acks.pop_front();
+        }
         self.last_sent = Instant::now();
         self.pump();
+    }
+
+    /// Whether the client reads from the server: not while events wait for the application,
+    /// and not while the acknowledgements of what it read before wait to be written past
+    /// [`WRITE_LIMIT`], so that a server that stops reading cannot make the client buffer
+    /// without limit. Only an application that falls behind pauses the PINGRESP deadline
+    /// ([`track_pause`](Self::track_pause)): a server that does not read is to blame for what
+    /// it is not heard saying meanwhile.
+    fn reading(&self) -> bool {
+        self.outbox.is_empty() && self.ack_bytes < WRITE_LIMIT
     }
 
     /// Queues an event for the application, unless it stopped listening.
@@ -865,6 +902,25 @@ impl Driver {
             .map_err(|error| Stop::Lost(format!("cannot send {}: {error}", packet.packet_type())))
     }
 
+    /// Queues the acknowledgement of a packet the server sent, counted until it is written
+    /// against what the client reads ([`reading`](Self::reading)).
+    fn acknowledge(&mut self, packet: &Packet) -> Result<(), Stop> {
+        let before = self.write_buf.len();
+        self.send(packet)?;
+        let len = self.write_buf.len() - before;
+        let end = self.written + self.write_buf.len() as u64;
+        match self.acks.back_mut() {
+            // Right after the previous one, as most are: the same run.
+            Some((last, left)) if *last == end - len as u64 => {
+                *last = end;
+                *left += len;
+            }
+            _ => self.acks.push_back((end, len)),
+        }
+        self.ack_bytes += len;
+        Ok(())
+    }
+
     /// Encodes a PUBLISH, checking its Topic Alias against what this connection mapped, and
     /// returns the copy to keep in the session: with the topic written out and no alias, since
     /// no alias outlives its connection ([MQTT-3.3.2-7]).
@@ -1006,11 +1062,13 @@ impl Driver {
         self.pump();
     }
 
-    /// Handles the whole packets in the read buffer, until one of them leaves an event for
-    /// the application: what follows waits until the application has taken it, so a slow
-    /// application holds back the acknowledgements of what it has not yet been given room for.
+    /// Handles the whole packets in the read buffer while the client reads
+    /// ([`reading`](Self::reading)): until one of them leaves an event for the application,
+    /// so that a slow application holds back the acknowledgements of what it has not yet been
+    /// given room for, or until the acknowledgements waiting to be written reach
+    /// [`WRITE_LIMIT`].
     fn decode_buffered(&mut self) -> Result<(), Stop> {
-        while self.outbox.is_empty() {
+        while self.reading() {
             match self.decoder.decode(&mut self.read_buf) {
                 Ok(Some(packet)) => self.on_packet(packet)?,
                 Ok(None) => return Ok(()),
@@ -1056,7 +1114,7 @@ impl Driver {
                 } else {
                     PubCompReasonCode::PacketIdentifierNotFound
                 };
-                self.send(&Packet::PubComp(PubComp {
+                self.acknowledge(&Packet::PubComp(PubComp {
                     reason_code,
                     ..PubComp::new(pubrel.packet_id)
                 }))
@@ -1138,7 +1196,7 @@ impl Driver {
                 // Acknowledged whether or not the application gets to it ([MQTT-4.5.0-2]),
                 // in the order the messages arrived ([MQTT-4.6.0-2]).
                 self.emit(Event::Message(publish));
-                self.send(&Packet::PubAck(PubAck::new(id)))?;
+                self.acknowledge(&Packet::PubAck(PubAck::new(id)))?;
             }
             (QoS::ExactlyOnce, Some(id)) => {
                 if !self.inbound_here.contains(&id.get()) {
@@ -1155,7 +1213,7 @@ impl Driver {
                 }
                 // A repeat before PUBREL gets PUBREC again and is not delivered twice
                 // ([MQTT-4.6.0-3] keeps the order).
-                self.send(&Packet::PubRec(PubRec::new(id)))?;
+                self.acknowledge(&Packet::PubRec(PubRec::new(id)))?;
             }
             // The codec gives every QoS 1 and 2 PUBLISH its identifier.
             (_, None) => {}
@@ -1185,7 +1243,7 @@ impl Driver {
     fn on_pubrec(&mut self, pubrec: PubRec) -> Result<(), Stop> {
         let id = pubrec.packet_id;
         let Some(index) = self.session.position(id) else {
-            return self.send(&Packet::PubRel(PubRel {
+            return self.acknowledge(&Packet::PubRel(PubRel {
                 reason_code: PubRelReasonCode::PacketIdentifierNotFound,
                 ..PubRel::new(id)
             }));
@@ -1193,7 +1251,7 @@ impl Driver {
         match self.session.outbound[index].stage {
             Stage::Receipt => {}
             // A repeated PUBREC: the PUBREL may not have arrived.
-            Stage::Completion => return self.send(&Packet::PubRel(PubRel::new(id))),
+            Stage::Completion => return self.acknowledge(&Packet::PubRel(PubRel::new(id))),
             Stage::Acknowledgement => return Ok(()),
         }
         if pubrec.reason_code.is_error() {
@@ -1211,7 +1269,7 @@ impl Driver {
         if let Some(Reply::Publish { pubrec: kept, .. }) = self.replies.get_mut(&id.get()) {
             *kept = Some(pubrec);
         }
-        self.send(&Packet::PubRel(PubRel::new(id)))
+        self.acknowledge(&Packet::PubRel(PubRel::new(id)))
     }
 
     /// PUBCOMP, the end of a QoS 2 exchange.

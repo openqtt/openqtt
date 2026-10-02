@@ -21,7 +21,9 @@
 //! - Packet Identifiers: taken from those not in use, scoped to the session ([MQTT-2.2.1-3]).
 //! - Acknowledgements: every PUBLISH from the server gets the PUBACK or PUBREC its QoS calls
 //!   for, in arrival order, and every PUBREL its PUBCOMP ([MQTT-4.5.0-2], [MQTT-4.6.0-2],
-//!   [MQTT-4.6.0-3]). A QoS 2 message repeated before its PUBREL is not delivered twice.
+//!   [MQTT-4.6.0-3]). A QoS 2 message repeated before its PUBREL is not delivered twice. While
+//!   64 KiB of acknowledgements wait for a server that does not read them, the client reads
+//!   nothing more from it, and a PINGREQ it leaves unanswered still ends the connection.
 //! - Flow control: QoS 1 and 2 messages wait for a free slot of the server's Receive Maximum
 //!   ([MQTT-3.3.4-7]); everything else goes at once ([MQTT-3.3.4-8]).
 //! - Limits the server announced in CONNACK: Maximum QoS, Retain Available, Maximum Packet Size

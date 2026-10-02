@@ -1332,16 +1332,19 @@ async fn publications_wait_for_room_to_be_written() {
     assert_eq!(second.await.unwrap().unwrap(), Published::AtMostOnce);
 }
 
-/// A server that never stops sending: CONNACK, then QoS 0 PUBLISH packets for as long as the
-/// client reads. It is ready whenever it is polled within the task's budget, as a fast link
-/// with a backlog is, or, with `coop` off, whenever it is polled at all, as a link whose data
-/// is always there before the task's budget runs out.
+/// A server that never stops sending: CONNACK, then one packet over and over, a QoS 0 PUBLISH
+/// unless [`Flood::of`] says otherwise, for as long as the client reads. It is ready whenever
+/// it is polled within the task's budget, as a fast link with a backlog is, or, with `coop`
+/// off, whenever it is polled at all, as a link whose data is always there before the task's
+/// budget runs out.
 struct Flood {
     connack: Vec<u8>,
     sent: usize,
-    publish: Vec<u8>,
+    packet: Vec<u8>,
     offset: usize,
     coop: bool,
+    /// How many bytes of the flood the client has read.
+    handed: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Flood {
@@ -1350,24 +1353,29 @@ impl Flood {
     }
 
     fn with_coop(coop: bool) -> Self {
+        let publish = Publish {
+            topic: "t".into(),
+            payload: Bytes::from_static(b"x"),
+            ..Publish::default()
+        };
+        Self::of(&Packet::Publish(publish), coop)
+    }
+
+    /// A flood of `packet`, over and over.
+    fn of(packet: &Packet, coop: bool) -> Self {
         let mut connack = BytesMut::new();
         Packet::from(ConnAck::default())
             .encode(&mut connack)
             .unwrap();
-        let mut publish = BytesMut::new();
-        Packet::Publish(Publish {
-            topic: "t".into(),
-            payload: Bytes::from_static(b"x"),
-            ..Publish::default()
-        })
-        .encode(&mut publish)
-        .unwrap();
+        let mut encoded = BytesMut::new();
+        packet.encode(&mut encoded).unwrap();
         Self {
             connack: connack.to_vec(),
             sent: 0,
-            publish: publish.to_vec(),
+            packet: encoded.to_vec(),
             offset: 0,
             coop,
+            handed: std::sync::Arc::default(),
         }
     }
 }
@@ -1390,10 +1398,12 @@ impl tokio::io::AsyncRead for Flood {
             this.sent += count;
         } else {
             while buf.remaining() > 0 {
-                let rest = &this.publish[this.offset..];
+                let rest = &this.packet[this.offset..];
                 let count = buf.remaining().min(rest.len());
                 buf.put_slice(&rest[..count]);
-                this.offset = (this.offset + count) % this.publish.len();
+                this.offset = (this.offset + count) % this.packet.len();
+                this.handed
+                    .fetch_add(count, std::sync::atomic::Ordering::SeqCst);
             }
         }
         if let Some(coop) = coop {
@@ -2008,4 +2018,187 @@ async fn a_pingreq_left_unanswered_ends_the_connection_under_a_flood_the_applica
         .count();
     assert_eq!(pings, 1);
     assert!(client.is_closed());
+}
+
+/// A server that takes the CONNECT and reads nothing after it.
+#[derive(Default)]
+struct Deaf {
+    connected: bool,
+}
+
+impl tokio::io::AsyncWrite for Deaf {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        if this.connected {
+            return std::task::Poll::Pending;
+        }
+        this.connected = true;
+        std::task::Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// A server that floods the client with QoS 1 messages and never reads the acknowledgements.
+struct Unheard;
+
+impl Transport for Unheard {
+    fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
+        let publish = Publish {
+            packet_id: Some(pid(1)),
+            ..qos1("t", "x")
+        };
+        let flood = Flood::of(&Packet::Publish(publish), false);
+        Box::pin(async move { Ok(Link::new(flood, Deaf::default(), Unclosable)) })
+    }
+}
+
+/// Takes every event as it comes, counting the messages, and returns how the connection closed
+/// and when.
+fn take_everything(
+    mut events: Events,
+    messages: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+) -> tokio::task::JoinHandle<Option<(CloseReason, Instant)>> {
+    tokio::spawn(async move {
+        while let Some(event) = events.recv().await {
+            match event {
+                Event::Message(_) => {
+                    messages.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+                Event::Closed(reason) => return Some((reason, Instant::now())),
+                _ => {}
+            }
+        }
+        None
+    })
+}
+
+/// Lets the client run, on a clock standing still, until `count`, of the messages the
+/// application took or of the bytes the client read, has not moved for a while, and returns it.
+/// Past `most`, the client is reading without limit.
+async fn until_reading_stops(count: &std::sync::atomic::AtomicUsize, most: usize) -> usize {
+    let mut seen = count.load(std::sync::atomic::Ordering::SeqCst);
+    let mut quiet = 0;
+    while quiet < 100 {
+        tokio::task::yield_now().await;
+        let now = count.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            now <= most,
+            "the client kept reading what it could not acknowledge: {now} so far"
+        );
+        if now == seen {
+            quiet += 1;
+        } else {
+            (seen, quiet) = (now, 0);
+        }
+    }
+    seen
+}
+
+/// How many bytes `packet` takes on the wire.
+fn encoded(packet: &Packet) -> usize {
+    let mut bytes = BytesMut::new();
+    packet.encode(&mut bytes).unwrap();
+    bytes.len()
+}
+
+/// How many PUBACK packets fill the write limit.
+fn pubacks_to_the_write_limit() -> usize {
+    crate::driver::WRITE_LIMIT.div_ceil(encoded(&Packet::PubAck(PubAck::new(pid(1)))))
+}
+
+#[tokio::test(start_paused = true)]
+async fn acknowledgements_the_server_does_not_read_stop_the_reading_at_the_write_limit() {
+    let (_client, events) = Client::connect(&Unheard, ConnectOptions::new("c").keep_alive(0))
+        .await
+        .unwrap();
+    let messages = std::sync::Arc::default();
+    let _closed = take_everything(events, std::sync::Arc::clone(&messages));
+    // Every message read leaves a PUBACK to write, which the server never takes: the client
+    // reads until those fill the write limit, and then waits for the server to read.
+    let pubacks = pubacks_to_the_write_limit();
+    assert_eq!(until_reading_stops(&messages, 2 * pubacks).await, pubacks);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_server_that_reads_no_acknowledgements_is_given_up_at_the_ping_timeout() {
+    let (client, events) = Client::connect(&Unheard, ConnectOptions::new("c").keep_alive(10))
+        .await
+        .unwrap();
+    let start = Instant::now();
+    let messages = std::sync::Arc::default();
+    let closed = take_everything(events, std::sync::Arc::clone(&messages));
+    // The client stops reading before the clock moves. That is the server's doing, so the
+    // answer to the PINGREQ is timed all along: the PINGREQ is due at the Keep Alive, never
+    // read either, and the connection lost a ping timeout, the Keep Alive too, later.
+    let pubacks = pubacks_to_the_write_limit();
+    assert_eq!(until_reading_stops(&messages, 2 * pubacks).await, pubacks);
+    while !closed.is_finished() {
+        assert!(
+            start.elapsed() < Duration::from_secs(60),
+            "the connection outlived its unanswered PINGREQ"
+        );
+        tokio::time::advance(Duration::from_millis(100)).await;
+        tokio::task::yield_now().await;
+    }
+    let (reason, at) = closed.await.unwrap().expect("the connection closed");
+    assert!(
+        matches!(&reason, CloseReason::Lost(detail) if detail.contains("PINGREQ")),
+        "{reason:?}"
+    );
+    let at = at - start;
+    assert!(
+        (Duration::from_secs(20)..Duration::from_secs(21)).contains(&at),
+        "{at:?}"
+    );
+    assert!(client.is_closed());
+}
+
+/// A server that floods the client with PUBREL for a message it never sent, which the client
+/// answers with PUBCOMP and no event, and never reads the answers.
+struct UnheardReleases(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl Transport for UnheardReleases {
+    fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
+        let mut flood = Flood::of(&Packet::PubRel(PubRel::new(pid(1))), false);
+        flood.handed = std::sync::Arc::clone(&self.0);
+        Box::pin(async move { Ok(Link::new(flood, Deaf::default(), Unclosable)) })
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn acknowledgements_without_events_the_server_does_not_read_stop_the_reading_too() {
+    let read = std::sync::Arc::default();
+    let (_client, _events) = Client::connect(
+        &UnheardReleases(std::sync::Arc::clone(&read)),
+        ConnectOptions::new("c").keep_alive(0),
+    )
+    .await
+    .unwrap();
+    // No event slows the reading down: only the PUBCOMP packets waiting to be written stop it,
+    // once they fill the write limit.
+    let pubrel = encoded(&Packet::PubRel(PubRel::new(pid(1))));
+    let pubcomp = encoded(&Packet::PubComp(PubComp {
+        reason_code: PubCompReasonCode::PacketIdentifierNotFound,
+        ..PubComp::new(pid(1))
+    }));
+    let least = crate::driver::WRITE_LIMIT.div_ceil(pubcomp) * pubrel;
+    let stopped = until_reading_stops(&read, 4 * least).await;
+    assert!(stopped >= least, "{stopped} bytes read");
 }
