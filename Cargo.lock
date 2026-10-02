@@ -667,6 +667,7 @@ version = "2.0.0-alpha.0"
 dependencies = [
  "foldhash",
  "hashbrown",
+ "proptest",
  "roaring",
  "thiserror",
 ]
