@@ -364,11 +364,11 @@ impl Driver {
     /// Runs until the connection ends; the error says why.
     ///
     /// The loop runs in rounds. Each round gives every source of work one bounded turn, in a
-    /// fixed order and without waiting ([`round`](Self::round)): the Keep Alive, deliveries to
-    /// the application, a read, one call, one publication and a write. Only a round in which
-    /// none of them had anything to do waits, for whichever becomes ready first
-    /// ([`wait`](Self::wait)). So however busy one of them is, the others still get their turn
-    /// every round, and the order is the same on every run.
+    /// fixed order and without waiting ([`round`](Self::round)): deliveries to the
+    /// application, the Keep Alive, a read, one call, one publication and a write. Only a
+    /// round in which none of them had anything to do waits, for whichever becomes ready
+    /// first ([`wait`](Self::wait)). So however busy one of them is, the others still get
+    /// their turn every round, and the order is the same on every run.
     async fn serve(&mut self) -> Result<Infallible, Stop> {
         if let Some(connack) = self.connack.take() {
             self.emit(Event::Received(connack));
@@ -403,15 +403,18 @@ impl Driver {
             return Err(self.abandon());
         }
 
-        // The Keep Alive: a due PINGREQ, or an overdue PINGRESP.
+        // Deliveries: waiting events handed over while the channel has room, which may end a
+        // pause in reading.
+        progressed |= self.deliver_now();
+        self.track_pause();
+
+        // The Keep Alive: a due PINGREQ, or an overdue PINGRESP, with the time the application
+        // held reading back taken out first, so that a PINGRESP waiting unread behind it is
+        // not timed over that time.
         if self.ping_deadline().is_some_and(|at| at <= Instant::now()) {
             self.keep_alive_due()?;
             progressed = true;
         }
-
-        // Deliveries: waiting events handed over while the channel has room.
-        progressed |= self.deliver_now();
-        self.track_pause();
 
         // Reads, while the client reads at all: first the packets that arrived while it did
         // not, then whatever the server has sent since.
@@ -478,6 +481,10 @@ impl Driver {
                 None => {}
             }
         }
+
+        // Events this round left waiting for room pause reading from now, not from the next
+        // round, which may come after the task has yielded.
+        self.track_pause();
         Ok(progressed)
     }
 
@@ -675,11 +682,11 @@ impl Driver {
     /// they resume. A PINGRESP may wait unread meanwhile, so an outstanding PINGREQ's answer is
     /// timed only over the time the client was reading.
     ///
-    /// Events still waiting after a round's deliveries do not pause reads on their own: the
-    /// round may only have handed over as many as it may, and the next one goes on. Only a
-    /// full channel makes the reads wait for the application. Checked before the round's
-    /// reads, since a client whose application keeps up holds the event it decoded last
-    /// round at every round's start.
+    /// Events still waiting do not pause reads on their own: a round may only have handed over
+    /// as many as it may, and a client whose application keeps up holds the event it decoded
+    /// last round at every round's start. Only a full channel makes the reads wait for the
+    /// application. Checked after each round's deliveries, before the Keep Alive, and again at
+    /// the round's end.
     fn track_pause(&mut self) {
         let paused = !self.outbox.is_empty() && self.events.capacity() == 0;
         match (paused, self.paused_since) {
@@ -1289,5 +1296,114 @@ impl Driver {
             })));
         }
         self.pump();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use openqtt_codec::Decoder;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
+
+    use super::*;
+    use crate::transport::BoxFuture;
+
+    /// Nothing to close beyond the stream's halves.
+    struct Unclosable;
+
+    impl LinkHandle for Unclosable {
+        fn close(&self, _: CloseCode) {}
+
+        fn closed(&self) -> BoxFuture<'_, ()> {
+            Box::pin(async {})
+        }
+    }
+
+    /// Runs rounds until one finds nothing to do, as the task does before it waits.
+    async fn settle(driver: &mut Driver, when: &str) {
+        loop {
+            match driver.round().await {
+                Ok(true) => {}
+                Ok(false) => return,
+                Err(Stop::Lost(detail)) => panic!("{when}, the connection was lost: {detail}"),
+                Err(_) => panic!("{when}, the connection ended"),
+            }
+        }
+    }
+
+    async fn send(server: &mut DuplexStream, packet: Packet) {
+        let mut bytes = BytesMut::new();
+        packet.encode(&mut bytes).unwrap();
+        server.write_all(&bytes).await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_pingresp_the_application_holds_back_across_its_deadline_is_still_read() {
+        let (client_end, mut server) = tokio::io::duplex(64 * 1024);
+        let (reader, writer) = tokio::io::split(client_end);
+        let connect = Connect {
+            keep_alive: 10,
+            ..Connect::default()
+        };
+        let connack = ConnAck::default();
+        let negotiated = Negotiated::new(&connect, &connack, Some(Duration::from_secs(5)));
+        let (_calls, commands) = mpsc::channel(1);
+        let (_publishers, publications) = mpsc::channel(1);
+        // Room for one event: past it, events wait in the client, which then stops reading.
+        let (events, mut application) = mpsc::channel(1);
+        let shared = Arc::new(Shared {
+            connack,
+            client_id: "c".into(),
+            session: std::sync::Mutex::new(None),
+        });
+        let mut driver = Driver::new(
+            Link::new(reader, writer, Unclosable),
+            BytesMut::new(),
+            Decoder::new().with_sender(Sender::Server),
+            Session::new("c"),
+            negotiated,
+            commands,
+            publications,
+            events,
+            None,
+            shared,
+        );
+        settle(&mut driver, "connected").await;
+
+        // PINGREQ at the Keep Alive. The server answers 4.9 s later, within the ping timeout of
+        // 5 s, but behind two messages: the first fills the application's channel, and the
+        // second then waits in the client, which reads nothing more.
+        tokio::time::advance(Duration::from_secs(10)).await;
+        settle(&mut driver, "at the Keep Alive").await;
+        let mut pingreq = [0; 2];
+        server.read_exact(&mut pingreq).await.unwrap();
+        let pingreq = Decoder::new()
+            .with_sender(Sender::Client)
+            .decode(&mut BytesMut::from(&pingreq[..]));
+        assert_eq!(pingreq, Ok(Some(Packet::PingReq)));
+        tokio::time::advance(Duration::from_millis(4_900)).await;
+        for payload in ["one", "two"] {
+            let publish = Publish {
+                topic: "t".into(),
+                payload: Bytes::from_static(payload.as_bytes()),
+                ..Publish::default()
+            };
+            send(&mut server, Packet::Publish(publish)).await;
+        }
+        send(&mut server, Packet::PingResp).await;
+        // Rounds go on until the second message waits for room the application has not made.
+        while driver.outbox.is_empty() || driver.events.capacity() > 0 {
+            assert!(matches!(driver.round().await, Ok(true)));
+        }
+
+        // The task yields there, and runs again past the deadline, with the PINGRESP still
+        // unread: the time the application held the client back does not count.
+        tokio::time::advance(Duration::from_millis(200)).await;
+        settle(&mut driver, "past the deadline").await;
+        // The application catches up, and the client reads the PINGRESP.
+        assert!(application.recv().await.is_some());
+        settle(&mut driver, "once the application caught up").await;
+        assert!(application.recv().await.is_some());
+        assert_eq!(driver.ping_sent, None);
     }
 }
