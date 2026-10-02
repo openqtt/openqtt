@@ -30,7 +30,7 @@ pub struct ConnAck {
 
 /// The properties of a CONNACK (section 3.2.2.3). Absent ones mean what the specification
 /// says they default to, noted on each.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct ConnAckProperties {
     /// Session Expiry Interval the server uses instead of the client's; absent means the
     /// client's (section 3.2.2.3.2).
@@ -71,6 +71,47 @@ pub struct ConnAckProperties {
     pub authentication_method: Option<String>,
     /// Authentication Data (section 3.2.2.3.18).
     pub authentication_data: Option<Bytes>,
+}
+
+/// Debug output that never shows authentication_data: a credential must not reach a log
+/// through `{:?}`.
+impl core::fmt::Debug for ConnAckProperties {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ConnAckProperties")
+            .field("session_expiry_interval", &self.session_expiry_interval)
+            .field("receive_maximum", &self.receive_maximum)
+            .field("maximum_qos", &self.maximum_qos)
+            .field("retain_available", &self.retain_available)
+            .field("maximum_packet_size", &self.maximum_packet_size)
+            .field(
+                "assigned_client_identifier",
+                &self.assigned_client_identifier,
+            )
+            .field("topic_alias_maximum", &self.topic_alias_maximum)
+            .field("reason_string", &self.reason_string)
+            .field("user_properties", &self.user_properties)
+            .field(
+                "wildcard_subscription_available",
+                &self.wildcard_subscription_available,
+            )
+            .field(
+                "subscription_identifier_available",
+                &self.subscription_identifier_available,
+            )
+            .field(
+                "shared_subscription_available",
+                &self.shared_subscription_available,
+            )
+            .field("server_keep_alive", &self.server_keep_alive)
+            .field("response_information", &self.response_information)
+            .field("server_reference", &self.server_reference)
+            .field("authentication_method", &self.authentication_method)
+            .field(
+                "authentication_data",
+                &crate::redact::Redacted(&self.authentication_data),
+            )
+            .finish()
+    }
 }
 
 impl ConnAck {

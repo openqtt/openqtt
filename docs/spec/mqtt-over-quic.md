@@ -22,7 +22,11 @@ The key words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
   connection closes, with the bytes report R1 gives (D1): an MQTT 3.1 or 3.1.1
   client gets the CONNACK of its own version with return code 0x01, and any other
   level gets CONNACK with reason code 0x84 (Unsupported Protocol Version).
-- QUIC datagrams (RFC 9221) are not used.
+- QUIC datagrams (RFC 9221) are not used, and OpenQTT clients never offer them
+  (the `max_datagram_frame_size` transport parameter): EMQX 5.8.9 closes any
+  connection whose client offers them, because its connection callbacks
+  (`apps/emqx/src/emqx_quic_connection.erl`) have none for the datagram state
+  msquic then reports.
 
 ## 2. Streams
 

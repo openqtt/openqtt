@@ -62,9 +62,10 @@ proptest = { version = "1.11", default-features = false, features = ["std"] }
 # The settings types derive their reading from TOML and their writing back to it. Never in the
 # codec, which stays free of any serialization framework.
 serde = { version = "1.0.229", features = ["derive"] }
-# The configuration file's format. Without `preserve_order`, tables keep their keys sorted, so
-# errors about a file come out in the same order every time.
-toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
+# TOML: the configuration file's format, and the differential harness's list of intended
+# divergences. Without `preserve_order`, tables keep their keys sorted, so errors about a file
+# come out in the same order every time; without `display`, since nothing writes TOML through it.
+toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
 # URLs parsed by the WHATWG rules, which openqtt-config checks the OTLP endpoint against. It is
 # in the tree anyway, under reqwest.
 url = "2.5"
@@ -83,13 +84,24 @@ opentelemetry-otlp = { version = "0.33", default-features = false, features = ["
 # and crypto provider (deny.toml, `make layers`). The binary hands it a TLS configuration of its
 # own rather than let it read the system's trust store.
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
-# TLS, on aws-lc-rs and never ring: the OTLP exporter's today, QUIC's when the transport arrives.
-rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12", "prefer-post-quantum"] }
+# The async runtime QUIC runs on. No default features; each crate names the ones it uses.
+tokio = { version = "1.53", default-features = false }
+# QUIC (RFC 9000) for the client and the test kit. Without the defaults, which bring ring
+# through rustls-ring and a platform certificate verifier: TLS runs on rustls with aws-lc-rs.
+quinn = { version = "0.11.12", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+# TLS on aws-lc-rs, the one crypto provider (deny.toml bans ring): TLS 1.3 inside QUIC, and the
+# OTLP exporter's HTTPS, which may meet a collector that speaks only TLS 1.2. Without the
+# defaults, since logging would go through the log crate. With `prefer-post-quantum`, so every
+# handshake offers X25519MLKEM768 first, as report R7 decided (D6).
+rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs", "std", "tls12", "prefer-post-quantum"] }
+# Throwaway CAs and certificates for tests, signed with aws-lc-rs instead of rcgen's default
+# ring.
+rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 # The Mozilla root store, trusted for an https collector when observability.otlp.ca_file names
 # no CA of its own.
 webpki-roots = "1.0"
-# JSON, which tests read to check what the probes and the logs write.
-serde_json = "1.0"
+# JSON: the test kit's traces, and what tests read back from the probes and the logs.
+serde_json = "1.0.151"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,94 @@
+{
+  "clients": {
+    "bridge_v5": [
+      {
+        "connection": 1
+      },
+      {
+        "sent_bytes": "101500044d5154548502003c00000864312d6272646735"
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "ended": "by the client"
+      }
+    ],
+    "other_protocol": [
+      {
+        "connection": 1
+      },
+      {
+        "sent_bytes": "101400044d5154580502003c00000764312d6d717478"
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "v31": [
+      {
+        "connection": 1
+      },
+      {
+        "sent_bytes": "101400064d51497364700302003c000664312d763331"
+      },
+      {
+        "received_malformed": {
+          "bytes": "20020000",
+          "error": "the packet ends inside the Property Length"
+        }
+      },
+      {
+        "ended": "by the client"
+      }
+    ],
+    "v311": [
+      {
+        "connection": 1
+      },
+      {
+        "sent_bytes": "101300044d5154540402003c000764312d76333131"
+      },
+      {
+        "received_malformed": {
+          "bytes": "20020000",
+          "error": "the packet ends inside the Property Length"
+        }
+      },
+      {
+        "ended": "by the client"
+      }
+    ],
+    "v6": [
+      {
+        "connection": 1
+      },
+      {
+        "sent_bytes": "101100044d5154540602003c000564312d7636"
+      },
+      {
+        "received_malformed": {
+          "bytes": "20020001",
+          "error": "0x01 is not a CONNACK reason code"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ]
+  },
+  "scenario": "unsupported_protocol"
+}

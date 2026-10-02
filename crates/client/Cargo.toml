@@ -9,5 +9,18 @@ repository.workspace = true
 # Meant for crates.io once its API settles; it stays unpublished until then.
 publish.workspace = true
 
+[dependencies]
+bytes.workspace = true
+openqtt-codec.workspace = true
+quinn.workspace = true
+rustls.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["io-util", "macros", "rt", "sync", "time"] }
+tracing.workspace = true
+
+[dev-dependencies]
+openqtt-testkit.workspace = true
+tokio = { workspace = true, features = ["io-util", "macros", "rt", "sync", "test-util", "time"] }
+
 [lints]
 workspace = true

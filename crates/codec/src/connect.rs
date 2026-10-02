@@ -29,7 +29,7 @@ const USER_NAME_FLAG: u8 = 0x80;
 
 /// CONNECT: the first packet a client sends on a connection, asking the server for a session
 /// (section 3.1).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Connect {
     /// Clean Start: discard any existing session and start a new one (section 3.1.2.4).
     pub clean_start: bool,
@@ -52,6 +52,22 @@ pub struct Connect {
     pub password: Option<Bytes>,
 }
 
+/// Debug output that never shows password: a credential must not reach a log
+/// through `{:?}`.
+impl core::fmt::Debug for Connect {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Connect")
+            .field("clean_start", &self.clean_start)
+            .field("keep_alive", &self.keep_alive)
+            .field("properties", &self.properties)
+            .field("client_id", &self.client_id)
+            .field("will", &self.will)
+            .field("username", &self.username)
+            .field("password", &crate::redact::Redacted(&self.password))
+            .finish()
+    }
+}
+
 /// The Will Message of a CONNECT: what the server publishes for the client when the
 /// connection ends without a normal DISCONNECT (sections 3.1.2.5 to 3.1.2.7 and 3.1.3.2 to
 /// 3.1.3.4).
@@ -70,7 +86,7 @@ pub struct Will {
 }
 
 /// The properties of a CONNECT (section 3.1.2.11).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct ConnectProperties {
     /// Session Expiry Interval in seconds; absent means 0, the session ends with the
     /// connection, and `u32::MAX` means it never expires (section 3.1.2.11.2).
@@ -94,6 +110,33 @@ pub struct ConnectProperties {
     pub authentication_method: Option<String>,
     /// Authentication Data, which needs an Authentication Method (section 3.1.2.11.10).
     pub authentication_data: Option<Bytes>,
+}
+
+/// Debug output that never shows authentication_data: a credential must not reach a log
+/// through `{:?}`.
+impl core::fmt::Debug for ConnectProperties {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ConnectProperties")
+            .field("session_expiry_interval", &self.session_expiry_interval)
+            .field("receive_maximum", &self.receive_maximum)
+            .field("maximum_packet_size", &self.maximum_packet_size)
+            .field("topic_alias_maximum", &self.topic_alias_maximum)
+            .field(
+                "request_response_information",
+                &self.request_response_information,
+            )
+            .field(
+                "request_problem_information",
+                &self.request_problem_information,
+            )
+            .field("user_properties", &self.user_properties)
+            .field("authentication_method", &self.authentication_method)
+            .field(
+                "authentication_data",
+                &crate::redact::Redacted(&self.authentication_data),
+            )
+            .finish()
+    }
 }
 
 /// The Will Properties of a CONNECT (section 3.1.3.2).

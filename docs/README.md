@@ -36,3 +36,11 @@ Normative specifications go in `spec/`.
 | [`spec/mqtt-over-quic.md`](spec/mqtt-over-quic.md): MQTT 5 over QUIC, compatible with EMQX and NanoMQ | draft |
 | [`spec/config.md`](spec/config.md): every setting, the configuration file and the `OPENQTT_` variables | draft |
 | `spec/wire.md`: the protocol between roles | to be written |
+
+## Test tooling
+
+| Tool | Where |
+| --- | --- |
+| `openqtt-client`: the MQTT 5 over QUIC client | `crates/client` |
+| `openqtt-testkit`: raw-packet client, throwaway PKI, fake server and broker, scenarios and traces | `crates/testkit` |
+| The differential harness against OpenQTT 1.x: `make differential` | [`crates/testkit/tests/differential`](../crates/testkit/tests/differential/README.md) |
