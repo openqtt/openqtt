@@ -5,14 +5,6 @@
 //! on one ([MQTT-3.8.3-4]) belong to openqtt-topic and the session, which can answer an
 //! invalid filter with its own reason code in the SUBACK rather than end the connection.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls the subscription decoders arrives in a following commit"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::ack::AckProperties;

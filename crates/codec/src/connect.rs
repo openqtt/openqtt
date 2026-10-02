@@ -1,13 +1,5 @@
 //! CONNECT (section 3.1), and the bytes that refuse a CONNECT that is not MQTT 5.0.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls Connect::decode arrives in a following commit"
-    )
-)]
-
 use std::num::{NonZeroU16, NonZeroU32};
 
 use bytes::{BufMut, Bytes, BytesMut};

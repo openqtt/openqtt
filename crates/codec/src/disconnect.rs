@@ -1,13 +1,5 @@
 //! DISCONNECT (section 3.14).
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls Disconnect::decode arrives in a following commit"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::encode::{Encode, encode_methods};

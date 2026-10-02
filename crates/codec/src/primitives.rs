@@ -5,14 +5,6 @@
 //! is a Malformed Packet rather than a reason to wait for more. The `put_*` functions write
 //! them into a packet that has already been measured and checked, so they cannot fail.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls the packet decoders arrives in a following commit"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::{Error, PacketId, PacketType};

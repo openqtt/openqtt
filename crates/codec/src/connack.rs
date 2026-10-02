@@ -1,13 +1,5 @@
 //! CONNACK (section 3.2).
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls ConnAck::decode arrives in a following commit"
-    )
-)]
-
 use std::num::{NonZeroU16, NonZeroU32};
 
 use bytes::{BufMut, Bytes, BytesMut};

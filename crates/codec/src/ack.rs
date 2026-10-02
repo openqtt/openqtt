@@ -1,14 +1,6 @@
 //! The acknowledgements of a publication: PUBACK, PUBREC, PUBREL and PUBCOMP (sections 3.4
 //! to 3.7), and the properties they share with SUBACK and UNSUBACK.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls the acknowledgement decoders arrives in a following commit"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::encode::{Encode, encode_methods};

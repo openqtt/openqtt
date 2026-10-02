@@ -1,7 +1,7 @@
 //! The codec's one error type.
 
 use crate::{
-    ConnectReasonCode, DisconnectReasonCode, PacketType, PropertyContext, PropertyId, QoS,
+    ConnectReasonCode, DisconnectReasonCode, PacketType, PropertyContext, PropertyId, QoS, Sender,
 };
 
 /// Why bytes could not be decoded as a packet, or a packet could not be encoded.
@@ -19,6 +19,10 @@ use crate::{
 #[non_exhaustive]
 pub enum Error {
     // Malformed Packet, 0x81.
+    /// The first byte names packet type 0, which is reserved and forbidden (Table 2-1).
+    /// Malformed.
+    #[error("packet type 0 is reserved")]
+    ReservedPacketType,
     /// A Variable Byte Integer runs past four bytes, or is longer than its value needs
     /// ([MQTT-1.5.5-1]). Malformed.
     #[error("the {field} is not a valid Variable Byte Integer")]
@@ -157,6 +161,39 @@ pub enum Error {
         /// The packet.
         packet_type: PacketType,
     },
+    /// A packet type the sender never sends, by the direction of flow in Table 2-1: a CONNACK
+    /// from a client, a SUBSCRIBE from a server. Protocol Error.
+    #[error("a {sender} does not send {packet_type}")]
+    NotSentBy {
+        /// The end that sent it.
+        sender: Sender,
+        /// The packet.
+        packet_type: PacketType,
+    },
+    /// A reason code only the other end sends: 0x10 in a PUBACK or PUBREC from a client
+    /// (Tables 3-4 and 3-5), and the Sent by columns of DISCONNECT and AUTH (Tables 3-10 and
+    /// 3-11). Protocol Error.
+    #[error("a {sender} does not send {packet_type} reason code {code:#04x}")]
+    ReasonCodeNotSentBy {
+        /// The end that sent it.
+        sender: Sender,
+        /// The packet.
+        packet_type: PacketType,
+        /// The reason code.
+        code: u8,
+    },
+    /// A property only the other end sends: a Subscription Identifier in a PUBLISH from a
+    /// client ([MQTT-3.3.4-6]), a Session Expiry Interval in a DISCONNECT from a server
+    /// ([MQTT-3.14.2-2]). Protocol Error.
+    #[error("a {sender} does not send the {property} in {packet_type}")]
+    PropertyNotSentBy {
+        /// The end that sent it.
+        sender: Sender,
+        /// The packet.
+        packet_type: PacketType,
+        /// The property.
+        property: PropertyId,
+    },
     /// A CONNACK sets Session Present with a reason code other than Success
     /// ([MQTT-3.2.2-6]). Protocol Error.
     #[error("the CONNACK sets Session Present with a failure reason code")]
@@ -231,7 +268,8 @@ impl Error {
     /// The kind of error, which decides its reason code.
     const fn class(&self) -> Class {
         match self {
-            Self::MalformedVariableByteInteger { .. }
+            Self::ReservedPacketType
+            | Self::MalformedVariableByteInteger { .. }
             | Self::Truncated { .. }
             | Self::TrailingBytes { .. }
             | Self::InvalidFlags { .. }
@@ -249,6 +287,9 @@ impl Error {
             | Self::EmptyTopicName
             | Self::InvalidReasonCode { .. }
             | Self::MissingAuthenticationMethod { .. }
+            | Self::NotSentBy { .. }
+            | Self::ReasonCodeNotSentBy { .. }
+            | Self::PropertyNotSentBy { .. }
             | Self::SessionPresentWithError => Class::Protocol,
             Self::ZeroTopicAlias => Class::TopicAlias,
             Self::PacketTooLarge { .. } => Class::TooLarge,
@@ -282,5 +323,213 @@ impl Error {
             Class::TooLarge => DisconnectReasonCode::PacketTooLarge,
             Class::Local => DisconnectReasonCode::ImplementationSpecificError,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One error of each variant with the CONNACK and DISCONNECT reason codes it maps to.
+    fn table() -> Vec<(Error, ConnectReasonCode, DisconnectReasonCode)> {
+        use ConnectReasonCode as C;
+        use DisconnectReasonCode as D;
+        let field = "Topic Name";
+        let packet_type = PacketType::Publish;
+        let malformed = (C::MalformedPacket, D::MalformedPacket);
+        let protocol = (C::ProtocolError, D::ProtocolError);
+        let local = (
+            C::ImplementationSpecificError,
+            D::ImplementationSpecificError,
+        );
+        [
+            (Error::ReservedPacketType, malformed),
+            (Error::MalformedVariableByteInteger { field }, malformed),
+            (Error::Truncated { field }, malformed),
+            (
+                Error::TrailingBytes {
+                    packet_type,
+                    count: 1,
+                },
+                malformed,
+            ),
+            (
+                Error::InvalidFlags {
+                    packet_type,
+                    flags: 6,
+                },
+                malformed,
+            ),
+            (Error::InvalidUtf8 { field }, malformed),
+            (Error::NullCharacter { field }, malformed),
+            (
+                Error::InvalidPropertyId {
+                    context: PropertyContext::Connect,
+                    id: 0x23,
+                },
+                malformed,
+            ),
+            (Error::InvalidConnectFlags { flags: 1 }, malformed),
+            (Error::InvalidConnAckFlags { flags: 2 }, malformed),
+            (
+                Error::ReservedSubscriptionOptions { options: 0x40 },
+                malformed,
+            ),
+            (
+                Error::DuplicateProperty {
+                    property: PropertyId::ContentType,
+                },
+                protocol,
+            ),
+            (
+                Error::InvalidPropertyValue {
+                    property: PropertyId::ReceiveMaximum,
+                    value: 0,
+                },
+                protocol,
+            ),
+            (Error::ZeroPacketIdentifier { packet_type }, protocol),
+            (Error::InvalidSubscriptionOptions { options: 3 }, protocol),
+            (Error::EmptyPayload { packet_type }, protocol),
+            (Error::EmptyTopicName, protocol),
+            (
+                Error::InvalidReasonCode {
+                    packet_type,
+                    code: 0x8E,
+                },
+                protocol,
+            ),
+            (Error::MissingAuthenticationMethod { packet_type }, protocol),
+            (
+                Error::NotSentBy {
+                    sender: Sender::Client,
+                    packet_type,
+                },
+                protocol,
+            ),
+            (
+                Error::ReasonCodeNotSentBy {
+                    sender: Sender::Client,
+                    packet_type,
+                    code: 0x10,
+                },
+                protocol,
+            ),
+            (
+                Error::PropertyNotSentBy {
+                    sender: Sender::Client,
+                    packet_type,
+                    property: PropertyId::SubscriptionIdentifier,
+                },
+                protocol,
+            ),
+            (Error::SessionPresentWithError, protocol),
+            (
+                Error::ZeroTopicAlias,
+                (C::ProtocolError, D::TopicAliasInvalid),
+            ),
+            (
+                Error::PacketTooLarge {
+                    size: 11,
+                    maximum: 10,
+                },
+                (C::PacketTooLarge, D::PacketTooLarge),
+            ),
+            (
+                Error::UnsupportedProtocol {
+                    name: "MQTT".into(),
+                    level: 4,
+                },
+                (C::UnsupportedProtocolVersion, D::ProtocolError),
+            ),
+            (
+                Error::PacketIdentifierMismatch {
+                    qos: QoS::AtMostOnce,
+                },
+                local,
+            ),
+            (Error::TooLong { field, len: 65_536 }, local),
+        ]
+        .into_iter()
+        .map(|(error, (connack, disconnect))| (error, connack, disconnect))
+        .collect()
+    }
+
+    /// A different number for every variant, so the table above is checked to cover them all:
+    /// a new variant fails to compile here until it is added.
+    fn variant(error: &Error) -> usize {
+        match error {
+            Error::ReservedPacketType => 0,
+            Error::MalformedVariableByteInteger { .. } => 1,
+            Error::Truncated { .. } => 2,
+            Error::TrailingBytes { .. } => 3,
+            Error::InvalidFlags { .. } => 4,
+            Error::InvalidUtf8 { .. } => 5,
+            Error::NullCharacter { .. } => 6,
+            Error::InvalidPropertyId { .. } => 7,
+            Error::InvalidConnectFlags { .. } => 8,
+            Error::InvalidConnAckFlags { .. } => 9,
+            Error::ReservedSubscriptionOptions { .. } => 10,
+            Error::DuplicateProperty { .. } => 11,
+            Error::InvalidPropertyValue { .. } => 12,
+            Error::ZeroPacketIdentifier { .. } => 13,
+            Error::InvalidSubscriptionOptions { .. } => 14,
+            Error::EmptyPayload { .. } => 15,
+            Error::EmptyTopicName => 16,
+            Error::InvalidReasonCode { .. } => 17,
+            Error::MissingAuthenticationMethod { .. } => 18,
+            Error::NotSentBy { .. } => 19,
+            Error::ReasonCodeNotSentBy { .. } => 20,
+            Error::PropertyNotSentBy { .. } => 21,
+            Error::SessionPresentWithError => 22,
+            Error::ZeroTopicAlias => 23,
+            Error::PacketTooLarge { .. } => 24,
+            Error::UnsupportedProtocol { .. } => 25,
+            Error::PacketIdentifierMismatch { .. } => 26,
+            Error::TooLong { .. } => 27,
+        }
+    }
+
+    #[test]
+    fn mqtt_4_13_1_every_error_maps_to_the_reason_code_its_kind_calls_for() {
+        let table = table();
+        let mut seen: Vec<usize> = table.iter().map(|(error, ..)| variant(error)).collect();
+        seen.sort_unstable();
+        assert_eq!(seen, (0..=27).collect::<Vec<_>>());
+        for (error, connack, disconnect) in table {
+            assert_eq!(error.connack_reason_code(), connack, "{error}");
+            assert_eq!(error.disconnect_reason_code(), disconnect, "{error}");
+            // Every code the errors map to is one a CONNACK or DISCONNECT may carry.
+            assert!(connack.is_error() && disconnect.is_error(), "{error}");
+        }
+    }
+
+    #[test]
+    fn errors_read_as_sentences() {
+        assert_eq!(
+            Error::InvalidFlags {
+                packet_type: PacketType::PubRel,
+                flags: 0
+            }
+            .to_string(),
+            "the flags 0b0000 are not valid for PUBREL"
+        );
+        assert_eq!(
+            Error::UnsupportedProtocol {
+                name: "MQIsdp".into(),
+                level: 3
+            }
+            .to_string(),
+            "protocol \"MQIsdp\" version 3 is not MQTT 5.0"
+        );
+        assert_eq!(
+            Error::PropertyNotSentBy {
+                sender: Sender::Server,
+                packet_type: PacketType::Disconnect,
+                property: PropertyId::SessionExpiryInterval
+            }
+            .to_string(),
+            "a server does not send the Session Expiry Interval in DISCONNECT"
+        );
     }
 }

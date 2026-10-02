@@ -1,13 +1,5 @@
 //! AUTH (section 3.15).
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls Auth::decode arrives in a following commit"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::encode::{Encode, encode_methods};

@@ -7,14 +7,6 @@
 //! set, such as "a Receive Maximum of 0 is a Protocol Error", live in [`check_number`] and
 //! apply both ways, so a packet that encodes always decodes.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls the property readers arrives in a following commit"
-    )
-)]
-
 use std::fmt;
 use std::num::{NonZeroU16, NonZeroU32};
 

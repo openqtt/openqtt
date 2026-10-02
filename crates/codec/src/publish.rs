@@ -1,13 +1,5 @@
 //! PUBLISH (section 3.3).
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the decoder that calls Publish::decode arrives in a following commit"
-    )
-)]
-
 use std::num::NonZeroU16;
 
 use bytes::{BufMut, Bytes, BytesMut};
