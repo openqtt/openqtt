@@ -15,8 +15,18 @@ path = "src/main.rs"
 [dependencies]
 clap.workspace = true
 openqtt-config.workspace = true
+opentelemetry.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry_sdk.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+webpki-roots.workspace = true
+
+[dev-dependencies]
+openqtt-observe.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

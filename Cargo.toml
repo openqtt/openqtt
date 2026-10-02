@@ -47,8 +47,9 @@ clap = { version = "4.6", features = ["derive"] }
 # Structured diagnostics, the one logging API every crate uses. Without `attributes` for now:
 # #[instrument] is unused, and its macro crate pins syn 2 beside clap's syn 3.
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
-# Formats tracing events and filters them by OPENQTT_LOG; only the binary installs it.
-tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter"] }
+# Writes tracing events as JSON or text, filtered by observability.log_level; only the binary
+# installs it. Without `ansi`, which would read NO_COLOR behind the configuration's back.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter", "json"] }
 # One error enum per crate, derived rather than written by hand.
 thiserror = "2.0"
 # Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
@@ -58,22 +59,49 @@ bytes = "1.12"
 # must never panic the decoder. Without the fork and timeout features, which run each case in
 # a child process and bring tempfile and rusty-fork for it.
 proptest = { version = "1.11", default-features = false, features = ["std"] }
+# The settings types derive their reading from TOML and their writing back to it. Never in the
+# codec, which stays free of any serialization framework.
+serde = { version = "1.0.229", features = ["derive"] }
+# TOML: the configuration file's format, and the differential harness's list of intended
+# divergences. Without `preserve_order`, tables keep their keys sorted, so errors about a file
+# come out in the same order every time; without `display`, since nothing writes TOML through it.
+toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
+# URLs parsed by the WHATWG rules, which openqtt-config checks the OTLP endpoint against. It is
+# in the tree anyway, under reqwest.
+url = "2.5"
+# The OpenTelemetry API, which every crate records metrics on. It records nothing until the
+# binary installs a provider, so a library takes only this; openqtt-observe must never take the
+# SDK (`make layers`).
+opentelemetry = { version = "0.33", default-features = false, features = ["metrics"] }
+# The OpenTelemetry SDK: the binary's meter provider, and the in-memory exporter tests read.
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["metrics"] }
+# Pushes metrics to a collector: OTLP over HTTP with protobuf bodies, on reqwest's blocking
+# client, which the SDK's reader calls from a thread of its own with no async runtime. Not gRPC,
+# which would bring tonic and want a tokio runtime to export from. `internal-logs` turns a failed
+# export into a log line rather than silence.
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "reqwest-blocking-client", "metrics", "internal-logs"] }
+# The HTTP client under the OTLP exporter, with rustls on aws-lc-rs: the binary's one TLS stack
+# and crypto provider (deny.toml, `make layers`). The binary hands it a TLS configuration of its
+# own rather than let it read the system's trust store.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 # The async runtime QUIC runs on. No default features; each crate names the ones it uses.
 tokio = { version = "1.53", default-features = false }
 # QUIC (RFC 9000) for the client and the test kit. Without the defaults, which bring ring
 # through rustls-ring and a platform certificate verifier: TLS runs on rustls with aws-lc-rs.
 quinn = { version = "0.11.12", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
-# TLS 1.3 inside QUIC, on aws-lc-rs, the one crypto provider (deny.toml bans ring). Without the
-# defaults: QUIC needs no TLS 1.2, and logging would go through the log crate.
-rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs", "std"] }
+# TLS on aws-lc-rs, the one crypto provider (deny.toml bans ring): TLS 1.3 inside QUIC, and the
+# OTLP exporter's HTTPS, which may meet a collector that speaks only TLS 1.2. Without the
+# defaults, since logging would go through the log crate. With `prefer-post-quantum`, so every
+# handshake offers X25519MLKEM768 first, as report R7 decided (D6).
+rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs", "std", "tls12", "prefer-post-quantum"] }
 # Throwaway CAs and certificates for tests, signed with aws-lc-rs instead of rcgen's default
 # ring.
 rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
-# JSON traces of test runs, written and compared by the test kit.
+# The Mozilla root store, trusted for an https collector when observability.otlp.ca_file names
+# no CA of its own.
+webpki-roots = "1.0"
+# JSON: the test kit's traces, and what tests read back from the probes and the logs.
 serde_json = "1.0.151"
-# The differential harness reads its list of intended divergences from TOML. Without
-# `display`, since nothing writes TOML.
-toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
 # The topic index's two tables, the level interner and the child table, store a 32-bit id and
 # compare against text and nodes kept elsewhere, which only hashbrown's HashTable allows. That
 # is what keeps a filter near 150 bytes (report R6). Without its default hasher: foldhash is

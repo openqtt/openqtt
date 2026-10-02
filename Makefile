@@ -4,7 +4,7 @@
 CARGO ?= cargo
 
 .PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance differential \
-	differential-bless tools need-nextest need-deny
+	differential-bless config-doc tools need-nextest need-deny
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -135,6 +135,13 @@ differential: need-nextest
 differential-bless: need-nextest
 	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
 		--no-capture -E 'test(bless_the_oracle_traces)'
+
+# --- Configuration reference -------------------------------------------------------------
+
+# Rewrites the settings tables of docs/spec/config.md from the declarations in
+# crates/config/src/settings.rs. A test in openqtt-config fails while the two differ.
+config-doc:
+	$(CARGO) run --locked --quiet -p openqtt-config --example config-doc
 
 # --- Tools --------------------------------------------------------------------------------
 
