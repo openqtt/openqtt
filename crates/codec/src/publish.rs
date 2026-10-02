@@ -521,8 +521,26 @@ mod tests {
         };
         let (first, body) = encode_parts(&publish);
         assert_eq!(first, 0x3D);
-        // [MQTT-3.3.2-17] [MQTT-3.3.2-18]: every User Property, in order, repeats kept.
+        // [MQTT-3.3.2-17] [MQTT-3.3.2-18]: every User Property, in order, repeats kept. What a
+        // server forwards unaltered, Response Topic, Correlation Data and Content Type
+        // ([MQTT-3.3.2-15], [MQTT-3.3.2-16], [MQTT-3.3.2-20]), comes out as it went in.
         assert_eq!(Publish::decode(0b1101, &body), Ok(publish));
+    }
+
+    #[test]
+    fn mqtt_3_3_2_13_and_mqtt_3_3_2_19_response_topic_and_content_type_are_utf8_strings() {
+        for (id, field) in [(0x08, "Response Topic"), (0x03, "Content Type")] {
+            let ill_formed = concat(&[&[id], &prefixed(&[0xC3, 0x28])]);
+            assert_eq!(
+                Publish::decode(0b0010, &with_properties(&[&ill_formed])),
+                Err(Error::InvalidUtf8 { field })
+            );
+            let null = concat(&[&[id], &prefixed(b"a\0")]);
+            assert_eq!(
+                Publish::decode(0b0010, &with_properties(&[&null])),
+                Err(Error::NullCharacter { field })
+            );
+        }
     }
 
     #[test]
