@@ -380,6 +380,25 @@ fn r1_d13_more_unacknowledged_publishes_than_receive_maximum_get_disconnect_0x93
 }
 
 #[test]
+fn receive_maximum_holds_as_packets_arrive_not_when_they_are_processed() {
+    let mut harness = Harness::connected();
+    harness.auto.authorize = None;
+    // One PUBLISH waits for its authorization, and holds up everything behind it.
+    harness.send(publish0("held", "x"));
+    for packet_id in 1..=32 {
+        assert!(harness.send(publish1("t", packet_id, "x")).is_empty());
+    }
+    // The 33rd unacknowledged QoS 1 PUBLISH is refused when it arrives.
+    let Packet::Disconnect(disconnect) = one(harness.send(publish1("t", 33, "x"))) else {
+        panic!("DISCONNECT");
+    };
+    assert_eq!(
+        disconnect.reason_code,
+        DisconnectReasonCode::ReceiveMaximumExceeded
+    );
+}
+
+#[test]
 fn publishes_sent_before_connack_are_not_held_to_a_limit_the_client_could_not_know() {
     let mut harness = Harness::new();
     harness.auto.claim = false;

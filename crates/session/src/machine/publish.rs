@@ -71,17 +71,7 @@ impl Session {
                 self.push_reply(stream, packet_id, ReplyKind::PubRec, state, false);
                 return self.flush(stream, now, fx);
             }
-            if self.inbound_in_flight >= self.config.receive_maximum.get() && !arrival.pipelined {
-                // [MQTT-3.3.4-7], report R1 O3 and D13. A PUBLISH sent behind the CONNECT,
-                // before the CONNACK announced the limit, is held to none: until then the
-                // client's Receive Maximum for the server was 65,535.
-                return self.close_with(
-                    DisconnectReasonCode::ReceiveMaximumExceeded,
-                    None,
-                    now,
-                    fx,
-                );
-            }
+            // Held to Receive Maximum when it arrived ([MQTT-3.3.4-7]); it takes its slot now.
             self.inbound_in_flight = self.inbound_in_flight.saturating_add(1);
         }
         // Topic syntax refuses this PUBLISH alone (report R1, O25 and D32).

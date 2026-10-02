@@ -449,6 +449,13 @@ struct Driver {
     pipelined: u16,
     /// Data streams whose server side was finished.
     finished: Vec<u64>,
+    /// Whether the machine asked the transport to stop reading.
+    paused: bool,
+    /// Whether the driver honours a pause as a transport does, holding the client's packets
+    /// until the machine resumes reading. Otherwise it keeps feeding them.
+    honour_pause: bool,
+    /// Packets the client sent while reading was paused.
+    unread: VecDeque<(StreamId, Packet, bool)>,
     /// What the server sent at QoS 1 and 2 and the client has not acknowledged in full, by
     /// identifier, with the packet the client answers with next. Only to aim acknowledgements.
     out: BTreeMap<u16, PacketType>,
@@ -486,6 +493,9 @@ impl Driver {
             sent_before_connack: Vec::new(),
             pipelined: 0,
             finished: Vec::new(),
+            paused: false,
+            honour_pause: false,
+            unread: VecDeque::new(),
             out: BTreeMap::new(),
             releasable: Vec::new(),
         };
@@ -549,7 +559,24 @@ impl Driver {
     }
 
     fn step(&mut self, step: Step) {
+        self.act(step);
+        // A transport reads again what it held back once the machine resumes.
+        while !self.paused
+            && let Some((stream, packet, early)) = self.unread.pop_front()
+        {
+            self.client(stream, packet, early);
+        }
+    }
+
+    fn act(&mut self, step: Step) {
         match step {
+            Step::Client {
+                stream,
+                packet,
+                early,
+            } if self.paused && self.honour_pause => {
+                self.unread.push_back((stream, packet, early));
+            }
             Step::Client {
                 stream,
                 packet,
@@ -843,6 +870,14 @@ impl Driver {
                     assert!(!self.finished.contains(&stream), "a stream finished twice");
                     self.finished.push(stream);
                 }
+                Effect::PauseReading => {
+                    assert!(!self.paused, "paused twice");
+                    self.paused = true;
+                }
+                Effect::ResumeReading => {
+                    assert!(self.paused, "resumed without a pause");
+                    self.paused = false;
+                }
                 Effect::Will(_) | Effect::Count(_) => {}
             }
         }
@@ -1004,6 +1039,7 @@ proptest! {
         (first, steps) in (calm_connect(), vec(calm_step(), 0..150))
     ) {
         let mut driver = Driver::new(false);
+        driver.honour_pause = true;
         driver.client(StreamId::Control, Packet::from(first), false);
         driver.step(Step::Authenticate(7));
         driver.step(Step::Claim(7));

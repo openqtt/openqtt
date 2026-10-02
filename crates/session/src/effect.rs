@@ -28,6 +28,15 @@ pub enum Effect {
     /// Finish the server's sending side of a data stream the client ended, once the server owes
     /// nothing more on it (docs/spec/mqtt-over-quic.md, section 2.4).
     FinishStream(u64),
+    /// Stop reading from the client. The machine holds as much as it may of what the client
+    /// sent and has not processed while it waits on an answer
+    /// ([`Config::maximum_pending_packets`](crate::Config::maximum_pending_packets)); the rest
+    /// waits in the transport, and QUIC's flow control holds the client back. The transport
+    /// hands over at most what it already decoded: the machine ends a connection that sends
+    /// it twice its limits.
+    PauseReading,
+    /// Read from the client again: what the machine held has been processed.
+    ResumeReading,
     /// Close the network connection, once what was sent is delivered or a linger ends
     /// ([MQTT-3.2.2-7], [MQTT-3.14.4-2]). It comes once, last but for the answers to
     /// requests still outstanding: a claim made before it is released when it completes.

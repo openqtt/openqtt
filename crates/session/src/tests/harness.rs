@@ -87,6 +87,8 @@ pub(crate) struct Harness {
     pub(crate) retained: BTreeMap<TopicName, Message>,
     /// Timers set and not fired or cancelled.
     pub(crate) timers: BTreeMap<Timer, Timestamp>,
+    /// Whether the machine asked the transport to stop reading.
+    pub(crate) paused: bool,
     /// Answers waiting to go in.
     answers: VecDeque<Input>,
 }
@@ -116,6 +118,7 @@ impl Harness {
             interest: BTreeMap::new(),
             retained: BTreeMap::new(),
             timers: BTreeMap::new(),
+            paused: false,
             answers: VecDeque::new(),
         };
         harness.absorb(effects.into_vec());
@@ -347,6 +350,8 @@ impl Harness {
                 Effect::CancelTimer(timer) => {
                     self.timers.remove(&timer);
                 }
+                Effect::PauseReading => self.paused = true,
+                Effect::ResumeReading => self.paused = false,
                 Effect::SendRefusal(_)
                 | Effect::FinishStream(_)
                 | Effect::Close(_)

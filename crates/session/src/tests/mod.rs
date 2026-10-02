@@ -4,6 +4,7 @@
 mod harness;
 
 mod auth;
+mod backlog;
 mod connect;
 mod deliver;
 mod ending;

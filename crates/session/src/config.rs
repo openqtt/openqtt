@@ -2,7 +2,7 @@
 //! connection.
 
 use std::fmt;
-use std::num::{NonZeroU16, NonZeroU32};
+use std::num::{NonZeroU16, NonZeroU32, NonZeroUsize};
 use std::time::Duration;
 
 use openqtt_codec::QoS;
@@ -51,6 +51,14 @@ pub struct Config {
     /// Messages a session holds before they are sent: one more ends the session (R1, O12).
     /// 1,000 by default.
     pub maximum_queued_messages: usize,
+    /// Packets from the client the machine holds unprocessed, while it waits on an answer,
+    /// before it asks the transport to stop reading ([`Effect::PauseReading`]). 64 by default.
+    ///
+    /// [`Effect::PauseReading`]: crate::Effect::PauseReading
+    pub maximum_pending_packets: NonZeroUsize,
+    /// Bytes of those packets, as encoded, before it asks the same. 256 KiB by default; a
+    /// single packet up to the Maximum Packet Size is always taken.
+    pub maximum_pending_bytes: NonZeroUsize,
     /// How long a connection has to send its CONNECT and be accepted, or `None` for no limit.
     /// 10 seconds by default.
     pub connect_timeout: Option<Duration>,
@@ -75,6 +83,10 @@ impl Config {
     pub const MAXIMUM_TOPIC_LEVELS: usize = 128;
     /// R1's limit on the messages a session holds (O12).
     pub const MAXIMUM_QUEUED_MESSAGES: usize = 1_000;
+    /// The default limit on unprocessed packets.
+    pub const MAXIMUM_PENDING_PACKETS: usize = 64;
+    /// The default limit on the bytes of unprocessed packets, 256 KiB.
+    pub const MAXIMUM_PENDING_BYTES: usize = 256 << 10;
     /// The default time a connection has to be accepted.
     pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 }
@@ -96,6 +108,10 @@ impl Default for Config {
             maximum_subscriptions: Self::MAXIMUM_SUBSCRIPTIONS,
             maximum_topic_levels: Self::MAXIMUM_TOPIC_LEVELS,
             maximum_queued_messages: Self::MAXIMUM_QUEUED_MESSAGES,
+            maximum_pending_packets: NonZeroUsize::new(Self::MAXIMUM_PENDING_PACKETS)
+                .unwrap_or(NonZeroUsize::MIN),
+            maximum_pending_bytes: NonZeroUsize::new(Self::MAXIMUM_PENDING_BYTES)
+                .unwrap_or(NonZeroUsize::MIN),
             connect_timeout: Some(Self::CONNECT_TIMEOUT),
             identity: Identity::Credentials,
             mountpoint: None,

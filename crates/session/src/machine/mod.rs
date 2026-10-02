@@ -77,6 +77,13 @@ pub struct Session {
     client: Option<Client>,
     /// What the client sent and the machine has not processed yet, in arrival order.
     inbox: VecDeque<Received>,
+    /// The bytes of the packets in `inbox`, as encoded.
+    inbox_bytes: usize,
+    /// The QoS 1 and 2 PUBLISH packets in `inbox` that will take a slot of the server's Receive
+    /// Maximum, which counts them from when they arrive.
+    inbox_slots: u16,
+    /// Whether the transport was asked to stop reading.
+    paused: bool,
     next_request: u64,
     next_token: u64,
     /// The packet waiting for its authorization.
@@ -229,9 +236,11 @@ enum Received {
 struct Arrival {
     /// The time.
     at: Timestamp,
-    /// Whether it came before the CONNACK went out, when the client could not know the
-    /// server's Receive Maximum yet and assumed 65,535 (section 3.2.2.3.3).
-    pipelined: bool,
+    /// Its size as encoded, which counts against the backlog.
+    size: usize,
+    /// Whether it is a QoS 1 or 2 PUBLISH that will take a slot of the server's Receive
+    /// Maximum: every one but a QoS 2 repeat of a message already received.
+    slot: bool,
 }
 
 impl Received {
@@ -503,6 +512,9 @@ impl Session {
             limits: Limits::default(),
             client: None,
             inbox: VecDeque::new(),
+            inbox_bytes: 0,
+            inbox_slots: 0,
+            paused: false,
             next_request: 1,
             next_token: 1,
             authorizing: None,
@@ -558,21 +570,7 @@ impl Session {
                 stream,
                 packet,
                 early,
-            } => {
-                let arrival = Arrival {
-                    at: now,
-                    pipelined: self.phase != Phase::Connected,
-                };
-                self.receive(
-                    Received::Packet {
-                        stream,
-                        packet,
-                        early,
-                        arrival,
-                    },
-                    now,
-                );
-            }
+            } => self.receive_packet(stream, packet, early, now, &mut fx),
             Input::DecodeError {
                 stream,
                 error,
@@ -584,6 +582,7 @@ impl Session {
                     packet_type,
                 },
                 now,
+                &mut fx,
             ),
             Input::HandshakeComplete {
                 early_data_accepted,
@@ -603,6 +602,7 @@ impl Session {
             Input::Shutdown(shutdown) => self.shutdown(shutdown, now, &mut fx),
         }
         self.drain(now, &mut fx);
+        self.flow(now, &mut fx);
         fx
     }
 
@@ -645,14 +645,142 @@ impl Session {
         self.client.as_ref().map(|client| self.state(client))
     }
 
-    /// Takes in something the client sent, after anything it sent before.
-    fn receive(&mut self, received: Received, now: Timestamp) {
+    /// Takes in a packet the client sent.
+    fn receive_packet(
+        &mut self,
+        stream: StreamId,
+        packet: Packet,
+        early: bool,
+        now: Timestamp,
+        fx: &mut Effects,
+    ) {
         if self.phase == Phase::Closed {
             return;
         }
-        // Every packet resets Keep Alive, from the moment it arrives ([MQTT-3.1.2-22]).
+        // A packet that came before the CONNACK went out, when the client could not know the
+        // server's Receive Maximum yet and assumed 65,535 (section 3.2.2.3.3).
+        let pipelined = self.phase != Phase::Connected;
+        let slot = match &packet {
+            Packet::Publish(publish) => match (publish.qos, publish.packet_id) {
+                (codec::QoS::AtMostOnce, _) | (_, None) => false,
+                (codec::QoS::ExactlyOnce, Some(id)) => !self.inbound.contains_key(&id.get()),
+                (codec::QoS::AtLeastOnce, Some(_)) => true,
+            },
+            _ => false,
+        };
+        // Receive Maximum holds from when a PUBLISH arrives, not when the machine gets to it
+        // ([MQTT-3.3.4-7], report R1 O3 and D13); one sent behind the CONNECT, before the
+        // CONNACK announced the limit, is held to none.
+        let held = u32::from(self.inbound_in_flight) + u32::from(self.inbox_slots);
+        if slot && !pipelined && held >= u32::from(self.config.receive_maximum.get()) {
+            self.last_activity = self.last_activity.max(now);
+            return self.close_with(DisconnectReasonCode::ReceiveMaximumExceeded, None, now, fx);
+        }
+        let arrival = Arrival {
+            at: now,
+            size: packet.encoded_len().unwrap_or(0),
+            slot,
+        };
+        self.receive(
+            Received::Packet {
+                stream,
+                packet,
+                early,
+                arrival,
+            },
+            now,
+            fx,
+        );
+    }
+
+    /// Takes in something the client sent, after anything it sent before, as long as the
+    /// backlog allows.
+    fn receive(&mut self, received: Received, now: Timestamp, fx: &mut Effects) {
+        if self.phase == Phase::Closed {
+            return;
+        }
+        // Every packet resets Keep Alive, from the moment it arrives ([MQTT-3.1.2-22]): a
+        // client whose packets wait is not silent.
         self.last_activity = self.last_activity.max(now);
+        if let Received::Packet { arrival, .. } = &received {
+            self.inbox_bytes = self.inbox_bytes.saturating_add(arrival.size);
+            if arrival.slot {
+                self.inbox_slots = self.inbox_slots.saturating_add(1);
+            }
+        }
         self.inbox.push_back(received);
+        // A transport keeps reading after a pause only for what it had already decoded. Twice
+        // the limits is more than that: the connection ends rather than the backlog grow. A
+        // single packet up to the Maximum Packet Size never does it.
+        let packets = self.config.maximum_pending_packets.get();
+        let bytes = self.config.maximum_pending_bytes.get();
+        let packet_size =
+            usize::try_from(self.config.maximum_packet_size.get()).unwrap_or(usize::MAX);
+        let overflowing = self.inbox.len() > packets.saturating_mul(2)
+            || self.inbox_bytes > bytes.saturating_mul(2).saturating_add(packet_size);
+        if self.inbox.len() > 1 && overflowing {
+            self.overflow(now, fx);
+        }
+    }
+
+    /// The next thing the client sent, out of the backlog.
+    fn next_received(&mut self) -> Option<Received> {
+        let received = self.inbox.pop_front()?;
+        if let Received::Packet { arrival, .. } = &received {
+            self.inbox_bytes = self.inbox_bytes.saturating_sub(arrival.size);
+            if arrival.slot {
+                self.inbox_slots = self.inbox_slots.saturating_sub(1);
+            }
+        }
+        Some(received)
+    }
+
+    /// Counts the backlog again, after packets left it other than in order.
+    fn recount_inbox(&mut self) {
+        let (bytes, slots) = self
+            .inbox
+            .iter()
+            .fold((0usize, 0u16), |(bytes, slots), received| match received {
+                Received::Packet { arrival, .. } => (
+                    bytes.saturating_add(arrival.size),
+                    slots.saturating_add(u16::from(arrival.slot)),
+                ),
+                Received::Error { .. } => (bytes, slots),
+            });
+        self.inbox_bytes = bytes;
+        self.inbox_slots = slots;
+    }
+
+    /// Asks the transport to stop reading while the backlog is past its limits, and to read
+    /// again once it is down to half of them.
+    fn flow(&mut self, now: Timestamp, fx: &mut Effects) {
+        if self.phase == Phase::Closed {
+            return;
+        }
+        let packets = self.config.maximum_pending_packets.get();
+        let bytes = self.config.maximum_pending_bytes.get();
+        if !self.paused && (self.inbox.len() > packets || self.inbox_bytes > bytes) {
+            self.paused = true;
+            fx.push(Effect::PauseReading);
+        } else if self.paused && self.inbox.len() <= packets / 2 && self.inbox_bytes <= bytes / 2 {
+            self.paused = false;
+            // The client was not silent while nothing was read from it.
+            self.last_activity = self.last_activity.max(now);
+            fx.push(Effect::ResumeReading);
+        }
+    }
+
+    /// Ends a connection whose transport kept feeding the machine past twice the backlog's
+    /// limits: DISCONNECT 0x97 once accepted, CONNACK 0x97 before.
+    fn overflow(&mut self, now: Timestamp, fx: &mut Effects) {
+        match self.phase {
+            Phase::Connected => {
+                self.close_with(DisconnectReasonCode::QuotaExceeded, None, now, fx);
+            }
+            Phase::Closed => {}
+            _ if self.connect_read => self.refuse(ConnectReasonCode::QuotaExceeded, now, fx),
+            _ => self.finish(Ending::NotAccepted, CloseCode::ProtocolError, fx),
+        }
     }
 
     /// Processes what the client sent, in order, until the machine has to wait for an answer.
@@ -666,7 +794,7 @@ impl Session {
             if !ready {
                 return;
             }
-            let Some(received) = self.inbox.pop_front() else {
+            let Some(received) = self.next_received() else {
                 return;
             };
             match self.phase {
@@ -919,6 +1047,7 @@ impl Session {
         }
         self.phase = Phase::Closed;
         self.inbox.clear();
+        self.recount_inbox();
         self.authorizing = None;
         if self.connect_timer {
             self.connect_timer = false;
@@ -1057,6 +1186,11 @@ impl Session {
             Timer::KeepAlive => {
                 if !self.keep_alive_timer || self.phase != Phase::Connected {
                     return;
+                }
+                if self.paused {
+                    // Nothing is read from the client while paused, so its silence says
+                    // nothing: Keep Alive starts again from now.
+                    self.last_activity = self.last_activity.max(now);
                 }
                 let deadline = self.keep_alive_deadline();
                 if now >= deadline {
