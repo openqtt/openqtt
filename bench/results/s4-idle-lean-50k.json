@@ -1,0 +1,97 @@
+{
+  "args": {
+    "conns": "50000",
+    "out": "../../bench/results/s4-idle-lean-50k.json",
+    "pki": "target/pki",
+    "profiles": "lean"
+  },
+  "experiment": "idle",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T06:20:34Z",
+    "kern.ipc.maxsockbuf": "8388608",
+    "kern.maxfilesperproc": "61440",
+    "memory_bytes": "17179869184",
+    "net.inet.udp.maxdgram": "9216",
+    "net.inet.udp.recvspace": "786896",
+    "note": "laptop numbers: server and client share one machine; absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "performance_cores": "6",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "rows": [
+      {
+        "allocations_per_conn": 58.00232,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1999184,
+          "handshakes": 0,
+          "heap": 122586,
+          "live": 0,
+          "pings": 0,
+          "resident": 4505600,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.001796,
+          "t": 12.020620667,
+          "user_s": 0.02566
+        },
+        "baseline_cpu_cores": 0.00003604541792312807,
+        "client_at_end": {
+          "closed": 0,
+          "established": 50000,
+          "failed": 0,
+          "footprint": 1791575720,
+          "heap": 1443793417,
+          "pings": 50000,
+          "t": 106.77124275
+        },
+        "conns": 50000,
+        "endpoints": 1,
+        "footprint_per_conn": 36479.00384,
+        "footprint_per_conn_at_end": 36479.00384,
+        "heap_per_conn": 29301.97796,
+        "heap_per_conn_at_end": 29301.97952,
+        "idle_cpu_cores": 0.0922692383018842,
+        "idle_cpu_cores_net": 0.09223319288396108,
+        "idle_cpu_us_per_keepalive": 55.33991573037664,
+        "idle_window_s": 60.229997583999996,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15000,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "lean",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 50000.0,
+        "live_at_measure": 50000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "lean",
+        "ready": {
+          "established": 50000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 11.53220375
+        },
+        "resident_per_conn": 9271.7056,
+        "server_threads": 0,
+        "setup_per_second": 4313.406959064207,
+        "setup_seconds": 11.591765042,
+        "setup_server_cpu_s": 26.394233,
+        "udp_full_buffer_drops": 0
+      }
+    ]
+  },
+  "spike": "S4"
+}

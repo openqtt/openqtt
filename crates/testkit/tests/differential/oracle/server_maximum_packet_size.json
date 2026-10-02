@@ -1,0 +1,104 @@
+{
+  "clients": {
+    "remaining": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-remaining",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "dup": false,
+          "packet_id": "c1",
+          "payload": "<1048549 bytes, fnv1a64 58102dad24b574d7>",
+          "qos": 1,
+          "retain": false,
+          "topic": "{ns}/huge",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "received": {
+          "reason_code": "0x95 PacketTooLarge",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "whole": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-whole",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "dup": false,
+          "packet_id": "c1",
+          "payload": "<1048545 bytes, fnv1a64 40ef550821649f87>",
+          "qos": 1,
+          "retain": false,
+          "topic": "{ns}/huge",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c1",
+          "reason_code": "0x10 NoMatchingSubscribers",
+          "type": "PUBACK"
+        }
+      },
+      {
+        "ended": "by the client"
+      }
+    ]
+  },
+  "scenario": "server_maximum_packet_size"
+}

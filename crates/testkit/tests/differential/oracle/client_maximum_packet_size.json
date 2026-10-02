@@ -1,0 +1,278 @@
+{
+  "clients": {
+    "at_limit": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-at_limit",
+          "keep_alive": 60,
+          "properties": {
+            "maximum_packet_size": 64
+          },
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "packet_id": "c1",
+          "subscriptions": [
+            {
+              "filter": "{ns}/size/64",
+              "maximum_qos": 0,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            }
+          ],
+          "type": "SUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c1",
+          "reason_codes": [
+            "0x00 GrantedQos0"
+          ],
+          "type": "SUBACK"
+        }
+      },
+      {
+        "sent": {
+          "reason_code": "0x00 NormalDisconnection",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "fits": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-fits",
+          "keep_alive": 60,
+          "properties": {
+            "maximum_packet_size": 64
+          },
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "packet_id": "c1",
+          "subscriptions": [
+            {
+              "filter": "{ns}/size/63",
+              "maximum_qos": 0,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            }
+          ],
+          "type": "SUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c1",
+          "reason_codes": [
+            "0x00 GrantedQos0"
+          ],
+          "type": "SUBACK"
+        }
+      },
+      {
+        "received": {
+          "dup": false,
+          "payload": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "qos": 0,
+          "retain": false,
+          "topic": "{ns}/size/63",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "sent": {
+          "reason_code": "0x00 NormalDisconnection",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "over": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-over",
+          "keep_alive": 60,
+          "properties": {
+            "maximum_packet_size": 64
+          },
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "packet_id": "c1",
+          "subscriptions": [
+            {
+              "filter": "{ns}/size/65",
+              "maximum_qos": 0,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            }
+          ],
+          "type": "SUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c1",
+          "reason_codes": [
+            "0x00 GrantedQos0"
+          ],
+          "type": "SUBACK"
+        }
+      },
+      {
+        "sent": {
+          "reason_code": "0x00 NormalDisconnection",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "pub": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-pub",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "dup": false,
+          "payload": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "qos": 0,
+          "retain": false,
+          "topic": "{ns}/size/63",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "sent": {
+          "dup": false,
+          "payload": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "qos": 0,
+          "retain": false,
+          "topic": "{ns}/size/64",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "sent": {
+          "dup": false,
+          "payload": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "qos": 0,
+          "retain": false,
+          "topic": "{ns}/size/65",
+          "type": "PUBLISH"
+        }
+      },
+      {
+        "sent": {
+          "reason_code": "0x00 NormalDisconnection",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ]
+  },
+  "scenario": "client_maximum_packet_size"
+}

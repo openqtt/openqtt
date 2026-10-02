@@ -3,7 +3,8 @@
 
 CARGO ?= cargo
 
-.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint tools need-nextest need-deny
+.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance differential \
+	differential-bless tools need-nextest need-deny
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -45,6 +46,30 @@ IMPLEMENTATIONS := openqtt-(auth|session|config|observe|wire|transport|cluster|l
 # One line per package, `name vX.Y.Z`, without the tree drawing.
 deps = $(CARGO) tree --locked --edges normal --target all --prefix none --format '{p}'
 
+# The platforms OpenQTT is built for; deny.toml lists the same. The TLS rule reads the tree for
+# these rather than for every target: quinn-proto depends on ring for wasm32-unknown-unknown,
+# which nothing here is built for.
+PLATFORMS := x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-unknown-linux-musl \
+	aarch64-unknown-linux-musl armv7-unknown-linux-gnueabihf x86_64-apple-darwin \
+	aarch64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+platform_deps = $(CARGO) tree --locked --edges normal $(addprefix --target ,$(PLATFORMS)) \
+	--prefix none --format '{p}'
+
+# $(call one_tls,<crate>,<least rustls versions>): one TLS stack and one crypto provider in what
+# <crate> links: at most one rustls and at least <least>, never ring, and aws-lc-rs whenever
+# rustls is there.
+one_tls = @out=$$($(platform_deps) -p $(1)) || exit 1; \
+	rustls=$$(echo "$$out" | grep -E '^rustls ' | cut -d' ' -f2 | sort -u); \
+	n=$$(echo "$$rustls" | grep -c .); \
+	if [ "$$n" -gt 1 ]; then echo "$$rustls"; \
+		echo "error: $(1) links $$n versions of rustls; there must be one"; exit 1; fi; \
+	if [ "$$n" -lt $(2) ]; then echo "error: $(1) links no rustls"; exit 1; fi; \
+	if echo "$$out" | grep -E '^ring '; then \
+		echo "error: $(1) links ring; aws-lc-rs is the only crypto provider"; exit 1; fi; \
+	if [ "$$n" -eq 1 ] && ! echo "$$out" | grep -qE '^aws-lc-rs '; then \
+		echo "error: $(1) links rustls without aws-lc-rs"; exit 1; fi; \
+	echo "layers: ok (rustls versions in $(1): $$n)"
+
 # $(call forbid,<crate>,<names>), where <names> is an extended regex of crate names.
 forbid = @out=$$($(deps) -p $(1)) || exit 1; \
 	bad=$$(echo "$$out" | sed 1d | grep -E '^($(2)) ' | sort -u); \
@@ -72,18 +97,11 @@ layers:
 	users=$$(echo "$$out" | sed 1d | sort -u); \
 	if [ -n "$$users" ]; then echo "$$users"; \
 		echo "error: openqtt-testkit must only ever be a dev-dependency"; exit 1; fi
-	@# One TLS stack and one crypto provider in the binary: at most one rustls (exactly one once
-	@# QUIC lands), never ring, and aws-lc-rs whenever rustls is there.
-	@out=$$($(deps) -p openqtt) || exit 1; \
-	rustls=$$(echo "$$out" | grep -E '^rustls ' | cut -d' ' -f2 | sort -u); \
-	n=$$(echo "$$rustls" | grep -c .); \
-	if [ "$$n" -gt 1 ]; then echo "$$rustls"; \
-		echo "error: openqtt links $$n versions of rustls; there must be one"; exit 1; fi; \
-	if echo "$$out" | grep -E '^ring '; then \
-		echo "error: openqtt links ring; aws-lc-rs is the only crypto provider"; exit 1; fi; \
-	if [ "$$n" -eq 1 ] && ! echo "$$out" | grep -qE '^aws-lc-rs '; then \
-		echo "error: openqtt links rustls without aws-lc-rs"; exit 1; fi; \
-	echo "layers: ok (rustls versions in openqtt: $$n)"
+	@# One TLS stack and one crypto provider: in the binary at most one rustls (exactly one once
+	@# QUIC lands there), and in the client and the test kit, which speak QUIC, exactly one.
+	$(call one_tls,openqtt,0)
+	$(call one_tls,openqtt-client,1)
+	$(call one_tls,openqtt-testkit,1)
 
 # --- Markdown -----------------------------------------------------------------------------
 
@@ -94,6 +112,28 @@ mdlint:
 	@if git ls-files -z -- '*.md' | LC_ALL=C xargs -0 grep -n -- '$(EM_DASH)'; then \
 		echo "error: em dash in Markdown; use a colon, a comma or a full stop"; exit 1; fi
 	@echo "mdlint: ok"
+
+# --- Conformance --------------------------------------------------------------------------
+
+# The MQTT 5.0 statements in report R1 that no test names yet, one per line. Not part of
+# check: today it lists every statement. R1 says how a test names the statements it proves.
+conformance:
+	@scripts/conformance-ids.sh
+
+# --- Differential -------------------------------------------------------------------------
+
+# The differential harness (crates/testkit/tests/differential/README.md): every scenario
+# against OpenQTT 1.x in Docker, twice, and the traces compared with each other and with those
+# kept in the repository. Not part of check: it needs Docker and takes a few minutes.
+differential: need-nextest
+	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
+		--no-capture -E 'test(the_oracle_traces_the_same_twice_and_as_kept)'
+
+# Rewrites the kept traces from two runs that agree, after an intended change to a scenario,
+# to the normalizing or to the oracle. Read the diff before committing it.
+differential-bless: need-nextest
+	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
+		--no-capture -E 'test(bless_the_oracle_traces)'
 
 # --- Tools --------------------------------------------------------------------------------
 

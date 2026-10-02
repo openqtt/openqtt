@@ -1,0 +1,29 @@
+# Spike S2: routing at scale. Measures the router design of report R3 and feeds report R6
+# (docs/reports/R06-routing.md, which says how to rerun it). A crate and workspace of its own,
+# excluded from the product workspace, with every dependency at an exact version.
+[package]
+name = "openqtt-spike-s2"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+# Destination sets above 64 entries, as R3 specifies.
+roaring = "=0.11.5"
+# Hash tables that store only a 32-bit id and compare against data kept elsewhere: the level
+# interner and the child table, which is what keeps them small.
+hashbrown = { version = "=0.17.1", default-features = false, features = ["inline-more"] }
+# A fixed-seed hasher, so every run builds the same tables and places devices the same way.
+foldhash = "=0.2.0"
+# Results are written as JSON under bench/results/.
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+
+[workspace]
+members = ["."]
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+debug = "line-tables-only"

@@ -11,17 +11,18 @@
 ## Reports
 
 Each report answers one design question, from reading the specification and
-EMQX or from a measured spike. They go in `reports/`.
+EMQX or from a measured spike. They go in `reports/`; a spike's code is in
+`../spikes/` and its raw results in `../bench/results/`.
 
 | Report | Question | Status |
 | --- | --- | --- |
-| R1 | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | to be written |
+| [R1](reports/R01-conformance.md) | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | draft |
 | [R2](reports/R02-compatibility.md) | Compatibility contract with 1.x, as executable tests | draft |
 | [R3](reports/R03-roles-and-wire.md) | Roles, the message path, the wire protocol between roles and the extension traits | draft |
 | [R4](reports/R04-log.md) | The log: storage engine, replication, what durable means before a PUBACK, data model (spike S1) | draft |
 | R5 | Sessions and handoff: takeover, drain, rolling upgrade, wills | to be written |
-| R6 | Routing at scale: interest aggregation, wildcard index, memory, fan-out | to be written |
-| R7 | QUIC in a cluster: migration, 0-RTT and load balancers | to be written |
+| [R6](reports/R06-routing.md) | Routing at scale: interest aggregation, wildcard index, memory, fan-out | draft |
+| [R7](reports/R07-quic.md) | QUIC in a cluster: migration, 0-RTT and load balancers | draft: S4 measured, S3 to come |
 | R8 | Security model: authentication, authorization, revocation, admin API | to be written |
 | R9 | Operations contract: metrics, logs, health, admin API and CLI | to be written |
 | R10 | Migration from 1.x | to be written |
@@ -34,3 +35,11 @@ Normative specifications go in `spec/`.
 | --- | --- |
 | [`spec/mqtt-over-quic.md`](spec/mqtt-over-quic.md): MQTT 5 over QUIC, compatible with EMQX and NanoMQ | draft |
 | `spec/wire.md`: the protocol between roles | to be written |
+
+## Test tooling
+
+| Tool | Where |
+| --- | --- |
+| `openqtt-client`: the MQTT 5 over QUIC client | `crates/client` |
+| `openqtt-testkit`: raw-packet client, throwaway PKI, fake server and broker, scenarios and traces | `crates/testkit` |
+| The differential harness against OpenQTT 1.x: `make differential` | [`crates/testkit/tests/differential`](../crates/testkit/tests/differential/README.md) |

@@ -5,17 +5,9 @@
 //! is a Malformed Packet rather than a reason to wait for more. The `put_*` functions write
 //! them into a packet that has already been measured and checked, so they cannot fail.
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the packet codecs in the following commits are what call these"
-    )
-)]
-
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::Error;
+use crate::{Error, PacketId, PacketType};
 
 /// The largest value a Variable Byte Integer holds: four bytes of seven bits (section 1.5.5,
 /// Table 1-1). It bounds the Remaining Length, every Property Length and the Subscription
@@ -25,6 +17,10 @@ pub const MAX_VARIABLE_BYTE_INTEGER: u32 = 268_435_455;
 /// The longest UTF-8 Encoded String or Binary Data value, in bytes. Both are prefixed by a Two
 /// Byte Integer length (sections 1.5.4 and 1.5.6).
 pub const MAX_STRING_LEN: usize = 65_535;
+
+/// The largest packet the protocol can express: one byte of type and flags, four of Remaining
+/// Length, and the largest Remaining Length (section 2.1.4).
+pub const MAX_PACKET_SIZE: u32 = 1 + 4 + MAX_VARIABLE_BYTE_INTEGER;
 
 /// Reads a Variable Byte Integer from the front of `bytes`, returning its value and how many
 /// bytes it took, or `None` when `bytes` ends before the integer does.
@@ -217,6 +213,14 @@ impl<'a> Reader<'a> {
         self.array(field).map(u32::from_be_bytes)
     }
 
+    /// A Packet Identifier, which is never 0 where a packet carries one ([MQTT-2.2.1-3],
+    /// [MQTT-2.2.1-4]; an acknowledgement repeats one of those, [MQTT-2.2.1-5] and
+    /// [MQTT-2.2.1-6]).
+    pub(crate) fn packet_id(&mut self, packet_type: PacketType) -> Result<PacketId, Error> {
+        PacketId::new(self.u16("Packet Identifier")?)
+            .ok_or(Error::ZeroPacketIdentifier { packet_type })
+    }
+
     /// A Variable Byte Integer (section 1.5.5).
     pub(crate) fn variable_byte_integer(&mut self, field: &'static str) -> Result<u32, Error> {
         let buf: &'a [u8] = self.buf;
@@ -264,6 +268,19 @@ impl<'a> Reader<'a> {
         let rest = self.buf.slice(self.pos..self.end);
         self.pos = self.end;
         rest
+    }
+
+    /// Checks that the last field of a packet has been read: anything after it means the
+    /// packet does not match its format, a Malformed Packet.
+    pub(crate) fn finish(&self, packet_type: PacketType) -> Result<(), Error> {
+        if self.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::TrailingBytes {
+                packet_type,
+                count: self.remaining(),
+            })
+        }
     }
 }
 

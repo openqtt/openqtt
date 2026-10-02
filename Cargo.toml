@@ -3,9 +3,11 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-# Measured spikes are workspaces of their own with their own pinned dependencies, so nothing
-# they pull in reaches Cargo.lock, cargo-deny or `make check`.
-exclude = ["spikes"]
+# The codec's fuzz targets are a crate of their own: cargo-fuzz needs a nightly compiler, and
+# the gate builds this workspace on the pinned stable one. The spikes are measurements kept
+# beside the code, not part of it: each is a crate of its own with exact versions and its own
+# lock file, so nothing they pull in reaches the product's.
+exclude = ["fuzz", "spikes/s1-log", "spikes/s2-routing", "spikes/s4-quinn"]
 
 [workspace.package]
 version = "2.0.0-alpha.0"
@@ -52,6 +54,26 @@ thiserror = "2.0"
 # Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
 # payload is a slice of the buffer it arrived in rather than a copy.
 bytes = "1.12"
+# Property tests, a dev-dependency only: random valid packets must round-trip and random bytes
+# must never panic the decoder. Without the fork and timeout features, which run each case in
+# a child process and bring tempfile and rusty-fork for it.
+proptest = { version = "1.11", default-features = false, features = ["std"] }
+# The async runtime QUIC runs on. No default features; each crate names the ones it uses.
+tokio = { version = "1.53", default-features = false }
+# QUIC (RFC 9000) for the client and the test kit. Without the defaults, which bring ring
+# through rustls-ring and a platform certificate verifier: TLS runs on rustls with aws-lc-rs.
+quinn = { version = "0.11.12", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+# TLS 1.3 inside QUIC, on aws-lc-rs, the one crypto provider (deny.toml bans ring). Without the
+# defaults: QUIC needs no TLS 1.2, and logging would go through the log crate.
+rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs", "std"] }
+# Throwaway CAs and certificates for tests, signed with aws-lc-rs instead of rcgen's default
+# ring.
+rcgen = { version = "0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
+# JSON traces of test runs, written and compared by the test kit.
+serde_json = "1.0.151"
+# The differential harness reads its list of intended divergences from TOML. Without
+# `display`, since nothing writes TOML.
+toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

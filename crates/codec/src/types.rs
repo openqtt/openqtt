@@ -192,6 +192,36 @@ impl fmt::Display for QoS {
     }
 }
 
+/// The Payload Format Indicator of an Application Message or Will Message (sections
+/// 3.3.2.3.2 and 3.1.3.2.3). Whether one was sent at all is kept apart from its value, since a
+/// server forwards it unaltered ([MQTT-3.3.2-4]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[repr(u8)]
+pub enum PayloadFormat {
+    /// 0: unspecified bytes, the same as sending no indicator.
+    #[default]
+    Unspecified = 0,
+    /// 1: UTF-8 Encoded Character Data. Checking that the payload is well-formed UTF-8 is up to
+    /// the receiver, which MAY refuse it with 0x99 (Payload format invalid).
+    Utf8 = 1,
+}
+
+impl PayloadFormat {
+    /// The format with this value, or `None` for anything but 0 and 1.
+    pub const fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Unspecified),
+            1 => Some(Self::Utf8),
+            _ => None,
+        }
+    }
+
+    /// The value, 0 or 1.
+    pub const fn value(self) -> u8 {
+        self as u8
+    }
+}
+
 /// The end of a connection that sent a packet. Some packets, properties and reason codes are
 /// only ever sent by one end (Tables 2-1, 3-4, 3-5, 3-10 and 3-11, and [MQTT-3.3.4-6] and
 /// [MQTT-3.14.2-2]).

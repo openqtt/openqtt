@@ -1,0 +1,127 @@
+{
+  "clients": {
+    "sub": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-sub",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "packet_id": "c1",
+          "subscriptions": [
+            {
+              "filter": "{ns}/s/0",
+              "maximum_qos": 0,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            },
+            {
+              "filter": "{ns}/s/1",
+              "maximum_qos": 1,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            },
+            {
+              "filter": "{ns}/s/2",
+              "maximum_qos": 2,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            }
+          ],
+          "type": "SUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c1",
+          "reason_codes": [
+            "0x00 GrantedQos0",
+            "0x01 GrantedQos1",
+            "0x02 GrantedQos2"
+          ],
+          "type": "SUBACK"
+        }
+      },
+      {
+        "sent": {
+          "packet_id": "c2",
+          "subscriptions": [
+            {
+              "filter": "{ns}/s/1",
+              "maximum_qos": 0,
+              "no_local": false,
+              "retain_as_published": false,
+              "retain_handling": 0
+            }
+          ],
+          "type": "SUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c2",
+          "reason_codes": [
+            "0x00 GrantedQos0"
+          ],
+          "type": "SUBACK"
+        }
+      },
+      {
+        "sent": {
+          "filters": [
+            "{ns}/s/0",
+            "{ns}/s/none"
+          ],
+          "packet_id": "c3",
+          "type": "UNSUBSCRIBE"
+        }
+      },
+      {
+        "received": {
+          "packet_id": "c3",
+          "reason_codes": [
+            "0x00 Success",
+            "0x11 NoSubscriptionExisted"
+          ],
+          "type": "UNSUBACK"
+        }
+      },
+      {
+        "sent": {
+          "reason_code": "0x00 NormalDisconnection",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ]
+  },
+  "scenario": "subscribe_and_unsubscribe"
+}

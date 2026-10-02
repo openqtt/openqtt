@@ -1,0 +1,143 @@
+{
+  "args": {
+    "conns": "10000",
+    "endpoints": "10",
+    "out": "../../bench/results/s4-idle-endpoint-per-core.json",
+    "pki": "target/pki",
+    "profiles": "default"
+  },
+  "experiment": "idle",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:58:54Z",
+    "kern.ipc.maxsockbuf": "8388608",
+    "kern.maxfilesperproc": "61440",
+    "memory_bytes": "17179869184",
+    "net.inet.udp.maxdgram": "9216",
+    "net.inet.udp.recvspace": "786896",
+    "note": "laptop numbers: server and client share one machine; absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "performance_cores": "6",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "rows": [
+      {
+        "allocations_per_conn": 58.0282,
+        "baseline": {
+          "allocs": 478,
+          "failed": 0,
+          "footprint": 2457960,
+          "handshakes": 0,
+          "heap": 542497,
+          "live": 0,
+          "pings": 0,
+          "resident": 3653632,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.006793,
+          "t": 11.071437666,
+          "user_s": 0.035123
+        },
+        "baseline_cpu_cores": 0.00008422864716596166,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 480477928,
+          "heap": 383445346,
+          "pings": 10000,
+          "t": 97.788172833
+        },
+        "conns": 10000,
+        "endpoints": 10,
+        "footprint_per_conn": 48211.5968,
+        "footprint_per_conn_at_end": 48211.5968,
+        "heap_per_conn": 38708.2901,
+        "heap_per_conn_at_end": 38708.4197,
+        "idle_cpu_cores": 0.029783574854883914,
+        "idle_cpu_cores_net": 0.029699346207717952,
+        "idle_cpu_us_per_keepalive": 89.09803862315384,
+        "idle_window_s": 60.366460667,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 10,
+          "listening": [
+            {
+              "port": 15000,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15001,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15002,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15003,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15004,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15005,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15006,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15007,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15008,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            },
+            {
+              "port": 15009,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "default",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "default",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 2.512276958
+        },
+        "resident_per_conn": 16018.6368,
+        "server_threads": 0,
+        "setup_per_second": 3913.1957941328483,
+        "setup_seconds": 2.5554560840000002,
+        "setup_server_cpu_s": 8.847307999999998,
+        "udp_full_buffer_drops": 0
+      }
+    ]
+  },
+  "spike": "S4"
+}

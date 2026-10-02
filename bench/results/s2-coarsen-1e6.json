@@ -1,0 +1,2845 @@
+{
+  "args": {
+    "n": "1000000",
+    "out": "../../bench/results/s2-coarsen-1e6.json",
+    "samples": "200000"
+  },
+  "experiment": "coarsen",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:35:43Z",
+    "memory_bytes": "17179869184",
+    "note": "laptop numbers: absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "consumer_of_all_telemetry_on_edge_0": "ingest/+/+/+/telemetry",
+    "narrow_consumers": [
+      {
+        "edge_of_100": 29,
+        "filter": "ingest/org-00000/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 57,
+        "filter": "ingest/org-00001/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 17,
+        "filter": "ingest/org-00002/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 11,
+        "filter": "ingest/org-00003/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 13,
+        "filter": "ingest/org-00004/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 61,
+        "filter": "ingest/org-00005/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 13,
+        "filter": "ingest/org-00006/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 55,
+        "filter": "ingest/org-00007/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 85,
+        "filter": "ingest/org-00008/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 93,
+        "filter": "ingest/org-00009/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 4,
+        "filter": "ingest/org-00010/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 80,
+        "filter": "ingest/org-00011/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 47,
+        "filter": "ingest/org-00012/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 58,
+        "filter": "ingest/org-00013/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 99,
+        "filter": "ingest/org-00014/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 43,
+        "filter": "ingest/org-00015/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 92,
+        "filter": "ingest/org-00016/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 36,
+        "filter": "ingest/org-00017/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 14,
+        "filter": "ingest/org-00018/+/+/telemetry"
+      },
+      {
+        "edge_of_100": 91,
+        "filter": "ingest/org-00019/+/+/telemetry"
+      }
+    ],
+    "rows": [
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.9863132828282828,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/+/+/+/#",
+          "ingest/+/+/+/commands/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 360,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/+/+/telemetry",
+          "ingest/+/+/+/commands/#",
+          "ingest/+/lab/+/commands/#"
+        ],
+        "max_entries_per_edge": 4,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 360,
+        "route_entries_per_device": 0.00036,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 420,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/field/+/commands/#",
+          "ingest/+/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 5,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 420,
+        "route_entries_per_device": 0.00042,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 420,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/field/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 5,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 420,
+        "route_entries_per_device": 0.00042,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 22573,
+        "command_false_positive_rate": 0.9897718325986526,
+        "command_remote_deliveries_per_message": 97.769225,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/field/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 259,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 22573,
+        "route_entries_per_device": 0.022573,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 86203,
+        "command_false_positive_rate": 0.9890536113613881,
+        "command_remote_deliveries_per_message": 91.35433,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/field/96128cad90714d4b/commands/#",
+          "ingest/+/field/f743e91dbb7dacc5/commands/#",
+          "ingest/+/field/8d094254d45c4bb7/commands/#"
+        ],
+        "max_entries_per_edge": 940,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 86203,
+        "route_entries_per_device": 0.086203,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 101,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 19,
+        "example_coarse_filters": [
+          "ingest/+/+/+/+",
+          "ingest/+/+/+/+/#",
+          "ingest/+/+/+/commands/#"
+        ],
+        "max_entries_per_edge": 2,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 120,
+        "route_entries_per_device": 0.00012,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9315591034092783,
+        "telemetry_remote_deliveries_per_message": 19.797885
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 21,
+        "example_coarse_filters": [
+          "ingest/+/lab/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 421,
+        "route_entries_per_device": 0.000421,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 21,
+        "example_coarse_filters": [
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/lab/+/commands/#",
+          "ingest/+/field/+/commands/#"
+        ],
+        "max_entries_per_edge": 6,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 421,
+        "route_entries_per_device": 0.000421,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 21,
+        "example_coarse_filters": [
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/field/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 421,
+        "route_entries_per_device": 0.000421,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 301,
+        "command_false_positive_rate": 0.9897718325986526,
+        "command_remote_deliveries_per_message": 97.769225,
+        "edges": 100,
+        "exact_entries": 22273,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/field/+/commands/#"
+        ],
+        "max_entries_per_edge": 259,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 22574,
+        "route_entries_per_device": 0.022574,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 200,
+        "command_false_positive_rate": 0.9890536113613881,
+        "command_remote_deliveries_per_message": 91.35433,
+        "edges": 100,
+        "exact_entries": 86004,
+        "example_coarse_filters": [
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 940,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 86204,
+        "route_entries_per_device": 0.086204,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97190,
+        "command_false_positive_rate": 0.9859936582085637,
+        "command_remote_deliveries_per_message": 71.39623,
+        "edges": 100,
+        "exact_entries": 184077,
+        "example_coarse_filters": [
+          "ingest/org-00021/#",
+          "ingest/org-04000/#",
+          "ingest/org-00067/#"
+        ],
+        "max_entries_per_edge": 2909,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 281267,
+        "route_entries_per_device": 0.281267,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9808312320547222,
+        "telemetry_remote_deliveries_per_message": 70.68712
+      },
+      {
+        "coarse_entries": 23599,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437271,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/#",
+          "ingest/org-00021/field/#",
+          "ingest/org-00021/production/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460870,
+        "route_entries_per_device": 0.46087,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9747737665864321,
+        "telemetry_remote_deliveries_per_message": 53.71333
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/#",
+          "ingest/org-00014/production/#",
+          "ingest/org-00016/production/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9676630495418305,
+        "telemetry_remote_deliveries_per_message": 41.902065
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/#",
+          "ingest/org-00007/production/#",
+          "ingest/org-00001/production/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9548189311107781,
+        "telemetry_remote_deliveries_per_message": 29.990105
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/#",
+          "ingest/org-00002/production/#",
+          "ingest/org-00000/staging/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9307624012682629,
+        "telemetry_remote_deliveries_per_message": 19.570075
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97190,
+        "command_false_positive_rate": 0.9859936582085637,
+        "command_remote_deliveries_per_message": 71.39623,
+        "edges": 100,
+        "exact_entries": 184077,
+        "example_coarse_filters": [
+          "ingest/org-00021/+/+/commands/#",
+          "ingest/org-04000/+/+/commands/#",
+          "ingest/org-00067/+/+/commands/#"
+        ],
+        "max_entries_per_edge": 2909,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 281267,
+        "route_entries_per_device": 0.281267,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 23600,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437271,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460871,
+        "route_entries_per_device": 0.460871,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/+/commands/#",
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00016/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00007/production/+/commands/#",
+          "ingest/org-00001/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/+/commands/#",
+          "ingest/org-00002/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97190,
+        "command_false_positive_rate": 0.9859936582085637,
+        "command_remote_deliveries_per_message": 71.39623,
+        "edges": 100,
+        "exact_entries": 184097,
+        "example_coarse_filters": [
+          "ingest/org-00021/+/+/commands/#",
+          "ingest/org-04000/+/+/commands/#",
+          "ingest/org-00067/+/+/commands/#"
+        ],
+        "max_entries_per_edge": 2909,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 281287,
+        "route_entries_per_device": 0.281287,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 23602,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437272,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460874,
+        "route_entries_per_device": 0.460874,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/+/commands/#",
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00016/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00007/production/+/commands/#",
+          "ingest/org-00001/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/+/commands/#",
+          "ingest/org-00002/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97791,
+        "command_false_positive_rate": 0.9846630342085654,
+        "command_remote_deliveries_per_message": 65.201945,
+        "edges": 100,
+        "exact_entries": 254661,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/#",
+          "ingest/org-00021/field/#",
+          "ingest/org-00021/production/#"
+        ],
+        "max_entries_per_edge": 3657,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 352452,
+        "route_entries_per_device": 0.352452,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9790101088744538,
+        "telemetry_remote_deliveries_per_message": 64.55417
+      },
+      {
+        "coarse_entries": 23602,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437272,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/#",
+          "ingest/org-00021/field/#",
+          "ingest/org-00021/production/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460874,
+        "route_entries_per_device": 0.460874,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9747737665864321,
+        "telemetry_remote_deliveries_per_message": 53.71333
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/#",
+          "ingest/org-00014/production/#",
+          "ingest/org-00016/production/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9676630495418305,
+        "telemetry_remote_deliveries_per_message": 41.902065
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/#",
+          "ingest/org-00007/production/#",
+          "ingest/org-00001/production/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9548189311107781,
+        "telemetry_remote_deliveries_per_message": 29.990105
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/#",
+          "ingest/org-00002/production/#",
+          "ingest/org-00000/staging/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9307624012682629,
+        "telemetry_remote_deliveries_per_message": 19.570075
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97791,
+        "command_false_positive_rate": 0.9846630342085654,
+        "command_remote_deliveries_per_message": 65.201945,
+        "edges": 100,
+        "exact_entries": 254661,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 3657,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 352452,
+        "route_entries_per_device": 0.352452,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 23602,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437272,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460874,
+        "route_entries_per_device": 0.460874,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/+/commands/#",
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00016/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00007/production/+/commands/#",
+          "ingest/org-00001/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/+/commands/#",
+          "ingest/org-00002/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 97791,
+        "command_false_positive_rate": 0.9846630342085654,
+        "command_remote_deliveries_per_message": 65.201945,
+        "edges": 100,
+        "exact_entries": 254661,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 3657,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 352452,
+        "route_entries_per_device": 0.352452,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 23602,
+        "command_false_positive_rate": 0.9815700561330015,
+        "command_remote_deliveries_per_message": 54.259525,
+        "edges": 100,
+        "exact_entries": 437272,
+        "example_coarse_filters": [
+          "ingest/org-00021/staging/+/commands/#",
+          "ingest/org-00021/field/+/commands/#",
+          "ingest/org-00021/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 4779,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 460874,
+        "route_entries_per_device": 0.460874,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 5409,
+        "command_false_positive_rate": 0.9763713423133259,
+        "command_remote_deliveries_per_message": 42.32149,
+        "edges": 100,
+        "exact_entries": 578535,
+        "example_coarse_filters": [
+          "ingest/org-00021/production/+/commands/#",
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00016/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 6035,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 583944,
+        "route_entries_per_device": 0.583944,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 1444,
+        "command_false_positive_rate": 0.9669019606285583,
+        "command_remote_deliveries_per_message": 30.21327,
+        "edges": 100,
+        "exact_entries": 704110,
+        "example_coarse_filters": [
+          "ingest/org-00014/production/+/commands/#",
+          "ingest/org-00007/production/+/commands/#",
+          "ingest/org-00001/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7250,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 705554,
+        "route_entries_per_device": 0.705554,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 400,
+        "command_false_positive_rate": 0.9489450907003227,
+        "command_remote_deliveries_per_message": 19.586755,
+        "edges": 100,
+        "exact_entries": 812509,
+        "example_coarse_filters": [
+          "ingest/org-00001/production/+/commands/#",
+          "ingest/org-00002/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 8351,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 812909,
+        "route_entries_per_device": 0.812909,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "coarse_entries": 0,
+        "command_false_positive_rate": 0.0,
+        "command_remote_deliveries_per_message": 1.0,
+        "edges": 100,
+        "exact_entries": 1000021,
+        "example_coarse_filters": [],
+        "max_entries_per_edge": 10242,
+        "n": 1000000,
+        "placement": "Uniform",
+        "route_entries": 1000021,
+        "route_entries_per_device": 1.000021,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.354985
+      },
+      {
+        "load": {
+          "max": 10241,
+          "max_over_mean": 1.0241,
+          "mean": 10000.0,
+          "min": 9771
+        },
+        "n": 1000000,
+        "organisations": 10000,
+        "placement": "Uniform",
+        "seconds": 22.982300833
+      },
+      {
+        "entries": 705554,
+        "filters": 704131,
+        "full_view_rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "heap_bytes": 137370464,
+        "heap_bytes_per_entry": 194.69872469010167,
+        "n": 1000000,
+        "placement": "Uniform"
+      },
+      {
+        "entries": 421,
+        "filters": 25,
+        "full_view_rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "heap_bytes": 7248,
+        "heap_bytes_per_entry": 17.216152019002376,
+        "n": 1000000,
+        "placement": "Uniform"
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.99,
+        "command_remote_deliveries_per_message": 100.0,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9863438888888889,
+        "telemetry_remote_deliveries_per_message": 99.0
+      },
+      {
+        "coarse_entries": 101,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#",
+          "ingest/org-00016/production/#",
+          "ingest/org-00004/production/#"
+        ],
+        "max_entries_per_edge": 2,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 101,
+        "route_entries_per_device": 0.000101,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9862069813361595,
+        "telemetry_remote_deliveries_per_message": 98.01734
+      },
+      {
+        "coarse_entries": 101,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#",
+          "ingest/org-00016/production/#",
+          "ingest/org-00004/production/#"
+        ],
+        "max_entries_per_edge": 2,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 101,
+        "route_entries_per_device": 0.000101,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9862069813361595,
+        "telemetry_remote_deliveries_per_message": 98.01734
+      },
+      {
+        "coarse_entries": 101,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/#",
+          "ingest/org-00016/production/#",
+          "ingest/org-00004/production/#"
+        ],
+        "max_entries_per_edge": 2,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 101,
+        "route_entries_per_device": 0.000101,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9862069813361595,
+        "telemetry_remote_deliveries_per_message": 98.01734
+      },
+      {
+        "coarse_entries": 107,
+        "command_false_positive_rate": 0.9846822278382281,
+        "command_remote_deliveries_per_message": 65.283645,
+        "edges": 100,
+        "exact_entries": 58840,
+        "example_coarse_filters": [
+          "ingest/#",
+          "ingest/org-00000/staging/#",
+          "ingest/org-00001/production/#"
+        ],
+        "max_entries_per_edge": 3644,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 58947,
+        "route_entries_per_device": 0.058947,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9789972238749858,
+        "telemetry_remote_deliveries_per_message": 64.3703
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/#",
+          "ingest/org-00036/production/#",
+          "ingest/org-00000/staging/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 100,
+        "command_false_positive_rate": 0.9899712294630837,
+        "command_remote_deliveries_per_message": 99.71312,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/+/+/+/#",
+          "ingest/+/+/+/commands/#",
+          "ingest/+/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 1,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 100,
+        "route_entries_per_device": 0.0001,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9317231858759255,
+        "telemetry_remote_deliveries_per_message": 19.801085
+      },
+      {
+        "coarse_entries": 358,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/+/+/telemetry",
+          "ingest/+/+/+/commands/#",
+          "ingest/+/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 4,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 358,
+        "route_entries_per_device": 0.000358,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.9317231858759255,
+        "telemetry_remote_deliveries_per_message": 19.801085
+      },
+      {
+        "coarse_entries": 418,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/field/+/commands/#"
+        ],
+        "max_entries_per_edge": 5,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 418,
+        "route_entries_per_device": 0.000418,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.9317231858759255,
+        "telemetry_remote_deliveries_per_message": 19.801085
+      },
+      {
+        "coarse_entries": 897,
+        "command_false_positive_rate": 0.9898752135254187,
+        "command_remote_deliveries_per_message": 98.767515,
+        "edges": 100,
+        "exact_entries": 0,
+        "example_coarse_filters": [
+          "ingest/+/field/+/commands/#",
+          "ingest/+/production/+/commands/#",
+          "ingest/+/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 64,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 897,
+        "route_entries_per_device": 0.000897,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.9317231858759255,
+        "telemetry_remote_deliveries_per_message": 19.801085
+      },
+      {
+        "coarse_entries": 6310,
+        "command_false_positive_rate": 0.9844780066159392,
+        "command_remote_deliveries_per_message": 64.424715,
+        "edges": 100,
+        "exact_entries": 58840,
+        "example_coarse_filters": [
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/lab/+/commands/#",
+          "ingest/+/field/+/commands/#"
+        ],
+        "max_entries_per_edge": 3644,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 65150,
+        "route_entries_per_device": 0.06515,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.9095361263645728,
+        "telemetry_remote_deliveries_per_message": 14.944695
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 101,
+        "command_false_positive_rate": 0.9899712294630837,
+        "command_remote_deliveries_per_message": 99.71312,
+        "edges": 100,
+        "exact_entries": 19,
+        "example_coarse_filters": [
+          "ingest/+/+/+/+",
+          "ingest/+/+/+/+/#",
+          "ingest/+/+/+/commands/#"
+        ],
+        "max_entries_per_edge": 2,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 120,
+        "route_entries_per_device": 0.00012,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.9317231858759255,
+        "telemetry_remote_deliveries_per_message": 19.801085
+      },
+      {
+        "coarse_entries": 398,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 21,
+        "example_coarse_filters": [
+          "ingest/+/field/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/lab/+/commands/#"
+        ],
+        "max_entries_per_edge": 6,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 419,
+        "route_entries_per_device": 0.000419,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 398,
+        "command_false_positive_rate": 0.9899007587963886,
+        "command_remote_deliveries_per_message": 99.01734,
+        "edges": 100,
+        "exact_entries": 21,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/staging/+/commands/#",
+          "ingest/+/field/+/commands/#"
+        ],
+        "max_entries_per_edge": 6,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 419,
+        "route_entries_per_device": 0.000419,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 387,
+        "command_false_positive_rate": 0.9898752135254187,
+        "command_remote_deliveries_per_message": 98.767515,
+        "edges": 100,
+        "exact_entries": 511,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/field/+/commands/#",
+          "ingest/+/lab/+/commands/#"
+        ],
+        "max_entries_per_edge": 64,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 898,
+        "route_entries_per_device": 0.000898,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 261,
+        "command_false_positive_rate": 0.9844780066159392,
+        "command_remote_deliveries_per_message": 64.424715,
+        "edges": 100,
+        "exact_entries": 64890,
+        "example_coarse_filters": [
+          "ingest/+/production/+/commands/#",
+          "ingest/+/field/+/commands/#",
+          "ingest/+/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 3644,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 65151,
+        "route_entries_per_device": 0.065151,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 22764,
+        "command_false_positive_rate": 0.4905354217984609,
+        "command_remote_deliveries_per_message": 1.962845,
+        "edges": 100,
+        "exact_entries": 1430,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/#",
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#"
+        ],
+        "max_entries_per_edge": 293,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24194,
+        "route_entries_per_device": 0.024194,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.4111335185943394,
+        "telemetry_remote_deliveries_per_message": 2.29586
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#",
+          "ingest/org-01769/production/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#",
+          "ingest/org-01769/production/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/#",
+          "ingest/org-00496/staging/#",
+          "ingest/org-00265/staging/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/#",
+          "ingest/org-00069/staging/#",
+          "ingest/org-00277/production/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/#",
+          "ingest/org-00036/production/#",
+          "ingest/org-00000/staging/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 22764,
+        "command_false_positive_rate": 0.4905354217984609,
+        "command_remote_deliveries_per_message": 1.962845,
+        "edges": 100,
+        "exact_entries": 1430,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/+/commands/#",
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 293,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24194,
+        "route_entries_per_device": 0.024194,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-00496/staging/+/commands/#",
+          "ingest/org-00265/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/+/commands/#",
+          "ingest/org-00069/staging/+/commands/#",
+          "ingest/org-00277/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 22764,
+        "command_false_positive_rate": 0.48742263285364634,
+        "command_remote_deliveries_per_message": 1.950925,
+        "edges": 100,
+        "exact_entries": 1431,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/+/commands/#",
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 293,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24195,
+        "route_entries_per_device": 0.024195,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-00496/staging/+/commands/#",
+          "ingest/org-00265/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/+/commands/#",
+          "ingest/org-00069/staging/+/commands/#",
+          "ingest/org-00277/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 2,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 22990,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 1459,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/#",
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#"
+        ],
+        "max_entries_per_edge": 296,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24449,
+        "route_entries_per_device": 0.024449,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#",
+          "ingest/org-01769/production/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/#",
+          "ingest/org-00307/production/#",
+          "ingest/org-01769/production/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/#",
+          "ingest/org-00496/staging/#",
+          "ingest/org-00265/staging/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/#",
+          "ingest/org-00069/staging/#",
+          "ingest/org-00277/production/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/#",
+          "ingest/org-00036/production/#",
+          "ingest/org-00000/staging/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "#",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.40789686901909944,
+        "telemetry_remote_deliveries_per_message": 2.28331
+      },
+      {
+        "coarse_entries": 22990,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 1459,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/+/commands/#",
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 296,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24449,
+        "route_entries_per_device": 0.024449,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-00496/staging/+/commands/#",
+          "ingest/org-00265/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/+/commands/#",
+          "ingest/org-00069/staging/+/commands/#",
+          "ingest/org-00277/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 22990,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 1459,
+        "example_coarse_filters": [
+          "ingest/org-07735/production/+/commands/#",
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 296,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 24449,
+        "route_entries_per_device": 0.024449,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 17295,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 18451,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 411,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 35746,
+        "route_entries_per_device": 0.035746,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 4
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 6402,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 116917,
+        "example_coarse_filters": [
+          "ingest/org-02566/production/+/commands/#",
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-01769/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 1360,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 123319,
+        "route_entries_per_device": 0.123319,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 16
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 1618,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 260773,
+        "example_coarse_filters": [
+          "ingest/org-00307/production/+/commands/#",
+          "ingest/org-00496/staging/+/commands/#",
+          "ingest/org-00265/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 3432,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 262391,
+        "route_entries_per_device": 0.262391,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 392,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 407014,
+        "example_coarse_filters": [
+          "ingest/org-00091/production/+/commands/#",
+          "ingest/org-00069/staging/+/commands/#",
+          "ingest/org-00277/production/+/commands/#"
+        ],
+        "max_entries_per_edge": 7893,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 407406,
+        "route_entries_per_device": 0.407406,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 256
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "coarse_entries": 109,
+        "command_false_positive_rate": 0.48408931445788106,
+        "command_remote_deliveries_per_message": 1.93832,
+        "edges": 100,
+        "exact_entries": 540631,
+        "example_coarse_filters": [
+          "ingest/org-00058/production/+/commands/#",
+          "ingest/org-00036/production/+/commands/#",
+          "ingest/org-00000/staging/+/commands/#"
+        ],
+        "max_entries_per_edge": 9986,
+        "n": 1000000,
+        "placement": "Prefix",
+        "route_entries": 540740,
+        "route_entries_per_device": 0.54074,
+        "rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 1024
+        },
+        "telemetry_false_positive_rate": 0.0,
+        "telemetry_remote_deliveries_per_message": 1.351955
+      },
+      {
+        "load": {
+          "max": 11575,
+          "max_over_mean": 1.1575,
+          "mean": 10000.0,
+          "min": 9866
+        },
+        "n": 1000000,
+        "organisations": 10000,
+        "placement": "Prefix",
+        "seconds": 18.137016125
+      },
+      {
+        "entries": 262391,
+        "filters": 262369,
+        "full_view_rule": {
+          "floor": 3,
+          "hysteresis": false,
+          "policy": "+",
+          "t": 64
+        },
+        "heap_bytes": 68681808,
+        "heap_bytes_per_entry": 261.7536729537217,
+        "n": 1000000,
+        "placement": "Prefix"
+      },
+      {
+        "entries": 898,
+        "filters": 517,
+        "full_view_rule": {
+          "floor": 1,
+          "hysteresis": false,
+          "policy": "shape",
+          "t": 64
+        },
+        "heap_bytes": 135920,
+        "heap_bytes_per_entry": 151.358574610245,
+        "n": 1000000,
+        "placement": "Prefix"
+      }
+    ]
+  },
+  "spike": "S2"
+}
