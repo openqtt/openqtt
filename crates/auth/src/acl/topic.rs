@@ -95,9 +95,10 @@ impl Template {
     }
 }
 
-/// Whether a rule's filter `rule` allows the subscription filter `subscription`, both without
-/// a `$share/{ShareName}/`: the subscription is read as a topic name and matched level by level
-/// (R2 rule 11), so that a rule allowing `a/+/+` allows that filter and refuses broader ones.
+/// Whether an allow rule's filter `rule` allows the subscription filter `subscription`, both
+/// without a `$share/{ShareName}/`: the subscription is read as a topic name and matched level by
+/// level (R2 rule 11), so that a rule allowing `a/+/+` allows that filter and refuses broader
+/// ones.
 ///
 /// A literal level of the rule matches the same text only, so the rule's `b` does not allow
 /// `+`. The rule's `+` matches any one level but `#`, which can stand for any number of levels,
@@ -108,6 +109,17 @@ impl Template {
 /// The check is level by level, and so errs towards refusal: the rule `+/#` matches every topic
 /// `#` matches, and still does not allow the subscription `#`.
 pub(crate) fn covers(rule: &str, subscription: &str) -> bool {
+    levels_match(rule, subscription, false)
+}
+
+/// Whether a deny rule's filter `rule` refuses the subscription filter `subscription`: as
+/// [`covers`], but the rule's `+` takes a `#` as well, as 1.x read it. A subscription to `a/#`
+/// receives what `a/+` names, and a deny never refuses less than it did in 1.x.
+pub(crate) fn denies(rule: &str, subscription: &str) -> bool {
+    levels_match(rule, subscription, true)
+}
+
+fn levels_match(rule: &str, subscription: &str, plus_takes_hash: bool) -> bool {
     if subscription.starts_with('$') && rule.starts_with(['+', '#']) {
         return false;
     }
@@ -116,7 +128,7 @@ pub(crate) fn covers(rule: &str, subscription: &str) -> bool {
     loop {
         match (rule.next(), subscription.next()) {
             (Some("#"), _) | (None, None) => return true,
-            (Some("+"), Some(level)) if level != "#" => {}
+            (Some("+"), Some(level)) if plus_takes_hash || level != "#" => {}
             (Some(literal), Some(level)) if literal == level && literal != "+" => {}
             _ => return false,
         }
@@ -183,6 +195,17 @@ mod tests {
         assert!(!covers("a", "a/#"));
         // Level by level: `+/#` does not allow `#`, although it matches the same topics.
         assert!(!covers("+/#", "#"));
+    }
+
+    #[test]
+    fn r2_rule_11_a_deny_refuses_what_it_refused_in_1x() {
+        // The one difference: a deny's `+` takes a subscription's `#`.
+        assert!(denies("a/+", "a/#"));
+        assert!(!covers("a/+", "a/#"));
+        assert!(denies("+", "#"));
+        assert!(denies("a/+", "a/+"));
+        assert!(!denies("a/b", "a/+"));
+        assert!(!denies("#", "$SYS/#"));
     }
 
     #[test]

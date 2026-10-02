@@ -17,7 +17,7 @@ use openqtt_topic::MAX_TOPIC_LEN;
 use regex::{Regex, RegexBuilder};
 
 use super::spec::{Cidr, Decision, NameMatch, RuleSpec, TopicSpec, Who, canonical};
-use super::topic::{Template, TemplateError, covers};
+use super::topic::{Template, TemplateError, covers, denies};
 use crate::Error;
 
 /// The most a compiled regular expression may take, so a rule cannot hold megabytes per name.
@@ -237,8 +237,8 @@ impl Acl {
             let matched = rule.topics.iter().any(|topic| match topic {
                 Topic::Template { template, .. } => template
                     .render(username, client_id)
-                    .is_some_and(|filter| filter_matches(&filter, target)),
-                other => topic_matches(other, None, target, first),
+                    .is_some_and(|filter| filter_matches(&filter, target, rule.decision)),
+                other => topic_matches(other, None, target, first, rule.decision),
             });
             if matched {
                 return permission(rule.decision);
@@ -283,26 +283,35 @@ fn permission(decision: Decision) -> Permission {
     }
 }
 
-fn filter_matches(filter: &TopicFilter, target: Target<'_>) -> bool {
+/// Whether `filter`, of a rule that decides `decision`, matches `target`. A subscription is
+/// held to an allow rule's filter level by level (R2 rule 11), and refused by a deny rule's
+/// filter wherever 1.x refused it.
+fn filter_matches(filter: &TopicFilter, target: Target<'_>, decision: Decision) -> bool {
     match target {
         Target::Name(name) => filter.matches(name),
-        Target::Filter(pattern) => covers(filter.pattern(), pattern),
+        Target::Filter(pattern) => match decision {
+            Decision::Allow => covers(filter.pattern(), pattern),
+            Decision::Deny => denies(filter.pattern(), pattern),
+        },
     }
 }
 
-/// Whether `topic` matches `target`, whose first level's key is `first`; a template's filter
-/// is `rendered`.
+/// Whether `topic`, of a rule that decides `decision`, matches `target`, whose first level's
+/// key is `first`; a template's filter is `rendered`.
 fn topic_matches(
     topic: &Topic,
     rendered: Option<&Rendered>,
     target: Target<'_>,
     first: LevelKey,
+    decision: Decision,
 ) -> bool {
     let differs = |key: Option<LevelKey>| key.is_some_and(|key| key != first);
     match topic {
-        Topic::Filter { filter, first: key } => !differs(*key) && filter_matches(filter, target),
+        Topic::Filter { filter, first: key } => {
+            !differs(*key) && filter_matches(filter, target, decision)
+        }
         Topic::Template { .. } => rendered.is_some_and(|rendered| {
-            !differs(rendered.first) && filter_matches(&rendered.filter, target)
+            !differs(rendered.first) && filter_matches(&rendered.filter, target, decision)
         }),
         Topic::Exact { text, first: key } => {
             *key == first
@@ -546,7 +555,7 @@ impl ClientRules {
                     }
                     _ => None,
                 };
-                if topic_matches(topic, rendered, target, first) {
+                if topic_matches(topic, rendered, target, first, rule.decision) {
                     return permission(rule.decision);
                 }
             }

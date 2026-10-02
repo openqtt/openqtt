@@ -120,10 +120,12 @@ A subscription's filter is checked as a topic name against the rule's filter (R2
 levels are text, compared level by level.
 
 - A literal level of the rule matches the same text only. The rule `a/b` does not allow `a/+`.
-- The rule's `+` matches any one level but `#`, since a `#` stands for any number of levels,
-  the parent level included. Only the rule's `#` allows it.
+- An allow rule's `+` matches any one level but `#`, since a `#` stands for any number of
+  levels, the parent level included. Only the rule's `#` allows it.
+- A deny rule's `+` matches a `#` as well, as 1.x read it: the subscription `a/#` receives what
+  `a/+` names, so a deny of `a/+` refuses it, and a deny never refuses less than it did in 1.x.
 - The rule's `#` matches the rest, nothing included.
-- A subscription beginning with `$` is allowed only by a rule that names its first level.
+- A subscription beginning with `$` is matched only by a rule that names its first level.
 
 So a rule allowing `ingest/acme/+/+/+` allows that filter, and `ingest/acme/a/+/c`, and refuses
 the broader `ingest/acme/#`, `ingest/+/+/+/+` and `ingest/acme/+/+/#`. The comparison is level

@@ -55,10 +55,11 @@ pub(crate) fn decide(rules: &[RuleSpec], client: &ClientInfo, action: &Action<'_
         if !action_applies || !rule.qos.contains(asked.qos) || !who(&rule.who, client) {
             continue;
         }
+        let deny = rule.decision == Decision::Deny;
         if rule
             .topics
             .iter()
-            .any(|topic| topic_applies(topic, client, &asked))
+            .any(|topic| topic_applies(topic, client, &asked, deny))
         {
             return match rule.decision {
                 Decision::Allow => Permission::Allow,
@@ -129,7 +130,7 @@ fn name_matches(matcher: &NameMatch, name: &str) -> bool {
     }
 }
 
-fn topic_applies(topic: &TopicSpec, client: &ClientInfo, asked: &Asked<'_>) -> bool {
+fn topic_applies(topic: &TopicSpec, client: &ClientInfo, asked: &Asked<'_>, deny: bool) -> bool {
     match topic {
         TopicSpec::All => true,
         TopicSpec::Exact(text) => asked.text == text,
@@ -145,7 +146,7 @@ fn topic_applies(topic: &TopicSpec, client: &ClientInfo, asked: &Asked<'_>) -> b
                 return false;
             }
             if asked.is_filter {
-                level_covers(&filter, &target)
+                level_covers(&filter, &target, deny)
             } else {
                 level_matches(&filter, &target)
             }
@@ -215,14 +216,17 @@ fn level_matches(filter: &[&str], name: &[&str]) -> bool {
     }
 }
 
-/// R2 rule 11 as `docs/spec/acl.md` words it: the subscription's levels read as text; the
-/// rule's `+` takes any one of them but `#`, and the rule's `#` takes the rest.
-fn level_covers(rule: &[&str], subscription: &[&str]) -> bool {
+/// R2 rule 11 as `docs/spec/acl.md` words it: the subscription's levels read as text; an allow
+/// rule's `+` takes any one of them but `#`, a deny rule's `+` any one at all, and the rule's
+/// `#` takes the rest.
+fn level_covers(rule: &[&str], subscription: &[&str], deny: bool) -> bool {
     match (rule.first(), subscription.first()) {
         (Some(&"#"), _) => true,
         (None, None) => true,
-        (Some(&"+"), Some(&level)) => level != "#" && level_covers(&rule[1..], &subscription[1..]),
-        (Some(r), Some(s)) => r == s && level_covers(&rule[1..], &subscription[1..]),
+        (Some(&"+"), Some(&level)) => {
+            (deny || level != "#") && level_covers(&rule[1..], &subscription[1..], deny)
+        }
+        (Some(r), Some(s)) => r == s && level_covers(&rule[1..], &subscription[1..], deny),
         _ => false,
     }
 }

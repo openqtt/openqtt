@@ -169,6 +169,21 @@ topics = ["ingest/acme/+/+/+"]
     ] {
         assert_eq!(subscribe(&rules, &watcher, broader, 1), DENY, "{broader}");
     }
+    // A deny's `+` still refuses a `#` beneath it, as in 1.x: the subscription receives what the
+    // deny names, so no later allow lets it through.
+    let narrowed = acl(r##"
+[[rule]]
+permission = "deny"
+action = "subscribe"
+topics = ["ingest/acme/+"]
+
+[[rule]]
+permission = "allow"
+action = "subscribe"
+topics = ["ingest/#"]
+"##);
+    assert_eq!(subscribe(&narrowed, &watcher, "ingest/acme/#", 1), DENY);
+    assert_eq!(subscribe(&narrowed, &watcher, "ingest/acme/a/b", 1), ALLOW);
     // A shared subscription is checked on its filter; the group grants nothing.
     assert_eq!(
         subscribe(&rules, &watcher, "$share/g/ingest/acme/a/b/c", 1),
