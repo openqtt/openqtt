@@ -38,6 +38,12 @@ impl TopicName {
         Ok(Self(name.into()))
     }
 
+    /// A name built from parts that were each checked: a mountpoint and a name, or what is
+    /// left of a name once its mountpoint is taken off.
+    pub(crate) fn from_checked(name: &str) -> Self {
+        Self(name.into())
+    }
+
     /// The name.
     pub fn as_str(&self) -> &str {
         &self.0

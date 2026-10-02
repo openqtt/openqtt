@@ -1,6 +1,8 @@
 //! The topic crate's one error type.
 
-/// Why a topic name or a topic filter was refused.
+use crate::Placeholder;
+
+/// Why a topic name, a topic filter or a mountpoint was refused.
 ///
 /// Sections 4.7 and 4.8 bind the sender and name no reason code, so a topic that breaks them
 /// does not have to end the connection ([MQTT-4.13.1-1]). Report R1 (O25) has the session
@@ -46,4 +48,31 @@ pub enum Error {
     /// A ShareName is not followed by `/` and a topic filter ([MQTT-4.8.2-2]).
     #[error("a ShareName must be followed by `/` and a topic filter")]
     MissingSharedFilter,
+    /// A mountpoint does not end with `/`, so it would not keep the levels of the topics put
+    /// behind it whole.
+    #[error("a mountpoint must end with `/`")]
+    UnterminatedMountpoint,
+    /// A mountpoint names a placeholder other than `${username}` and `${clientid}`.
+    #[error("a mountpoint may use ${{username}} and ${{clientid}}, not ${{{name}}}")]
+    UnknownPlaceholder {
+        /// The name between the braces.
+        name: String,
+    },
+    /// A mountpoint opens a placeholder with `${` and never closes it.
+    #[error("a mountpoint opens a placeholder with `${{` and does not close it")]
+    UnclosedPlaceholder,
+    /// The connection has no value for a placeholder its mountpoint uses: a client without a
+    /// User Name under `${username}`.
+    #[error("the connection has no value for {placeholder}")]
+    MissingPlaceholderValue {
+        /// The placeholder.
+        placeholder: Placeholder,
+    },
+    /// A placeholder's value cannot go into a topic: it is empty, holds a wildcard character or
+    /// U+0000, or would make the mounted topics begin with `$`.
+    #[error("the value of {placeholder} cannot be used in a mountpoint")]
+    InvalidPlaceholderValue {
+        /// The placeholder.
+        placeholder: Placeholder,
+    },
 }

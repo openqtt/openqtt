@@ -57,6 +57,15 @@ impl TopicFilter {
         })
     }
 
+    /// A filter built from parts that were each checked, with its pattern starting at
+    /// `pattern`: a mountpoint and a filter, or a path through the index.
+    pub(crate) fn from_checked(text: &str, pattern: usize) -> Self {
+        Self {
+            text: text.into(),
+            pattern,
+        }
+    }
+
     /// The whole filter, as the client sent it, `$share/{ShareName}/` included.
     pub fn as_str(&self) -> &str {
         &self.text
