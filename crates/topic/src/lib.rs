@@ -2,8 +2,9 @@
 //!
 //! Validation of names and filters (section 4.7 of MQTT 5.0), the `$share/{ShareName}/` form of
 //! shared subscriptions (section 4.8), matching a name against a filter, including the rule that
-//! a filter starting with a wildcard does not match a topic beginning with `$`, and mountpoints,
-//! which give each client a namespace of its own (report R2, rule 6).
+//! a filter starting with a wildcard does not match a topic beginning with `$`, mountpoints,
+//! which give each client a namespace of its own (report R2, rule 6), and [`TopicIndex`], the
+//! arena trie of reports R3 and R6 that finds every filter matching a topic.
 //!
 //! Topics are strings here, not packets, so this crate must not depend on `openqtt-codec`. The
 //! codec checks that a Topic Name or a Topic Filter is a UTF-8 Encoded String and no more; the
@@ -22,10 +23,12 @@
 
 mod error;
 mod filter;
+mod index;
 mod mount;
 mod name;
 
 pub use error::Error;
 pub use filter::TopicFilter;
+pub use index::{Destination, Matched, Memory, Scratch, SharedGroup, TopicIndex};
 pub use mount::{Mount, Mountpoint, Placeholder};
 pub use name::{MAX_TOPIC_LEN, TopicName};

@@ -2,7 +2,8 @@
 
 use crate::Placeholder;
 
-/// Why a topic name, a topic filter or a mountpoint was refused.
+/// Why a topic name, a topic filter or a mountpoint was refused, or a filter could not be
+/// indexed.
 ///
 /// Sections 4.7 and 4.8 bind the sender and name no reason code, so a topic that breaks them
 /// does not have to end the connection ([MQTT-4.13.1-1]). Report R1 (O25) has the session
@@ -75,4 +76,8 @@ pub enum Error {
         /// The placeholder.
         placeholder: Placeholder,
     },
+    /// The index has run out of ids or of room for level text: about four billion nodes,
+    /// terminals or levels, or 4 GiB of distinct level text.
+    #[error("the topic index is full")]
+    IndexFull,
 }
