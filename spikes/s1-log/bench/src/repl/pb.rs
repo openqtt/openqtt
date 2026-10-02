@@ -158,6 +158,7 @@ impl Node {
 pub struct Cluster {
     pub nodes: Vec<Arc<Node>>,
     pub disks: Vec<Disk>,
+    tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
 }
 
 impl Cluster {
@@ -181,6 +182,7 @@ impl Cluster {
                 })
             })
             .collect();
+        let mut tasks = Vec::new();
         // One lane per ordered pair of nodes. A lane takes everything queued for its peer and
         // delivers it as one message after the one-way delay; messages in flight overlap.
         for a in 0..3 {
@@ -194,7 +196,7 @@ impl Cluster {
                 out.push(Some(tx));
                 let to = nodes[b].clone();
                 let line = line.clone();
-                tokio::spawn(async move {
+                tasks.push(tokio::spawn(async move {
                     while let Some(first) = rx.recv().await {
                         let mut appends = Vec::new();
                         let mut acks = Vec::new();
@@ -223,22 +225,33 @@ impl Cluster {
                             }
                         });
                     }
-                });
+                }));
             }
             let _ = nodes[a].out.set(out);
         }
         // Node leases with the meta group (node 0 here): one renewal a second per node.
         for n in 1..3 {
             let node = nodes[n].clone();
-            tokio::spawn(async move {
+            tasks.push(tokio::spawn(async move {
                 let mut tick = tokio::time::interval(Duration::from_secs(1));
                 loop {
                     tick.tick().await;
                     node.send(0, Msg::Lease);
                 }
-            });
+            }));
         }
-        Cluster { nodes, disks }
+        Cluster {
+            nodes,
+            disks,
+            tasks: Mutex::new(tasks),
+        }
+    }
+
+    /// Stops the lanes and leases; the nodes hold each other through their lanes otherwise.
+    pub fn shutdown(&self) {
+        for t in self.tasks.lock().expect("not poisoned").drain(..) {
+            t.abort();
+        }
     }
 
     pub async fn write(&self, g: u32, cmd: Cmd) -> anyhow::Result<()> {

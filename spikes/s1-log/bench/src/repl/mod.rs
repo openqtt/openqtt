@@ -107,11 +107,13 @@ impl AnyCluster {
         }
     }
 
-    async fn shutdown(self) {
+    /// Stops every Raft instance, even with writes still outstanding: an overloaded run must
+    /// not leave its groups heartbeating under the next one.
+    async fn shutdown(&self) {
         match self {
             AnyCluster::Raft(c) => c.shutdown().await,
             AnyCluster::Raft10(c) => c.shutdown().await,
-            AnyCluster::Pb(_) => {}
+            AnyCluster::Pb(c) => c.shutdown(),
         }
     }
 }
@@ -252,7 +254,8 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         let _ = tokio::task::spawn_blocking(move || g.join()).await;
     }
     let wait = Instant::now();
-    while outstanding.load(Ordering::Relaxed) > 0 && wait.elapsed() < Duration::from_secs(60) {
+    // An overloaded scheme can hold minutes of backlog; give it 20 s, then report what is left.
+    while outstanding.load(Ordering::Relaxed) > 0 && wait.elapsed() < Duration::from_secs(20) {
         tokio::time::sleep(Duration::from_millis(5)).await;
     }
     let secs = measure.as_secs_f64();
@@ -269,6 +272,7 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         "disk_flushes_per_s": round2(flushes as f64 / secs),
         "disk_items_per_flush": if flushes > 0 { round2(items as f64 / flushes as f64) } else { 0.0 },
         "drain_s": round2(wait.elapsed().as_secs_f64()),
+        "left_outstanding": outstanding.load(Ordering::Relaxed),
         "rss_bytes": u1.rss,
     })
 }
@@ -317,9 +321,7 @@ pub fn latency(out: &std::path::Path, a: &LatencyArgs) -> Result<()> {
                             line.lateness.lock().expect("not poisoned").reset();
                             let r = offer(c.clone(), groups, load, a.warmup, a.measure).await;
                             let extra = c.extra().await;
-                            if let Ok(c) = Arc::try_unwrap(c) {
-                                c.shutdown().await;
-                            }
+                            c.shutdown().await;
                             let late = line.lateness.lock().expect("not poisoned").summary();
                             anyhow::Ok(json!({
                                 "exp": "repl", "scheme": scheme.name(), "groups": groups,

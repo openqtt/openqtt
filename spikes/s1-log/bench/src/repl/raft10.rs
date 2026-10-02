@@ -414,7 +414,7 @@ impl Cluster {
         n
     }
 
-    pub async fn shutdown(self) {
+    pub async fn shutdown(&self) {
         let rafts: Vec<R10> = self
             .router
             .rafts

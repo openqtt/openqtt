@@ -552,7 +552,7 @@ impl Cluster {
             .count() as u32
     }
 
-    pub async fn shutdown(self) {
+    pub async fn shutdown(&self) {
         let rafts: Vec<Raft<TypeConfig>> = self
             .router
             .rafts
