@@ -26,12 +26,14 @@ pub(crate) const SHARE_PREFIX: &str = "$share/";
 ///
 /// `$share/` is the only special form. `$queue/` and `$exclusive/`, which EMQX reads as a
 /// shared and an exclusive subscription, are ordinary filters here (report R1, D17), and so is
-/// a `$share/` filter inside a shared one, which EMQX refuses
-/// ([emqx_topic.erl L280-L281](https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_topic.erl#L280-L281)).
+/// a `$share/` filter inside a shared one, which EMQX refuses ([emqx_topic.erl
+/// L280-L281][nested]).
 ///
 /// Filters compare, hash and order as the whole text, byte for byte, the way UNSUBSCRIBE
 /// compares them ([MQTT-3.10.4-1]): `$queue/t` and `$share/$queue/t` are different filters. A
 /// clone shares the text.
+///
+/// [nested]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_topic.erl#L280-L281
 #[derive(Clone)]
 pub struct TopicFilter {
     text: Arc<str>,

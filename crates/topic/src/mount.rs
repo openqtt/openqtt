@@ -12,12 +12,14 @@
 //! mounted nor stripped, since it reaches subscribers unaltered ([MQTT-3.3.2-15]).
 //!
 //! EMQX mounts the same way, by putting the mountpoint in front of the topic, and in front of
-//! the filter of a shared subscription rather than its `$share/{ShareName}/`
-//! ([emqx_mountpoint.erl L51-L95](https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L51-L95)).
-//! It differs in what it accepts: it keeps a placeholder it has no value for as literal text
-//! ([emqx_mountpoint.erl L105-L117](https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L105-L117)),
-//! which puts every client without a username in one namespace, and delivers a topic outside
-//! the mountpoint unchanged. Here both are refused.
+//! the filter of a shared subscription rather than its `$share/{ShareName}/` ([emqx_mountpoint.erl
+//! L51-L95][mount]). It differs in what it accepts: it keeps a placeholder it has no value for
+//! as literal text ([emqx_mountpoint.erl L105-L117][lookup]), which puts every client without a
+//! username in one namespace, and delivers a topic outside the mountpoint unchanged. Here both
+//! are refused.
+//!
+//! [mount]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L51-L95
+//! [lookup]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_mountpoint.erl#L105-L117
 
 use std::fmt;
 use std::sync::Arc;
