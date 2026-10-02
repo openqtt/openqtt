@@ -1,0 +1,9 @@
+# The image is built from the workspace sources; nothing else needs to reach the daemon.
+.git/
+target/
+fuzz/target/
+bench/out/
+.context/
+.gstack/
+.claude/
+CLAUDE.md
