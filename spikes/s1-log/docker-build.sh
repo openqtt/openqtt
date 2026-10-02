@@ -63,5 +63,8 @@ set +e
 ran=$(docker run --rm -v s1-probe-bin:/b "$RUN" /b/s1-probe-rocksdb 2>&1)
 st=$?
 set -e
-libs=$(docker create "$RUN" >/tmp/s1-cid && docker export "$(cat /tmp/s1-cid)" | tar -t 2>/dev/null | grep -E 'libstdc\+\+|libgcc_s' | tr '\n' ' '; docker rm "$(cat /tmp/s1-cid)" >/dev/null)
+# distroless has no default command, so create needs one; it is never run.
+cid=$(docker create "$RUN" /nonexistent)
+libs=$(docker export "$cid" | tar -t 2>/dev/null | grep -E 'libstdc\+\+\.so\.6\.|libgcc_s' | tr '\n' ' ')
+docker rm "$cid" >/dev/null
 echo "{\"exp\":\"runtime\",\"image\":\"$RUN\",\"binary\":\"probe with rocksdb\",\"exit\":$st,\"output\":\"$(echo "$ran" | tr '"' "'" | tr '\n' ' ' | cut -c1-200)\",\"cxx_libs_in_image\":\"$libs\"}" | tee -a "$OUT"
