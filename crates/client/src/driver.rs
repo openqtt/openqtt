@@ -185,8 +185,13 @@ pub(crate) struct Driver {
     outbound_aliases: HashMap<u16, String>,
     /// When the client last wrote anything.
     last_sent: Instant,
-    /// When an unanswered PINGREQ was queued.
+    /// When the oldest unanswered PINGREQ was queued, moved later by the time reads were
+    /// paused since, which the answer is not timed over.
     ping_sent: Option<Instant>,
+    /// When the latest PINGREQ was queued.
+    last_ping: Option<Instant>,
+    /// Since when reads are paused because events wait for the application.
+    paused_since: Option<Instant>,
     commands: mpsc::Receiver<Command>,
     commands_open: bool,
     publications: mpsc::Receiver<Publication>,
@@ -236,6 +241,8 @@ impl Driver {
             outbound_aliases: HashMap::new(),
             last_sent: Instant::now(),
             ping_sent: None,
+            last_ping: None,
+            paused_since: None,
             commands,
             commands_open: true,
             publications,
@@ -349,6 +356,7 @@ impl Driver {
             // A publication whose caller gave up, by a timeout or by dropping the call, is
             // not sent and not held.
             self.queued.retain(|(_, reply)| !reply.is_closed());
+            self.track_pause();
             let ping_at = self.ping_deadline();
             // A due PINGREQ, or an overdue PINGRESP, comes before anything else: the timer
             // branch below is reached only when nothing else is ready, and a server that
@@ -469,24 +477,56 @@ impl Driver {
         );
     }
 
-    /// When the next PINGREQ is due, or the answer to the last one overdue.
-    fn ping_deadline(&self) -> Option<Instant> {
-        let keep_alive = self.negotiated.keep_alive?;
-        Some(match self.ping_sent {
-            Some(sent) => sent + self.negotiated.ping_timeout,
-            None => self.last_sent + keep_alive,
-        })
+    /// Notes when reads pause, because events wait for the application, and when they resume.
+    /// A PINGRESP may wait unread meanwhile, so an outstanding PINGREQ's answer is timed only
+    /// over the time the client was reading.
+    fn track_pause(&mut self) {
+        let paused = !self.outbox.is_empty();
+        match (paused, self.paused_since) {
+            (true, None) => self.paused_since = Some(Instant::now()),
+            (false, Some(since)) => {
+                let now = Instant::now();
+                if let Some(sent) = &mut self.ping_sent {
+                    *sent += now.saturating_duration_since(since.max(*sent));
+                }
+                self.paused_since = None;
+            }
+            _ => {}
+        }
     }
 
-    /// The Keep Alive passed with nothing sent: PINGREQ ([MQTT-3.1.2-20]), unless the last
-    /// one is still unanswered, in which case the server is gone (section 3.1.2.10). A
-    /// PINGREQ the server never takes is unanswered too.
+    /// When the Keep Alive next asks for something: the answer to an outstanding PINGREQ,
+    /// while the client reads, or else the next PINGREQ, a Keep Alive after the client last
+    /// wrote or queued one.
+    fn ping_deadline(&self) -> Option<Instant> {
+        let keep_alive = self.negotiated.keep_alive?;
+        if let Some(sent) = self.ping_sent
+            && self.paused_since.is_none()
+        {
+            return Some(sent + self.negotiated.ping_timeout);
+        }
+        let quiet_since = self
+            .last_ping
+            .map_or(self.last_sent, |ping| ping.max(self.last_sent));
+        Some(quiet_since + keep_alive)
+    }
+
+    /// The Keep Alive passed with nothing sent: PINGREQ ([MQTT-3.1.2-20]). A PINGREQ left
+    /// unanswered for the ping timeout while the client reads means the server is gone
+    /// (section 3.1.2.10); one the server never took is unanswered too. While reads are paused
+    /// the answer may be waiting unread, so the client only goes on keeping the server's Keep
+    /// Alive.
     fn keep_alive_due(&mut self) -> Result<(), Stop> {
-        if self.ping_sent.is_some() {
+        let now = Instant::now();
+        if let Some(sent) = self.ping_sent
+            && self.paused_since.is_none()
+            && now >= sent + self.negotiated.ping_timeout
+        {
             return Err(Stop::Lost("the server did not answer PINGREQ".into()));
         }
         self.send(&Packet::PingReq)?;
-        self.ping_sent = Some(Instant::now());
+        self.ping_sent.get_or_insert(now);
+        self.last_ping = Some(now);
         Ok(())
     }
 

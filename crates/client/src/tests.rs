@@ -1616,3 +1616,45 @@ async fn the_inbound_quota_starts_afresh_on_each_connection() {
     assert_eq!(message.payload, "after");
     assert!(server.silent_for(Duration::from_secs(1)).await);
 }
+
+#[tokio::test(start_paused = true)]
+async fn an_unread_pingresp_does_not_end_the_connection_while_the_application_is_behind() {
+    let options = ConnectOptions::new("c")
+        .keep_alive(10)
+        .ping_timeout(Duration::from_secs(5))
+        .event_capacity(1);
+    let (client, mut events, mut server) = connect(options).await;
+    // One message fills the event channel and the next waits in the client, which then reads
+    // nothing more until the application takes them.
+    for payload in ["one", "two"] {
+        server
+            .send(Publish {
+                topic: "t".into(),
+                payload: Bytes::from_static(payload.as_bytes()),
+                ..Publish::default()
+            })
+            .await;
+    }
+    // The application is busy for a minute. The client keeps the server's Keep Alive with
+    // PINGREQ, and the server answers each one, unread for now.
+    let start = Instant::now();
+    let mut pings = 0;
+    while let Some(left) = Duration::from_secs(60).checked_sub(start.elapsed()) {
+        let Ok(packet) = tokio::time::timeout(left, server.recv()).await else {
+            break;
+        };
+        assert_eq!(packet, Packet::PingReq);
+        pings += 1;
+        server.send(Packet::PingResp).await;
+    }
+    assert_eq!(pings, 5, "a PINGREQ every Keep Alive of silence");
+    // The application catches up, and the connection is still there.
+    for payload in ["one", "two"] {
+        assert_eq!(
+            events.next_message().await.map(|message| message.payload),
+            Some(Bytes::from_static(payload.as_bytes()))
+        );
+    }
+    assert!(!client.is_closed());
+    client.disconnect().await.unwrap();
+}
