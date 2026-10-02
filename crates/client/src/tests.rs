@@ -1214,3 +1214,22 @@ async fn a_resumed_message_too_large_for_the_new_server_is_discarded() {
         crate::Discard::Invalid(openqtt_codec::Error::PacketTooLarge { maximum: 64, .. })
     ));
 }
+
+#[tokio::test(start_paused = true)]
+async fn dropping_every_handle_of_an_idle_connection_disconnects_it() {
+    for events_first in [false, true] {
+        let (client, events, mut server) = connect(ConnectOptions::new("c").keep_alive(0)).await;
+        if events_first {
+            drop(events);
+            drop(client);
+        } else {
+            drop(client);
+            drop(events);
+        }
+        assert_eq!(
+            server.recv().await,
+            Packet::Disconnect(Disconnect::default()),
+            "Events dropped first: {events_first}"
+        );
+    }
+}

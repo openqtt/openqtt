@@ -338,6 +338,14 @@ impl Driver {
                     // Packets that arrived while the application was behind.
                     self.decode_buffered().await?;
                 }
+                // The application dropped its Events, whether or not one was waiting.
+                () = self.events.closed(), if !self.events_closed => {
+                    self.events_closed = true;
+                    self.outbox.clear();
+                    if !self.commands_open {
+                        return Err(self.abandon().await);
+                    }
+                }
                 command = self.commands.recv(), if self.commands_open => match command {
                     Some(command) => self.command(command).await?,
                     None => {

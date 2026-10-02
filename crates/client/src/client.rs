@@ -23,7 +23,9 @@ const COMMAND_CAPACITY: usize = 64;
 /// [`Client::connect`] opens it and returns this handle with the [`Events`] that carry
 /// incoming messages. The connection runs on a task of its own: it acknowledges what the
 /// server sends, keeps the connection alive with PINGREQ, and holds the client's half of the
-/// session. The handle is cheap to clone; every clone drives the same connection.
+/// session. The handle is cheap to clone; every clone drives the same connection. Once every
+/// clone and the [`Events`] are dropped, the client sends DISCONNECT 0x00 and closes the
+/// connection, as [`disconnect`](Self::disconnect) does.
 ///
 /// ```no_run
 /// # async fn run(transport: openqtt_client::QuicTransport) -> Result<(), openqtt_client::Error> {
@@ -145,7 +147,8 @@ pub enum CloseReason {
 ///
 /// When the application lets events pile up past
 /// [`ConnectOptions::event_capacity`], the client stops reading from the server until it
-/// catches up. Dropping it discards events from then on, and the connection carries on.
+/// catches up. Dropping it discards events from then on, and the connection carries on while
+/// any [`Client`] handle remains.
 #[derive(Debug)]
 pub struct Events {
     rx: mpsc::Receiver<Event>,
