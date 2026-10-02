@@ -1,0 +1,443 @@
+{
+  "args": {
+    "conns": "10000",
+    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/../../bench/results/s4-idle-transport-profiles.json",
+    "pki": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/target/pki",
+    "profiles": "streams,windows,no-datagrams,no-mtu-discovery,ack-frequency,lean",
+    "window": "30"
+  },
+  "experiment": "idle",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T06:08:57Z",
+    "kern.ipc.maxsockbuf": "8388608",
+    "kern.maxfilesperproc": "61440",
+    "memory_bytes": "17179869184",
+    "net.inet.udp.maxdgram": "9216",
+    "net.inet.udp.recvspace": "786896",
+    "note": "laptop numbers: server and client share one machine; absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "performance_cores": "6",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "rows": [
+      {
+        "allocations_per_conn": 58.0127,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1835344,
+          "handshakes": 0,
+          "heap": 122592,
+          "live": 0,
+          "pings": 0,
+          "resident": 4489216,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.002349,
+          "t": 11.076861833,
+          "user_s": 0.034883
+        },
+        "baseline_cpu_cores": 0.00007025777300516793,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 383058592,
+          "heap": 300885509,
+          "pings": 10000,
+          "t": 68.70238475
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 38681.0216,
+        "footprint_per_conn_at_end": 38681.0216,
+        "heap_per_conn": 30469.855,
+        "heap_per_conn_at_end": 30469.9558,
+        "idle_cpu_cores": 0.026166393518090827,
+        "idle_cpu_cores_net": 0.02609613574508566,
+        "idle_cpu_us_per_keepalive": 78.28840723525698,
+        "idle_window_s": 30.186200457999995,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15000,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "streams",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "streams",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 4.011293708
+        },
+        "resident_per_conn": 18997.248,
+        "server_threads": 0,
+        "setup_per_second": 2477.387158190955,
+        "setup_seconds": 4.036510792,
+        "setup_server_cpu_s": 10.216225000000001,
+        "udp_full_buffer_drops": 0
+      },
+      {
+        "allocations_per_conn": 58.0131,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1884520,
+          "handshakes": 0,
+          "heap": 122464,
+          "live": 0,
+          "pings": 0,
+          "resident": 4374528,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.003084,
+          "t": 11.080111583,
+          "user_s": 0.034712
+        },
+        "baseline_cpu_cores": 0.00006366647330412022,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 479757032,
+          "heap": 383295347,
+          "pings": 10000,
+          "t": 68.676493958
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 48393.4592,
+        "footprint_per_conn_at_end": 48393.4592,
+        "heap_per_conn": 38708.2254,
+        "heap_per_conn_at_end": 38708.2542,
+        "idle_cpu_cores": 0.03650844875777219,
+        "idle_cpu_cores_net": 0.03644478228446807,
+        "idle_cpu_us_per_keepalive": 109.3343468534042,
+        "idle_window_s": 30.115850916999996,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15020,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "windows",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "windows",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 4.010859375
+        },
+        "resident_per_conn": 12011.1104,
+        "server_threads": 0,
+        "setup_per_second": 2473.40639817057,
+        "setup_seconds": 4.04300725,
+        "setup_server_cpu_s": 10.418541999999999,
+        "udp_full_buffer_drops": 0
+      },
+      {
+        "allocations_per_conn": 58.0139,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1835344,
+          "handshakes": 0,
+          "heap": 122602,
+          "live": 0,
+          "pings": 0,
+          "resident": 3211264,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.002818,
+          "t": 11.020754,
+          "user_s": 0.035303
+        },
+        "baseline_cpu_cores": 0.00004945773342334535,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 480314088,
+          "heap": 383272817,
+          "pings": 10000,
+          "t": 70.704241209
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 48437.7032,
+        "footprint_per_conn_at_end": 48437.7032,
+        "heap_per_conn": 38706.263,
+        "heap_per_conn_at_end": 38706.3782,
+        "idle_cpu_cores": 0.02772360937457782,
+        "idle_cpu_cores_net": 0.027674151641154474,
+        "idle_cpu_us_per_keepalive": 83.02245492346343,
+        "idle_window_s": 30.065168958999998,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15040,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "no-datagrams",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "no-datagrams",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 5.012751584
+        },
+        "resident_per_conn": 25246.1056,
+        "server_threads": 0,
+        "setup_per_second": 1978.476173927349,
+        "setup_seconds": 5.054394959,
+        "setup_server_cpu_s": 9.880476,
+        "udp_full_buffer_drops": 92
+      },
+      {
+        "allocations_per_conn": 58.0115,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1835344,
+          "handshakes": 0,
+          "heap": 122610,
+          "live": 0,
+          "pings": 0,
+          "resident": 4489216,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.002576,
+          "t": 11.023551625,
+          "user_s": 0.035021
+        },
+        "baseline_cpu_cores": 0.00005555579196645722,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 465208016,
+          "heap": 371326512,
+          "pings": 10000,
+          "t": 68.663587541
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 46945.1184,
+        "footprint_per_conn_at_end": 46945.1184,
+        "heap_per_conn": 37512.1556,
+        "heap_per_conn_at_end": 37512.1556,
+        "idle_cpu_cores": 0.0277738747133041,
+        "idle_cpu_cores_net": 0.027718318921337644,
+        "idle_cpu_us_per_keepalive": 83.15495676401292,
+        "idle_window_s": 30.082010833000005,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15060,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "no-mtu-discovery",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "no-mtu-discovery",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 3.509480625
+        },
+        "resident_per_conn": 22876.9792,
+        "server_threads": 0,
+        "setup_per_second": 2798.5191446766053,
+        "setup_seconds": 3.573318417,
+        "setup_server_cpu_s": 6.770075,
+        "udp_full_buffer_drops": 0
+      },
+      {
+        "allocations_per_conn": 58.0132,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1868136,
+          "handshakes": 0,
+          "heap": 122604,
+          "live": 0,
+          "pings": 0,
+          "resident": 3178496,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.002981,
+          "t": 11.026096708,
+          "user_s": 0.035147
+        },
+        "baseline_cpu_cores": 0.00004633739455473107,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 480445136,
+          "heap": 383335895,
+          "pings": 10000,
+          "t": 69.722875333
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 48424.5912,
+        "footprint_per_conn_at_end": 48424.5912,
+        "heap_per_conn": 38715.0248,
+        "heap_per_conn_at_end": 38715.1544,
+        "idle_cpu_cores": 0.021178532068754915,
+        "idle_cpu_cores_net": 0.021132194674200185,
+        "idle_cpu_us_per_keepalive": 63.39658402260055,
+        "idle_window_s": 30.072197541,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15080,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "ack-frequency",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "ack-frequency",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 4.010795958
+        },
+        "resident_per_conn": 10335.0272,
+        "server_threads": 0,
+        "setup_per_second": 2469.5637077362726,
+        "setup_seconds": 4.04929825,
+        "setup_server_cpu_s": 9.900981,
+        "udp_full_buffer_drops": 0
+      },
+      {
+        "allocations_per_conn": 58.0118,
+        "baseline": {
+          "allocs": 244,
+          "failed": 0,
+          "footprint": 1868136,
+          "handshakes": 0,
+          "heap": 122458,
+          "live": 0,
+          "pings": 0,
+          "resident": 3194880,
+          "resumed": 0,
+          "stored_sessions": 0,
+          "sys_s": 0.001996,
+          "t": 12.028820167,
+          "user_s": 0.025775
+        },
+        "baseline_cpu_cores": 0.000035000943392592896,
+        "client_at_end": {
+          "closed": 0,
+          "established": 10000,
+          "failed": 0,
+          "footprint": 368607880,
+          "heap": 288775250,
+          "pings": 10000,
+          "t": 68.663374667
+        },
+        "conns": 10000,
+        "endpoints": 1,
+        "footprint_per_conn": 37330.9752,
+        "footprint_per_conn_at_end": 37330.9752,
+        "heap_per_conn": 29276.0654,
+        "heap_per_conn_at_end": 29276.0654,
+        "idle_cpu_cores": 0.018716957409342157,
+        "idle_cpu_cores_net": 0.018681956465949563,
+        "idle_cpu_us_per_keepalive": 56.04586939784869,
+        "idle_window_s": 30.073851625000003,
+        "interval_s": 30,
+        "keepalive": "quic",
+        "listening": {
+          "endpoints": 1,
+          "listening": [
+            {
+              "port": 15100,
+              "recv_buffer": 8388608,
+              "send_buffer": 8388608
+            }
+          ],
+          "pq": true,
+          "profile": "lean",
+          "tickets": "Stateless"
+        },
+        "live_at_end": 10000.0,
+        "live_at_measure": 10000.0,
+        "pings_seen_by_server": 0.0,
+        "profile": "lean",
+        "ready": {
+          "established": 10000,
+          "failed": 0,
+          "ready": true,
+          "seconds": 3.00871975
+        },
+        "resident_per_conn": 18930.0736,
+        "server_threads": 0,
+        "setup_per_second": 3283.7221293226403,
+        "setup_seconds": 3.045324667,
+        "setup_server_cpu_s": 4.863707,
+        "udp_full_buffer_drops": 0
+      }
+    ]
+  },
+  "spike": "S4"
+}

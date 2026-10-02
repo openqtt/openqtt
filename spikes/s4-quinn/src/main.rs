@@ -280,7 +280,10 @@ fn idle(a: &Args) -> Result<Value, pki::Error> {
             ]))?;
             let ready = client.wait_mark("ready", Duration::from_secs(1800));
             let setup_seconds = started.elapsed().as_secs_f64();
-            let s_ready = server.fresh(f(&s0, "t"));
+            // The first statistics line after the client saw every connection up, so the setup
+            // CPU covers every handshake.
+            let at_ready = server.latest();
+            let s_ready = server.fresh(f(&at_ready, "t"));
             // Every connection sends its first PINGREQ within one interval of being ready.
             std::thread::sleep(Duration::from_secs(interval + 5));
             let s1 = server.fresh(f(&s_ready, "t"));

@@ -19,9 +19,11 @@ run() {
     "$bin" "$@" --pki "$pki"
 }
 ONLY="$*"
-run single idle --conns 1000,10000,50000 --endpoints 1 --profiles default \
+run single idle --conns 1000,10000 --endpoints 1 --profiles default \
     --out "$out/s4-idle-one-endpoint.json"
-run per-core idle --conns 10000,50000 --endpoints 10 --profiles default \
+run single-50k idle --conns 50000 --endpoints 1 --profiles default \
+    --out "$out/s4-idle-one-endpoint-50k.json"
+run per-core idle --conns 10000 --endpoints 10 --profiles default \
     --out "$out/s4-idle-endpoint-per-core.json"
 run stream-keepalive idle --conns 10000 --keepalive stream --profiles default \
     --out "$out/s4-idle-stream-keepalive.json"

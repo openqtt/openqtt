@@ -153,8 +153,10 @@ async fn idle(a: &Args) -> Result<(), crate::pki::Error> {
     loop {
         tokio::time::sleep(Duration::from_millis(500)).await;
         let (e, f) = (ESTABLISHED.load(Relaxed), FAILED.load(Relaxed));
+        let (footprint, _) = os::memory();
         let line = json!({ "t": start.elapsed().as_secs_f64(), "established": e, "failed": f,
-            "closed": CLOSED.load(Relaxed), "pings": PINGS.load(Relaxed) });
+            "closed": CLOSED.load(Relaxed), "pings": PINGS.load(Relaxed),
+            "heap": crate::alloc::now().bytes, "footprint": footprint });
         if !ready && e + f >= n {
             ready = true;
             println!(
