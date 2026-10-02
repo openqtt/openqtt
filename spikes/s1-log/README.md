@@ -26,8 +26,9 @@ dependencies never reach the broker's `Cargo.lock` or `make check`.
 ```console
 cargo build --release
 DATA=/path/with/60GiB/free ./run.sh fsync     # then write, shared, claims, footprint,
-                                              # churn, window, recovery, repl, repl-max,
-                                              # repl-storm, idle, netcost, build
+                                              # footprint-reopen, churn, window, recovery,
+                                              # repl, repl-max, repl-storm, idle, netcost,
+                                              # build
 ./docker-build.sh                             # build friction in rust:1.99.0-bookworm
 python3 collect.py                            # out/*.jsonl -> bench/results/s1-<date>.json
 python3 summarize.py                          # the tables R4 quotes

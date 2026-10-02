@@ -50,14 +50,16 @@ def mib(b):
 
 def fsync(rows):
     print("\n### Durability floor (one thread unless noted)\n")
-    print("| Primitive | File | Size | Threads | Syncs/s | p50 ms | p99 ms |")
-    print("| --- | --- | --- | --- | --- | --- | --- |")
-    for r in rows:
+    print("| Pass | Primitive | File | Size | Threads | Syncs/s | p50 ms | p99 ms | Load average |")
+    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    # The step runs 64 configurations a pass; a later pass appends to the same file.
+    for i, r in enumerate(rows):
+        pass_no = i // 64 + 1
         L = r["lat_us"]
         names = {"StdSyncData": "std sync_data", "Fsync": "fsync", "Fullfsync": "F_FULLFSYNC",
                  "Barrier": "F_BARRIERFSYNC"}
-        print(f"| {names.get(r['primitive'], r['primitive'])} | {r['mode'].lower()} | {r['size']} | {r['threads']} | "
-              f"{r['per_s']:.0f} | {ms(L['p50'])} | {ms(L['p99'])} |")
+        print(f"| {pass_no} | {names.get(r['primitive'], r['primitive'])} | {r['mode'].lower()} | {r['size']} | "
+              f"{r['threads']} | {r['per_s']:.0f} | {ms(L['p50'])} | {ms(L['p99'])} | {r['load_avg'][0]} |")
 
 
 def grouped(rows, keys):
@@ -81,6 +83,8 @@ def write(rows):
     print("| --- | --- | --- | --- | --- |")
     for load in ["closed:1", "closed:64", "open:10000/s", "open:50000/s"]:
         for eng in ["fjall", "redb", "rocksdb"]:
+            if not any(g.get((128, w, load, eng)) for w in [0, 1000, 2000]):
+                continue
             cells = []
             for w in [0, 1000, 2000]:
                 rs = g.get((128, w, load, eng), [])
@@ -191,14 +195,16 @@ def footprint(rows):
 def churn(rows):
     print("\n### Queue churn\n")
     print("| Engine | Secs | Published | Write p50 ms | p99 ms | p99.9 ms | max ms | Worst second p99 ms | "
-          "Stall s | Drain p99 ms | Scan p99 ms | GC p99 ms | Disk end MiB | Disk max MiB | CPU |")
+          "Seconds with a write over 100 ms | Drain p99 ms | Scan p99 ms | GC p99 ms | Disk end MiB | "
+          "Disk max MiB | CPU |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         w = r["write_us"]
         worst = max(r["series"]["write_p99"]) if r["series"]["write_p99"] else None
         dmax = max(d["allocated"] for d in r["disk"]) if r["disk"] else 0
+        slow = sum(1 for x in r["series"]["write_max"] if x > 100_000)
         print(f"| {r['engine']} | {r['secs']} | {r['published']:,} | {ms(w['p50'])} | {ms(w['p99'])} | "
-              f"{ms(w['p999'])} | {ms(w['max'])} | {ms(worst)} | {r['stall_seconds']} | "
+              f"{ms(w['p999'])} | {ms(w['max'])} | {ms(worst)} | {slow} | "
               f"{ms((r['drain_us'] or {}).get('p99'))} | {ms((r['scan_us'] or {}).get('p99'))} | "
               f"{ms((r['gc_us'] or {}).get('p99'))} | {mib(r['final_disk']['allocated'])} | {mib(dmax)} | {r['cpu_cores']} |")
 
@@ -278,7 +284,8 @@ def build(rows):
 def main():
     runs = load()
     for step, fn in [("fsync", fsync), ("write", write), ("shared", shared), ("claims", claims),
-                     ("footprint", footprint), ("churn", churn), ("recovery", recovery),
+                     ("footprint", footprint), ("footprint-reopen", footprint), ("churn", churn),
+                     ("recovery", recovery), ("recovery-50", recovery),
                      ("repl", repl), ("repl-pipelined", repl), ("repl-storm", repl), ("repl-max", repl),
                      ("idle", idle), ("window", write), ("netcost", netcost),
                      ("build", build)]:

@@ -121,6 +121,16 @@ window)
         done
     done
     ;;
+recovery-50)
+    # The chosen engine again at 50 GiB, to see how reopening scales with size.
+    for e in rocksdb; do
+        b recovery --engine "$e" --phase load --gib 50 --sync-every-mb 16
+        b recovery --engine "$e" --phase open --label clean
+        crash "$e" 10
+        b recovery --engine "$e" --phase open --label crash
+        b recovery --engine "$e" --phase remove
+    done
+    ;;
 repl)
     b repl --schemes raft,raft-batched,raft10-seq,raft10,pb --groups 1,16,128 --delays-us 1000,2000 \
         --flush-us 0,1000 --loads o1000,o20000
