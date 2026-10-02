@@ -85,6 +85,9 @@ foldhash = "0.2"
 # Destination sets above 64 entries, as R3 specifies. Without std, which adds only
 # serialization and two dependencies for it.
 roaring = { version = "0.11", default-features = false }
+# xxh3-64, which places a session on its log partition (openqtt-core's partition_of, R3). Only
+# that hash: the default features add four others and a random seed source.
+twox-hash = { version = "2.1", default-features = false, features = ["xxhash3_64"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

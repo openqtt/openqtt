@@ -617,6 +617,11 @@ dependencies = [
 [[package]]
 name = "openqtt-core"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "proptest",
+ "thiserror",
+ "twox-hash",
+]
 
 [[package]]
 name = "openqtt-edge"
@@ -1282,6 +1287,12 @@ dependencies = [
  "tracing",
  "tracing-core",
 ]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5283634e518fe9e82c7b20520bb4bc209009fd16c82077c802f8111ecbb0117a"
 
 [[package]]
 name = "unarray"
