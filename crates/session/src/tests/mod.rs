@@ -5,4 +5,6 @@ mod harness;
 
 mod connect;
 mod deliver;
+mod ending;
 mod publish;
+mod subscribe;
