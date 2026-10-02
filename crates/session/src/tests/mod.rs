@@ -9,5 +9,6 @@ mod deliver;
 mod ending;
 mod properties;
 mod publish;
+mod scenarios;
 mod streams;
 mod subscribe;
