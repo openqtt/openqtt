@@ -479,6 +479,7 @@ once they have measurements, and say so.
 | O23 | Wills when the server closes the connection | Published after the Will Delay unless the client reconnects; only the client's DISCONNECT 0x00 removes the will | Published; when a node stops, at once whatever the delay, since the session ends with the node [emqx_channel.erl L2998-3028][c-will-terminate] | Published after the Will Delay unless the client reconnects within it. Sessions outlive an edge drain, so a client that reconnects within its delay publishes no will; devices that should not fire wills on a drain set a Will Delay of a few seconds |
 | O24 | What PUBACK and PUBREC promise | That the receiver has taken ownership | The message has been routed in memory | The message is durable: the retained write and every durable partition commit are done (R3) |
 | O25 | Topic syntax errors in a PUBLISH or a filter | These statements bind the sender and name no reason code, so MQTT-4.13.1-1 does not require a close | DISCONNECT: 0x90 for a Topic Name, 0x82 for a Response Topic, and 0x8F for a filter, which refuses the packet's other filters with it [emqx_packet.erl L249-262][p-publish] [emqx_packet.erl L289-301][p-pubprops] [emqx_packet.erl L267-287][p-sub-check] | The one item is refused and the connection stays: a PUBLISH whose Topic Name or Response Topic breaks section 4.7 gets PUBACK or PUBREC 0x90, or is dropped and counted at QoS 0; a filter that breaks sections 4.7 or 4.8 gets 0x8F in the SUBACK or UNSUBACK, alone. A device with one bad filter keeps its others and does not loop on reconnect. An empty Topic Name without a Topic Alias stays a Protocol Error |
+| O26 | The reason code of PUBACK and PUBREC for a message no subscription matched | 0x10 No matching subscribers is the server's to send, when it knows nobody subscribes; 0x00 is always allowed (Tables 3-4 and 3-5) | 0x10 whenever routing found no subscriber, even for a retained message it stored, which later subscribers receive [emqx_channel.erl L790-796][c-puback-rc]; the differential harness shows it for plain and retained publications | 0x00 whenever the message was accepted, including when it was stored as retained or committed for a durable session; 0x10 only when the message is not retained and nothing matched. A publisher reads 0x10 as "nobody gets this", which is untrue of a message kept for later delivery |
 
 ## Summary
 
@@ -511,7 +512,7 @@ Counted from the rows above.
 | e2e | 37 |
 | diff | 16 |
 
-OpenQTT deviates from the specification in 2 statements, MQTT-3.1.3-2 and MQTT-3.2.2-16, both only on listeners configured for certificate identity (D20). It differs from EMQX in 32 decisions, D1 to D32, and settles 25 behaviours the specification leaves open, O1 to O25.
+OpenQTT deviates from the specification in 2 statements, MQTT-3.1.3-2 and MQTT-3.2.2-16, both only on listeners configured for certificate identity (D20). It differs from EMQX in 32 decisions, D1 to D32, and settles 26 behaviours the specification leaves open, O1 to O26.
 
 <!-- EMQX 5.8.9 permalinks, at tag emqx-v5.8.9 (upstream a8319fe2390169e1f2483e3ec80dd01a6cdb233d) -->
 [b-cleandup]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_broker.erl#L265-L266
@@ -537,6 +538,7 @@ OpenQTT deviates from the specification in 2 statements, MQTT-3.1.3-2 and MQTT-3
 [c-pub-deny]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L643-L661
 [c-pub-errors]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L680-L690
 [c-puback]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L804-L826
+[c-puback-rc]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L790-L796
 [c-pubrec]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L832-L853
 [c-qos2-inuse]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L758-L760
 [c-resp-info]: https://github.com/openqtt/OpenQTT/blob/emqx-v5.8.9/apps/emqx/src/emqx_channel.erl#L2745-L2763
