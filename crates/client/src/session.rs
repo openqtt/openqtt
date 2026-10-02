@@ -16,6 +16,11 @@ use crate::ids::PacketIds;
 /// unacknowledged messages in the order it first sent them ([MQTT-4.6.0-1]). If the server
 /// answers Session Present 0, the client discards this state ([MQTT-3.2.2-5]).
 ///
+/// The new CONNACK may allow less than the one the messages were sent under. A message it
+/// forbids, with a QoS above its Maximum QoS, RETAIN without Retain Available, or too large
+/// for its Maximum Packet Size, is not sent again: it leaves the session, and
+/// [`Event::Discarded`](crate::Event::Discarded) hands it back to the application.
+///
 /// [`Session::new`] is a session with nothing in flight. Connecting with Clean Start 0 and no
 /// session means the client holds no state, so a server answering Session Present 1 makes it
 /// close the connection ([MQTT-3.2.2-4]).

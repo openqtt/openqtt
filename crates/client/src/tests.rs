@@ -1111,3 +1111,106 @@ async fn a_disconnect_reason_string_that_would_not_fit_the_server_is_left_out() 
         })
     );
 }
+
+/// Publishes `messages`, none of which the server acknowledges, and returns the session the
+/// client keeps.
+async fn session_holding(messages: Vec<Publish>) -> Session {
+    let (client, _events, mut server) = connect(ConnectOptions::new("c").keep_alive(0)).await;
+    for message in messages {
+        let publisher = client.clone();
+        tokio::spawn(async move { drop(publisher.publish(message).await) });
+        assert!(matches!(server.recv().await, Packet::Publish(_)));
+    }
+    client.disconnect().await.unwrap()
+}
+
+// covers: MQTT-3.2.2-14
+#[tokio::test(start_paused = true)]
+async fn mqtt_3_2_2_11_a_resumed_message_the_new_connack_forbids_is_not_sent() {
+    let session = session_holding(vec![
+        Publish {
+            qos: QoS::ExactlyOnce,
+            ..qos1("exactly_once", "2")
+        },
+        Publish {
+            retain: true,
+            ..qos1("retained", "r")
+        },
+        qos1("plain", "1"),
+    ])
+    .await;
+    assert_eq!(session.unacknowledged(), 3);
+    let narrower = ConnAck {
+        session_present: true,
+        properties: ConnAckProperties {
+            maximum_qos: Some(QoS::AtLeastOnce),
+            retain_available: Some(false),
+            ..ConnAckProperties::default()
+        },
+        ..ConnAck::default()
+    };
+    let (client, mut events, mut server, _) = connect_with(
+        ConnectOptions::new("c").keep_alive(0).resume(session),
+        narrower,
+    )
+    .await;
+    // Only the message the server still allows is sent again.
+    let Packet::Publish(resent) = server.recv().await else {
+        panic!("a PUBLISH");
+    };
+    assert_eq!(resent.topic, "plain");
+    assert!(resent.dup);
+    assert!(server.silent_for(Duration::from_secs(1)).await);
+    // The others are handed back to the application, in the order they were first sent.
+    for (topic, expected) in [
+        (
+            "exactly_once",
+            crate::Discard::QosNotSupported {
+                maximum: QoS::AtLeastOnce,
+            },
+        ),
+        ("retained", crate::Discard::RetainNotSupported),
+    ] {
+        let Some(Event::Discarded { publish, reason }) = events.recv().await else {
+            panic!("the message on {topic} is discarded");
+        };
+        assert_eq!(publish.topic, topic);
+        assert!(!publish.dup);
+        assert_eq!(reason, expected);
+    }
+    server.send(PubAck::new(resent.packet_id.unwrap())).await;
+    // On the paused clock the sleep ends once the client has read the PUBACK.
+    tokio::time::sleep(Duration::from_millis(1)).await;
+    assert_eq!(client.disconnect().await.unwrap().unacknowledged(), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_resumed_message_too_large_for_the_new_server_is_discarded() {
+    let session = session_holding(vec![Publish {
+        payload: Bytes::from(vec![0; 100]),
+        ..qos1("large", "")
+    }])
+    .await;
+    let smaller = ConnAck {
+        session_present: true,
+        properties: ConnAckProperties {
+            maximum_packet_size: NonZeroU32::new(64),
+            ..ConnAckProperties::default()
+        },
+        ..ConnAck::default()
+    };
+    let (_client, mut events, mut server, _) = connect_with(
+        ConnectOptions::new("c").keep_alive(0).resume(session),
+        smaller,
+    )
+    .await;
+    assert!(server.silent_for(Duration::from_secs(1)).await);
+    let Some(Event::Discarded { publish, reason }) = events.recv().await else {
+        panic!("the message is discarded");
+    };
+    assert_eq!(publish.topic, "large");
+    assert!(matches!(
+        reason,
+        crate::Discard::Invalid(openqtt_codec::Error::PacketTooLarge { maximum: 64, .. })
+    ));
+}

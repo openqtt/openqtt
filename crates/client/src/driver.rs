@@ -17,7 +17,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Instant, sleep_until, timeout};
 
-use crate::client::{CloseReason, Event, Published, Shared};
+use crate::client::{CloseReason, Discard, Event, Published, Shared};
 use crate::session::{Outbound, Stage};
 use crate::transport::{CloseCode, Link, LinkHandle};
 use crate::{Error, Session};
@@ -443,14 +443,25 @@ impl Driver {
             if let Some(index) = self.session.outbound.iter().position(|o| !o.sent) {
                 let mut publish = self.session.outbound[index].publish.clone();
                 publish.dup = true;
-                self.session.outbound[index].sent = true;
-                self.in_flight += 1;
-                if let Err(error) = self.encode(&Packet::Publish(publish)) {
-                    // It no longer fits what this server accepts; it cannot be delivered.
-                    tracing::warn!(%error, "dropping a resumed message the server would refuse");
-                    self.finish_outbound(index);
+                let refusal = self.forbidden(&publish).or_else(|| {
+                    self.encode(&Packet::Publish(publish))
+                        .err()
+                        .map(Discard::Invalid)
+                });
+                if let Some(reason) = refusal {
+                    // The server would refuse it now; it leaves the session unsent, and the
+                    // application hears of it.
+                    if let Some(outbound) = self.session.outbound.remove(index) {
+                        self.session.ids.release(outbound.id);
+                        self.emit(Event::Discarded {
+                            publish: outbound.publish,
+                            reason,
+                        });
+                    }
                     continue;
                 }
+                self.session.outbound[index].sent = true;
+                self.in_flight += 1;
                 self.flush().await?;
                 continue;
             }
@@ -506,16 +517,28 @@ impl Driver {
 
     /// Checks a packet against what a client may send and the server's Maximum Packet Size,
     /// and appends it to the write buffer.
-    fn encode(&mut self, packet: &Packet) -> Result<(), Error> {
-        packet
-            .check_sender(Sender::Client)
-            .map_err(Error::Invalid)?;
-        packet
-            .encode_within(
-                &mut self.write_buf,
-                self.negotiated.server_maximum_packet_size,
-            )
-            .map_err(Error::Invalid)
+    fn encode(&mut self, packet: &Packet) -> Result<(), openqtt_codec::Error> {
+        packet.check_sender(Sender::Client)?;
+        packet.encode_within(
+            &mut self.write_buf,
+            self.negotiated.server_maximum_packet_size,
+        )
+    }
+
+    /// What a server that sent this CONNACK no longer allows of a message the session held:
+    /// a QoS above its Maximum QoS ([MQTT-3.2.2-11]), or RETAIN without Retain Available
+    /// ([MQTT-3.2.2-14]).
+    fn forbidden(&self, publish: &Publish) -> Option<Discard> {
+        let negotiated = &self.negotiated;
+        if publish.qos > negotiated.server_maximum_qos {
+            Some(Discard::QosNotSupported {
+                maximum: negotiated.server_maximum_qos,
+            })
+        } else if publish.retain && !negotiated.server_retain_available {
+            Some(Discard::RetainNotSupported)
+        } else {
+            None
+        }
     }
 
     /// [`encode`](Self::encode) for a packet the client makes itself, which never fails
@@ -563,7 +586,8 @@ impl Driver {
             }
             stored.properties.topic_alias = None;
         }
-        self.encode(&Packet::Publish(publish.clone()))?;
+        self.encode(&Packet::Publish(publish.clone()))
+            .map_err(Error::Invalid)?;
         if let Some(alias) = publish.properties.topic_alias
             && !publish.topic.is_empty()
         {
@@ -593,7 +617,7 @@ impl Driver {
                 });
                 if let Err(error) = self.encode(&packet) {
                     self.session.ids.release(id);
-                    drop(reply.send(Err(error)));
+                    drop(reply.send(Err(Error::Invalid(error))));
                     return Ok(());
                 }
                 self.replies.insert(id.get(), Reply::Subscribe(reply));
@@ -615,7 +639,7 @@ impl Driver {
                 });
                 if let Err(error) = self.encode(&packet) {
                     self.session.ids.release(id);
-                    drop(reply.send(Err(error)));
+                    drop(reply.send(Err(Error::Invalid(error))));
                     return Ok(());
                 }
                 self.replies.insert(id.get(), Reply::Unsubscribe(reply));
@@ -629,10 +653,9 @@ impl Driver {
                 let mut packet = Packet::Disconnect(disconnect);
                 let encoded = packet
                     .fit_within(self.negotiated.server_maximum_packet_size)
-                    .map_err(Error::Invalid)
                     .and_then(|_| self.encode(&packet));
                 if let Err(error) = encoded {
-                    drop(reply.send(Err(error)));
+                    drop(reply.send(Err(Error::Invalid(error))));
                     return Ok(());
                 }
                 drop(self.flush().await);

@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use bytes::BytesMut;
 use openqtt_codec::{
-    ConnAck, Decoder, Disconnect, Packet, PubAck, PubComp, PubRec, Publish, Sender, SubAck,
+    ConnAck, Decoder, Disconnect, Packet, PubAck, PubComp, PubRec, Publish, QoS, Sender, SubAck,
     SubscribeProperties, Subscription, SubscriptionOptions, UnsubAck, UnsubscribeProperties,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -91,8 +91,34 @@ pub enum Event {
     /// A packet as the server sent it, before the client acted on it. Only with
     /// [`ConnectOptions::packet_log`].
     Received(Packet),
+    /// A message a resumed [`Session`] held from an earlier connection, which this one may not
+    /// send: the server's CONNACK no longer allows it. It has left the session unsent. The
+    /// call that published it ended with the earlier connection, so this is where the
+    /// application learns it was not delivered.
+    Discarded {
+        /// The message, as it was first sent.
+        publish: Publish,
+        /// What the server no longer allows.
+        reason: Discard,
+    },
     /// The connection ended. Always the last event.
     Closed(CloseReason),
+}
+
+/// Why a resumed message was discarded rather than sent again ([`Event::Discarded`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Discard {
+    /// Its QoS is above the server's Maximum QoS ([MQTT-3.2.2-11]).
+    QosNotSupported {
+        /// The server's Maximum QoS.
+        maximum: QoS,
+    },
+    /// It is retained, and the server announced Retain Available 0 ([MQTT-3.2.2-14]).
+    RetainNotSupported,
+    /// It does not encode for this server, as when it is larger than the server's Maximum
+    /// Packet Size ([MQTT-3.2.2-15]).
+    Invalid(openqtt_codec::Error),
 }
 
 /// Why a connection ended.

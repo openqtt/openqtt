@@ -90,7 +90,9 @@ impl ConnectOptions {
     }
 
     /// Resumes `session`: Clean Start 0 and the session's Client Identifier. If the server
-    /// still holds the session, the client resends what was in flight ([MQTT-4.4.0-1]).
+    /// still holds the session, the client resends what was in flight ([MQTT-4.4.0-1]), but
+    /// for what the new CONNACK forbids, which [`Event::Discarded`](crate::Event::Discarded)
+    /// reports instead.
     #[must_use]
     pub fn resume(mut self, session: Session) -> Self {
         self.connect.clean_start = false;

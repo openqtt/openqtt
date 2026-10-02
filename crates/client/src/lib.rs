@@ -64,7 +64,7 @@ mod session;
 mod tls;
 mod transport;
 
-pub use client::{Client, CloseReason, Event, Events, Published};
+pub use client::{Client, CloseReason, Discard, Event, Events, Published};
 pub use error::Error;
 pub use options::{
     ConnectOptions, DEFAULT_CONNECT_TIMEOUT, DEFAULT_EVENT_CAPACITY, DEFAULT_KEEP_ALIVE,
