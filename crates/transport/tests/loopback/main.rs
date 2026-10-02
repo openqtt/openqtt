@@ -82,6 +82,59 @@ pub(crate) async fn connected(
     )
 }
 
+/// Encodes a packet, for a test that writes to a QUIC stream itself.
+pub(crate) fn encode(packet: impl Into<openqtt_testkit::codec::Packet>) -> Vec<u8> {
+    let mut bytes = bytes::BytesMut::new();
+    packet
+        .into()
+        .encode(&mut bytes)
+        .expect("the packet encodes");
+    bytes.to_vec()
+}
+
+/// A client on quinn itself, connected to `endpoint` with its control stream open, and the
+/// server's side, past the CONNECT: for what the raw client cannot do to the control stream.
+pub(crate) async fn quinn_client(
+    endpoint: &Endpoint,
+    target: &Target,
+) -> (
+    quinn::Endpoint,
+    quinn::Connection,
+    quinn::SendStream,
+    quinn::RecvStream,
+    QuicConnection,
+) {
+    let client =
+        quinn::Endpoint::client(SocketAddr::from(([127, 0, 0, 1], 0))).expect("a client endpoint");
+    let config = target.quic_config().expect("a client configuration");
+    let address = endpoint.local_address();
+    let (connection, server) = tokio::join!(
+        async {
+            client
+                .connect_with(config, address, "localhost")
+                .expect("an attempt")
+                .await
+                .expect("the client connects")
+        },
+        async {
+            endpoint
+                .accept()
+                .await
+                .expect("a connection attempt")
+                .establish()
+                .await
+                .expect("the server accepts")
+        }
+    );
+    let mut server = server;
+    let (mut send, recv) = connection.open_bi().await.expect("the control stream");
+    send.write_all(&encode(openqtt_testkit::packets::connect("quinn")))
+        .await
+        .expect("the CONNECT goes out");
+    take_connect(&mut server).await;
+    (client, connection, send, recv, server)
+}
+
 /// The connection's next event, which must come in time.
 pub(crate) async fn next(connection: &mut QuicConnection) -> Result<Event, Error> {
     tokio::time::timeout(WAIT, connection.recv())

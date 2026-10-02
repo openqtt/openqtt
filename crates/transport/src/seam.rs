@@ -82,7 +82,8 @@ pub enum Event {
     /// One side of a stream ended. Each side ends once: the client's with
     /// [`Finished`](StreamEnd::Finished) or [`Reset`](StreamEnd::Reset), after which no packet
     /// arrives on the stream, and the server's with [`Stopped`](StreamEnd::Stopped), after which
-    /// nothing can be sent on it. Either end of the control stream ends the MQTT connection
+    /// nothing can be sent on it. Either comes after every packet the stream delivered before
+    /// it ended. Either end of the control stream ends the MQTT connection
     /// (section 2.1); section 2.4 says what follows the end of a data stream, which the session
     /// then [`finish`](MqttConnection::finish)es or [`reset`](MqttConnection::reset)s so that the
     /// connection lets it go.

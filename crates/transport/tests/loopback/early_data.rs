@@ -6,7 +6,6 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use bytes::BytesMut;
 use openqtt_testkit::codec::{ConnAck, Packet};
 use openqtt_testkit::{TestPki, packets};
 use openqtt_transport::{
@@ -14,7 +13,7 @@ use openqtt_transport::{
 };
 use quinn::crypto::rustls::QuicClientConfig;
 
-use crate::{WAIT, bind, config, next};
+use crate::{WAIT, bind, config, encode, next};
 
 /// A client that keeps the sessions it is given and sends 0-RTT data on resuming one, with a
 /// client certificate from `pki`.
@@ -33,16 +32,6 @@ fn client_config(pki: &TestPki) -> quinn::ClientConfig {
     tls.enable_early_data = true;
     let crypto = QuicClientConfig::try_from(Arc::new(tls)).expect("TLS for QUIC");
     quinn::ClientConfig::new(Arc::new(crypto))
-}
-
-/// Encodes a packet.
-fn encode(packet: impl Into<Packet>) -> Vec<u8> {
-    let mut bytes = BytesMut::new();
-    packet
-        .into()
-        .encode(&mut bytes)
-        .expect("the packet encodes");
-    bytes.to_vec()
 }
 
 /// Accepts the next connection on `endpoint`.

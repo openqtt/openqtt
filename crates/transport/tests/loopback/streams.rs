@@ -5,14 +5,16 @@
 use std::num::NonZeroU16;
 
 use openqtt_testkit::codec::{
-    ConnAck, ConnectReasonCode, Packet, PacketType, PublishProperties, QoS,
+    ConnAck, ConnectReasonCode, Disconnect, Packet, PacketType, PublishProperties, QoS,
 };
 use openqtt_testkit::{Close, RawConnection, Recorded, TestPki, packets};
 use openqtt_transport::{
     CloseCode, Error, Event, MqttConnection, QuicConnection, StreamEnd, StreamTag, Violation,
 };
 
-use crate::{QUIET, WAIT, bind, config, connected, next, quiet, take_connect, target};
+use crate::{
+    QUIET, WAIT, bind, config, connected, encode, next, quiet, quinn_client, take_connect, target,
+};
 
 /// A client connected and accepted: CONNECT, CONNACK, and data streams accepted.
 async fn accepted(pki: &TestPki) -> (RawConnection, QuicConnection, openqtt_transport::Endpoint) {
@@ -404,4 +406,63 @@ async fn a_client_opens_no_more_streams_than_the_listener_allows() {
             ..
         }
     ));
+}
+
+#[tokio::test]
+async fn a_disconnect_comes_before_the_stop_that_follows_it() {
+    let pki = TestPki::new("Streams CA").unwrap();
+    let endpoint = bind(config(&pki));
+    let (_client, _connection, mut send, mut recv, mut server) =
+        quinn_client(&endpoint, &target(&endpoint, &pki)).await;
+    // The client says goodbye and stops the server's side of the control stream, and both
+    // arrive before the server reads either. Taken in the other order, the stop would look like
+    // an abnormal end, and the session would publish the Will Message.
+    send.write_all(&encode(Disconnect::default()))
+        .await
+        .unwrap();
+    recv.stop(quinn::VarInt::from_u32(5)).unwrap();
+    tokio::time::sleep(QUIET).await;
+    assert_eq!(
+        next(&mut server).await.unwrap(),
+        Event::Packet {
+            stream: StreamTag::Control,
+            packet: Packet::from(Disconnect::default()),
+        }
+    );
+    assert_eq!(
+        next(&mut server).await.unwrap(),
+        Event::StreamEnded {
+            stream: StreamTag::Control,
+            end: StreamEnd::Stopped(5),
+        }
+    );
+}
+
+#[tokio::test]
+async fn a_publish_comes_before_the_stop_of_its_data_stream() {
+    let pki = TestPki::new("Streams CA").unwrap();
+    let (client, mut server, _endpoint) = accepted(&pki).await;
+    let mut stream = client.open_stream().await.unwrap();
+    // The session must hear of the PUBLISH to know it owes a PUBACK it can no longer send
+    // (section 2.4).
+    stream
+        .send(packets::publish("t/9", QoS::AtLeastOnce, 1, "owed"))
+        .await
+        .unwrap();
+    stream.stop(6);
+    tokio::time::sleep(QUIET).await;
+    assert_eq!(
+        next(&mut server).await.unwrap(),
+        Event::Packet {
+            stream: StreamTag::Data(1),
+            packet: Packet::from(packets::publish("t/9", QoS::AtLeastOnce, 1, "owed")),
+        }
+    );
+    assert_eq!(
+        next(&mut server).await.unwrap(),
+        Event::StreamEnded {
+            stream: StreamTag::Data(1),
+            end: StreamEnd::Stopped(6),
+        }
+    );
 }

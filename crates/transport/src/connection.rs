@@ -658,35 +658,65 @@ impl QuicConnection {
         self.data.retain(|stream| !stream.is_done());
     }
 
-    /// The next stream end to report from the server's side.
-    fn take_stop(&mut self) -> Option<Event> {
-        let event = self.streams_mut().find_map(|stream| match stream.stop {
-            Stop::Unreported(code) => {
-                stream.stop = Stop::Reported;
-                Some(Event::StreamEnded {
-                    stream: stream.tag,
-                    end: StreamEnd::Stopped(code),
-                })
+    /// Whether packets may be read now.
+    fn reading(&self) -> bool {
+        // A closed connection is drained whatever else holds reading back, so that a DISCONNECT
+        // that came before the close is not mistaken for an abnormal end. Not one whose handshake
+        // never completed: what it sent may be a replay.
+        !self.failed
+            && match self.closed {
+                Some(_) => matches!(self.handshake, Handshake::Complete { .. }),
+                None => !self.paused && self.backlog() < self.backlog_limit,
             }
-            Stop::None | Stop::Reported => None,
-        });
-        if event.is_some() {
+    }
+
+    /// The next stop of a server's side to report, once the client's side of that stream has
+    /// nothing left that arrived before it: those packets come first, so that a DISCONNECT
+    /// followed by a stop of the control stream is not taken for an abnormal end, nor a PUBLISH
+    /// whose acknowledgement can no longer be sent missed. While nothing may be read, the stop
+    /// waits too.
+    fn take_stop(&mut self, cx: &mut Context<'_>) -> Option<Result<Event, Error>> {
+        if !self.reading() {
+            return None;
+        }
+        let decoder = self.decoder;
+        let mut lost = None;
+        let mut taken = None;
+        for stream in self.control.iter_mut().chain(self.data.iter_mut()) {
+            let Stop::Unreported(code) = stream.stop else {
+                continue;
+            };
+            match stream.poll_read(decoder, cx) {
+                Read::Event(result) => {
+                    taken = Some(result);
+                    break;
+                }
+                // Nothing more will arrive on it.
+                Read::Lost(error) => lost = Some(error),
+                Read::Pending => {}
+            }
+            stream.stop = Stop::Reported;
+            taken = Some(Ok(Event::StreamEnded {
+                stream: stream.tag,
+                end: StreamEnd::Stopped(code),
+            }));
+            break;
+        }
+        if let Some(error) = lost {
+            self.lose(&error);
+        }
+        if matches!(taken, Some(Err(_))) {
+            self.failed = true;
+        }
+        if taken.is_some() {
             self.data.retain(|stream| !stream.is_done());
         }
-        event
+        taken
     }
 
     /// Reads the next packet, taking the streams in turn so that none starves the others.
     fn drive_reads(&mut self, cx: &mut Context<'_>) -> Option<Result<Event, Error>> {
-        // A closed connection is drained whatever else holds reading back, so that a DISCONNECT
-        // that came before the close is not mistaken for an abnormal end. Not one whose handshake
-        // never completed: what it sent may be a replay.
-        let reading = !self.failed
-            && match self.closed {
-                Some(_) => matches!(self.handshake, Handshake::Complete { .. }),
-                None => !self.paused && self.backlog() < self.backlog_limit,
-            };
-        if !reading {
+        if !self.reading() {
             return None;
         }
         let decoder = self.decoder;
@@ -746,8 +776,8 @@ impl MqttConnection for QuicConnection {
         }
         self.drive_accept(cx);
         self.drive_stopped(cx);
-        if let Some(event) = self.take_stop() {
-            return Poll::Ready(Ok(event));
+        if let Some(result) = self.take_stop(cx) {
+            return Poll::Ready(result);
         }
         if let Some(result) = self.drive_reads(cx) {
             return Poll::Ready(result);
