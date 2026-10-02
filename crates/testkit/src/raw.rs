@@ -34,6 +34,7 @@ pub struct Target {
     roots: Vec<CertificateDer<'static>>,
     identity: Option<Identity>,
     alpn: Vec<Vec<u8>>,
+    transport: Option<Arc<quinn::TransportConfig>>,
 }
 
 impl Target {
@@ -49,6 +50,7 @@ impl Target {
             roots,
             identity: None,
             alpn: vec![ALPN.to_vec()],
+            transport: None,
         }
     }
 
@@ -66,12 +68,29 @@ impl Target {
         self
     }
 
-    fn quinn_config(&self) -> Result<quinn::ClientConfig, Error> {
+    /// Uses `transport` for the QUIC connection instead of the test kit's own settings: to give
+    /// a client small receive windows, say, and see a server held back by flow control.
+    #[must_use]
+    pub fn with_transport_config(mut self, transport: Arc<quinn::TransportConfig>) -> Self {
+        self.transport = Some(transport);
+        self
+    }
+
+    /// The quinn configuration a connection to this target uses, for a test that drives quinn
+    /// itself: many connections on one endpoint, say.
+    ///
+    /// # Errors
+    ///
+    /// When rustls refuses the roots or the client certificate.
+    pub fn quic_config(&self) -> Result<quinn::ClientConfig, Error> {
         let tls = client_config(&self.roots, self.identity.as_ref(), &self.alpn)?;
         let crypto = QuicClientConfig::try_from(tls)
             .map_err(|error| Error::TlsForQuic(error.to_string()))?;
         let mut config = quinn::ClientConfig::new(Arc::new(crypto));
-        config.transport_config(transport_config()?);
+        config.transport_config(match &self.transport {
+            Some(transport) => Arc::clone(transport),
+            None => transport_config()?,
+        });
         Ok(config)
     }
 }
@@ -248,7 +267,7 @@ impl RawConnection {
     /// When the handshake fails, as it must for a server that refuses the client's
     /// certificate or ALPN.
     pub async fn connect(target: &Target) -> Result<Self, Error> {
-        let config = target.quinn_config()?;
+        let config = target.quic_config()?;
         let bind = if target.addr.is_ipv6() {
             SocketAddr::from((Ipv6Addr::UNSPECIFIED, 0))
         } else {
@@ -521,6 +540,157 @@ impl RawConnection {
             .downcast::<quinn::crypto::rustls::HandshakeData>()
             .ok()?
             .protocol
+    }
+
+    /// Opens a data stream (docs/spec/mqtt-over-quic.md, section 2.3), the next bidirectional
+    /// stream after those already open. It waits while the server allows no more streams. The
+    /// server hears of the stream only once something is sent on it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Connection`] when the connection is closed.
+    pub async fn open_stream(&self) -> Result<RawStream, Error> {
+        let (send, recv) = self.connection.open_bi().await?;
+        Ok(RawStream {
+            send,
+            recv,
+            buffer: BytesMut::new(),
+            decoder: Decoder::new().with_sender(Sender::Server),
+            ended: false,
+        })
+    }
+
+    /// The QUIC connection, for what the methods here do not do.
+    pub fn quic(&self) -> &quinn::Connection {
+        &self.connection
+    }
+}
+
+/// A data stream of a [`RawConnection`] (docs/spec/mqtt-over-quic.md, section 2.3): it sends
+/// exactly what it is given, and reads what the server sends on it only when asked, so that a
+/// test can also leave it unread.
+#[derive(Debug)]
+pub struct RawStream {
+    send: SendStream,
+    recv: RecvStream,
+    buffer: BytesMut,
+    decoder: Decoder,
+    ended: bool,
+}
+
+impl RawStream {
+    /// The stream's place among the client's bidirectional streams: the control stream is 0,
+    /// so the first data stream is 1.
+    pub fn index(&self) -> u64 {
+        self.recv.id().index()
+    }
+
+    /// Encodes and sends a packet.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Encode`] for a packet the codec refuses to encode, and [`Error::Write`] when the
+    /// stream is closed.
+    pub async fn send(&mut self, packet: impl Into<Packet>) -> Result<(), Error> {
+        let mut bytes = BytesMut::new();
+        packet.into().encode(&mut bytes)?;
+        self.send.write_all(&bytes).await?;
+        Ok(())
+    }
+
+    /// Sends bytes as they are.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Write`] when the stream is closed.
+    pub async fn send_bytes(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        self.send.write_all(bytes).await?;
+        Ok(())
+    }
+
+    /// What the server sends next on the stream: a packet, bytes that do not decode, the end of
+    /// its side, or the close of the connection; `None` when nothing comes within `timeout`, or
+    /// nothing more can.
+    pub async fn recv(&mut self, timeout: Duration) -> Option<Recorded> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            if let Some(frame) = next_frame(&mut self.buffer) {
+                return Some(match frame {
+                    Ok(frame) => decode(self.decoder, frame),
+                    Err(rest) => Recorded::Malformed {
+                        bytes: rest,
+                        error: "the Remaining Length is not a valid Variable Byte Integer".into(),
+                    },
+                });
+            }
+            if self.ended {
+                return None;
+            }
+            let read =
+                tokio::time::timeout_at(deadline, self.recv.read_chunk(64 * 1024, true)).await;
+            match read {
+                Err(_) => return None,
+                Ok(Ok(Some(chunk))) => self.buffer.extend_from_slice(&chunk.bytes),
+                Ok(Ok(None)) => {
+                    self.ended = true;
+                    if !self.buffer.is_empty() {
+                        return Some(Recorded::Malformed {
+                            bytes: self.buffer.split().freeze(),
+                            error: "the stream ended inside a packet".into(),
+                        });
+                    }
+                    return Some(Recorded::StreamFinished);
+                }
+                Ok(Err(ReadError::Reset(code))) => {
+                    self.ended = true;
+                    return Some(Recorded::StreamReset(code.into_inner()));
+                }
+                Ok(Err(ReadError::ConnectionLost(error))) => {
+                    self.ended = true;
+                    return Some(Recorded::Closed(Close::of(&error)));
+                }
+                Ok(Err(error)) => {
+                    self.ended = true;
+                    return Some(Recorded::Closed(Close::Other(error.to_string())));
+                }
+            }
+        }
+    }
+
+    /// The next packet the server sends on the stream: `None` when the next thing is not a
+    /// packet, or nothing comes in time.
+    pub async fn recv_packet(&mut self, timeout: Duration) -> Option<Packet> {
+        match self.recv(timeout).await? {
+            Recorded::Received(packet) => Some(packet),
+            _ => None,
+        }
+    }
+
+    /// Finishes this end's side of the stream.
+    pub fn finish(&mut self) {
+        // Finishing twice is not an error a test cares about.
+        drop(self.send.finish());
+    }
+
+    /// Resets this end's side of the stream with an application error code.
+    pub fn reset(&mut self, code: u32) {
+        drop(self.send.reset(VarInt::from_u32(code)));
+    }
+
+    /// Asks the server to stop sending on the stream (STOP_SENDING) with an application error
+    /// code.
+    pub fn stop(&mut self, code: u32) {
+        drop(self.recv.stop(VarInt::from_u32(code)));
+        self.ended = true;
+    }
+
+    /// The code the server stopped this end's side with, once it does; `None` when it has not
+    /// within `timeout`, or the side ended otherwise.
+    pub async fn stopped(&mut self, timeout: Duration) -> Option<u64> {
+        match tokio::time::timeout(timeout, self.send.stopped()).await {
+            Ok(Ok(Some(code))) => Some(code.into_inner()),
+            _ => None,
+        }
     }
 }
 

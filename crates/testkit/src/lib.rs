@@ -2,7 +2,8 @@
 //!
 //! - [`RawConnection`]: an MQTT connection over QUIC that sends whatever it is given,
 //!   malformed bytes included, and records every packet each way with its time, and how the
-//!   connection closed: what statements that end in "MUST close the connection" need.
+//!   connection closed: what statements that end in "MUST close the connection" need. Its
+//!   [`RawStream`]s are data streams, for multi-stream mode.
 //! - [`TestPki`]: throwaway certificate authorities and certificates, with the negative cases
 //!   a server must refuse.
 //! - [`FakeServer`] and [`FakeBroker`]: a QUIC listener whose connections a test plays packet
@@ -32,7 +33,7 @@ pub mod trace;
 pub use error::Error;
 pub use oracle::{ORACLE_IMAGE, Oracle};
 pub use pki::{Identity, TestPki};
-pub use raw::{Close, RawConnection, Record, Recorded, Target};
+pub use raw::{Close, RawConnection, RawStream, Record, Recorded, Target};
 pub use scenario::{CLOSE_WAIT, Check, DEFAULT_WAIT, Outcome, Runner, Scenario, Step, substitute};
 pub use server::{FakeBroker, FakeServer};
 pub use tls::{ALPN, ClientAuth};
