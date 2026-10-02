@@ -34,13 +34,21 @@ fn opts(quick_repair: bool) -> Opts {
 }
 
 /// Fills a database with `gib` GiB: a million sessions, Raft log entries (a tenth of the bytes)
-/// and message bodies (the rest), 1 KiB each, synced every 256 MiB.
-pub fn load(data: &Path, out: &Path, kind: Kind, gib: u64, quick_repair: bool) -> Result<()> {
+/// and message bodies (the rest), 1 KiB each, in batches of 1000, synced every `sync_every_mb`.
+pub fn load(
+    data: &Path,
+    out: &Path,
+    kind: Kind,
+    gib: f64,
+    quick_repair: bool,
+    sync_every_mb: u64,
+    sessions: u64,
+) -> Result<()> {
     let dir = fresh_dir(data, &format!("recovery-{}", kind.name()));
     let eng = engine::open(kind, &dir, opts(quick_repair))?;
     let t = Instant::now();
-    preload(eng.as_ref(), 1_000_000)?;
-    let target = gib << 30;
+    preload(eng.as_ref(), sessions)?;
+    let target = (gib * f64::from(1u32 << 30)) as u64;
     let mut rng = Rng::new(9);
     let mut written: u64 = 0;
     let mut since_sync: u64 = 0;
@@ -61,7 +69,7 @@ pub fn load(data: &Path, out: &Path, kind: Kind, gib: u64, quick_repair: bool) -
         written += 1024 + 12;
         since_sync += 1024 + 12;
         if ops.len() == 1000 {
-            let sync = since_sync >= 256 << 20;
+            let sync = since_sync >= sync_every_mb << 20;
             eng.write(&ops, sync)?;
             ops.clear();
             if sync {
@@ -77,6 +85,7 @@ pub fn load(data: &Path, out: &Path, kind: Kind, gib: u64, quick_repair: bool) -
         out,
         json!({
             "exp": "recovery-load", "engine": kind.name(), "gib": gib, "quick_repair": quick_repair,
+            "sync_every_mb": sync_every_mb, "sessions": sessions,
             "load_s": round2(load_s), "entries": idx, "apparent": apparent, "allocated": allocated,
             "engine_stats": eng.stats(),
         }),

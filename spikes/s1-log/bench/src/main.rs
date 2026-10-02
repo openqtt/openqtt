@@ -128,14 +128,20 @@ enum Cmd {
         engine: Kind,
         #[arg(long)]
         phase: String,
-        #[arg(long, default_value_t = 10)]
-        gib: u64,
+        #[arg(long, default_value_t = 10.0)]
+        gib: f64,
         #[arg(long, default_value = "clean")]
         label: String,
         #[arg(long)]
         quick_repair: bool,
         #[arg(long, default_value_t = 1_000_000)]
         entries: u64,
+        /// Load phase: sync after this many MiB.
+        #[arg(long, default_value_t = 16)]
+        sync_every_mb: u64,
+        /// Load phase: sessions written before the bulk data.
+        #[arg(long, default_value_t = 1_000_000)]
+        sessions: u64,
     },
     /// Experiment 6: commit latency and throughput of Raft against primary-backup.
     Repl {
@@ -223,8 +229,10 @@ fn main() -> Result<()> {
         Cmd::Churn { engine, secs: s, rate, sessions, body, min_off_s, max_off_s } => {
             exp::churn::run(&cli.data, &cli.out, engine, s, rate, sessions, body, min_off_s, max_off_s)
         }
-        Cmd::Recovery { engine, phase, gib, label, quick_repair, entries } => match phase.as_str() {
-            "load" => exp::recovery::load(&cli.data, &cli.out, engine, gib, quick_repair),
+        Cmd::Recovery { engine, phase, gib, label, quick_repair, entries, sync_every_mb, sessions } => match phase.as_str() {
+            "load" => {
+                exp::recovery::load(&cli.data, &cli.out, engine, gib, quick_repair, sync_every_mb, sessions)
+            }
             "open" => exp::recovery::open(&cli.data, &cli.out, engine, &label, quick_repair),
             "crash-writer" => exp::recovery::crash_writer(&cli.data, engine, quick_repair),
             "replay" => exp::recovery::replay(&cli.data, &cli.out, engine, entries),

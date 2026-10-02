@@ -43,6 +43,34 @@ impl std::fmt::Display for Cmd {
     }
 }
 
+/// Several claims carried as one entry: an empty client id marks the batch, and `val` holds
+/// length-prefixed (cid, val) pairs. Only the batching proposer below writes these.
+fn encode_batch(cmds: &[Cmd]) -> Cmd {
+    let mut val = Vec::new();
+    for c in cmds {
+        val.extend_from_slice(&(c.cid.len() as u16).to_be_bytes());
+        val.extend_from_slice(&c.cid);
+        val.extend_from_slice(&(c.val.len() as u16).to_be_bytes());
+        val.extend_from_slice(&c.val);
+    }
+    Cmd { cid: Vec::new(), val }
+}
+
+fn decode_batch(val: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 2 <= val.len() {
+        let n = usize::from(u16::from_be_bytes([val[i], val[i + 1]]));
+        let cid = val[i + 2..i + 2 + n].to_vec();
+        i += 2 + n;
+        let m = usize::from(u16::from_be_bytes([val[i], val[i + 1]]));
+        let v = val[i + 2..i + 2 + m].to_vec();
+        i += 2 + m;
+        out.push((cid, v));
+    }
+    out
+}
+
 openraft::declare_raft_types!(
     pub TypeConfig:
         D = Cmd,
@@ -220,8 +248,15 @@ impl RaftStateMachine<TypeConfig> for Sm {
                 EntryPayload::Blank => res.push(0),
                 EntryPayload::Normal(c) => {
                     // A bounded map: the storm reuses client ids.
-                    g.own.insert(c.cid, c.val);
-                    g.applied += 1;
+                    if c.cid.is_empty() {
+                        for (cid, val) in decode_batch(&c.val) {
+                            g.own.insert(cid, val);
+                            g.applied += 1;
+                        }
+                    } else {
+                        g.own.insert(c.cid, c.val);
+                        g.applied += 1;
+                    }
                     res.push(g.applied);
                 }
                 EntryPayload::Membership(m) => {
@@ -358,6 +393,9 @@ pub struct Cluster {
     pub router: Arc<Router>,
     pub groups: u32,
     pub disks: Vec<Disk>,
+    /// With batching, one proposer per group turns whatever claims are waiting into one entry,
+    /// at most two entries in flight, because 0.9 appends one client write per flush.
+    proposers: Option<Vec<tokio::sync::mpsc::UnboundedSender<(Cmd, tokio::sync::oneshot::Sender<bool>)>>>,
 }
 
 pub struct Timing {
@@ -443,7 +481,44 @@ impl Cluster {
             router,
             groups,
             disks,
+            proposers: None,
         })
+    }
+
+    /// Puts a batching proposer in front of every group's leader.
+    pub fn with_batching(mut self) -> Self {
+        let mut txs = Vec::new();
+        for g in 0..self.groups {
+            let (tx, mut rx) =
+                tokio::sync::mpsc::unbounded_channel::<(Cmd, tokio::sync::oneshot::Sender<bool>)>();
+            txs.push(tx);
+            let raft = self.leader(g);
+            tokio::spawn(async move {
+                let slots = Arc::new(tokio::sync::Semaphore::new(2));
+                loop {
+                    let Ok(permit) = slots.clone().acquire_owned().await else { return };
+                    let Some(first) = rx.recv().await else { return };
+                    let mut batch = vec![first];
+                    while batch.len() < 1024 {
+                        match rx.try_recv() {
+                            Ok(x) => batch.push(x),
+                            Err(_) => break,
+                        }
+                    }
+                    let raft = raft.clone();
+                    tokio::spawn(async move {
+                        let cmds: Vec<Cmd> = batch.iter().map(|(c, _)| c.clone()).collect();
+                        let ok = raft.client_write(encode_batch(&cmds)).await.is_ok();
+                        for (_, tx) in batch {
+                            let _ = tx.send(ok);
+                        }
+                        drop(permit);
+                    });
+                }
+            });
+        }
+        self.proposers = Some(txs);
+        self
     }
 
     pub fn leader(&self, group: u32) -> Raft<TypeConfig> {
@@ -453,6 +528,17 @@ impl Cluster {
     }
 
     pub async fn write(&self, group: u32, cmd: Cmd) -> Result<()> {
+        if let Some(p) = &self.proposers {
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            p[group as usize]
+                .send((cmd, tx))
+                .map_err(|_| anyhow!("proposer gone"))?;
+            return if rx.await.unwrap_or(false) {
+                Ok(())
+            } else {
+                Err(anyhow!("batched write failed"))
+            };
+        }
         self.leader(group).client_write(cmd).await?;
         Ok(())
     }

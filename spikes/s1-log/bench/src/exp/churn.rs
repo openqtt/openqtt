@@ -265,6 +265,8 @@ pub fn run(
     while outstanding.load(Ordering::Relaxed) > 0 {
         std::thread::sleep(Duration::from_millis(5));
     }
+    // The committer's thread ends when its last sender goes.
+    drop(sender);
     committer.stop();
     let (apparent, allocated) = dir_size(&dir);
     let w_p99 = writes.series(0.99);

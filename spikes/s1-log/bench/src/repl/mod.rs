@@ -28,6 +28,8 @@ use raft::{Cmd, Timing};
 pub enum Scheme {
     /// openraft 0.9.25
     Raft,
+    /// openraft 0.9.25 behind a proposer that batches waiting claims into one entry
+    RaftBatched,
     /// openraft 0.10.0-alpha.36
     Raft10,
     Pb,
@@ -37,6 +39,7 @@ impl Scheme {
     fn name(self) -> &'static str {
         match self {
             Scheme::Raft => "raft",
+            Scheme::RaftBatched => "raft-batched",
             Scheme::Raft10 => "raft10",
             Scheme::Pb => "pb",
         }
@@ -60,6 +63,11 @@ impl AnyCluster {
     ) -> Result<Self> {
         Ok(match scheme {
             Scheme::Raft => AnyCluster::Raft(raft::Cluster::start(groups, line, delay, flush, timing).await?),
+            Scheme::RaftBatched => AnyCluster::Raft(
+                raft::Cluster::start(groups, line, delay, flush, timing)
+                    .await?
+                    .with_batching(),
+            ),
             Scheme::Raft10 => {
                 AnyCluster::Raft10(raft10::Cluster::start(groups, line, delay, flush, timing).await?)
             }
@@ -261,6 +269,7 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         "disk_flushes_per_s": round2(flushes as f64 / secs),
         "disk_items_per_flush": if flushes > 0 { round2(items as f64 / flushes as f64) } else { 0.0 },
         "drain_s": round2(wait.elapsed().as_secs_f64()),
+        "rss_bytes": u1.rss,
     })
 }
 
@@ -384,6 +393,9 @@ pub fn idle(
                         "cpu_cores_per_node": round2(protocol / secs / 3.0),
                         "cpu_us_per_group_replica_per_s": round2(protocol / secs / f64::from(g * 3) * 1e6),
                         "messages_per_s": round2((m1 - m0) as f64 / secs),
+                        // Resident memory of the whole process: three nodes and all their groups.
+                        "rss_bytes": u1.rss,
+                        "footprint_bytes": u1.footprint,
                         "extra": extra,
                     }))
                 })?;

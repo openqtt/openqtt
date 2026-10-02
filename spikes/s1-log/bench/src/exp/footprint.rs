@@ -106,8 +106,10 @@ pub fn idle(data: &Path, out: &Path, kind: Kind, n: u64, cache_mb: u64, reads: u
             "rss": { "base": base.rss, "opened": opened.rss, "warm": warm.rss, "settled": settled.rss },
             "footprint": { "base": base.footprint, "opened": opened.footprint, "warm": warm.footprint,
                            "settled": settled.footprint },
-            "rss_per_session": per(settled.rss, base.rss),
-            "footprint_per_session": per(settled.footprint, base.footprint),
+            // Read right after the sample reads: on a machine under memory pressure the kernel
+            // compresses idle pages within seconds, which `settled` shows.
+            "rss_per_session": per(warm.rss, base.rss),
+            "footprint_per_session": per(warm.footprint, base.footprint),
             "engine_stats": eng.stats(),
         }),
     );
