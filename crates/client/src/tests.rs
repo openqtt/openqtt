@@ -1959,3 +1959,53 @@ async fn publications_whose_callers_gave_up_free_the_queue_on_their_own() {
     };
     assert_eq!(sent.payload, "zero");
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_pingreq_left_unanswered_ends_the_connection_under_a_flood_the_application_keeps_up_with()
+{
+    let written = Written::default();
+    let (client, mut events) = Client::connect(
+        &Drowning(written.clone()),
+        ConnectOptions::new("c").keep_alive(10),
+    )
+    .await
+    .unwrap();
+    let start = Instant::now();
+    // The application takes every message as it comes, so events never wait for room: the
+    // client never stops reading, and nothing excuses the PINGRESP that never comes.
+    let closed = tokio::spawn(async move {
+        while let Some(event) = events.recv().await {
+            if let Event::Closed(reason) = event {
+                return Some((reason, start.elapsed()));
+            }
+        }
+        None
+    });
+    while !closed.is_finished() {
+        assert!(
+            start.elapsed() < Duration::from_secs(60),
+            "the connection outlived its unanswered PINGREQ: {:?}",
+            written.packets()
+        );
+        tokio::time::advance(Duration::from_millis(100)).await;
+        tokio::task::yield_now().await;
+    }
+    // PINGREQ at the Keep Alive, and the connection lost a ping timeout, which is the Keep
+    // Alive too, later.
+    let (reason, at) = closed.await.unwrap().expect("the connection closed");
+    assert!(
+        matches!(&reason, CloseReason::Lost(detail) if detail.contains("PINGREQ")),
+        "{reason:?}"
+    );
+    assert!(
+        (Duration::from_secs(20)..Duration::from_secs(21)).contains(&at),
+        "{at:?}"
+    );
+    let pings = written
+        .packets()
+        .into_iter()
+        .filter(|packet| *packet == Packet::PingReq)
+        .count();
+    assert_eq!(pings, 1);
+    assert!(client.is_closed());
+}

@@ -194,7 +194,7 @@ pub(crate) struct Driver {
     ping_sent: Option<Instant>,
     /// When the latest PINGREQ was queued.
     last_ping: Option<Instant>,
-    /// Since when reads are paused because events wait for the application.
+    /// Since when reads are paused because the application has left no room for events.
     paused_since: Option<Instant>,
     commands: mpsc::Receiver<Command>,
     commands_open: bool,
@@ -389,7 +389,6 @@ impl Driver {
         if self.events_closed && !self.commands_open {
             return Err(self.abandon());
         }
-        self.track_pause();
 
         // The Keep Alive: a due PINGREQ, or an overdue PINGRESP.
         if self.ping_deadline().is_some_and(|at| at <= Instant::now()) {
@@ -399,6 +398,7 @@ impl Driver {
 
         // Deliveries: waiting events handed over while the channel has room.
         progressed |= self.deliver_now();
+        self.track_pause();
 
         // Reads, unless events still wait for the application: first the packets that arrived
         // while it was behind, then whatever the server has sent since.
@@ -634,11 +634,17 @@ impl Driver {
         );
     }
 
-    /// Notes when reads pause, because events wait for the application, and when they resume.
-    /// A PINGRESP may wait unread meanwhile, so an outstanding PINGREQ's answer is timed only
-    /// over the time the client was reading.
+    /// Notes when reads pause because the application has left no room for events, and when
+    /// they resume. A PINGRESP may wait unread meanwhile, so an outstanding PINGREQ's answer is
+    /// timed only over the time the client was reading.
+    ///
+    /// Events still waiting after a round's deliveries do not pause reads on their own: the
+    /// round may only have handed over as many as it may, and the next one goes on. Only a
+    /// full channel makes the reads wait for the application. Checked before the round's
+    /// reads, since a client whose application keeps up holds the event it decoded last
+    /// round at every round's start.
     fn track_pause(&mut self) {
-        let paused = !self.outbox.is_empty();
+        let paused = !self.outbox.is_empty() && self.events.capacity() == 0;
         match (paused, self.paused_since) {
             (true, None) => self.paused_since = Some(Instant::now()),
             (false, Some(since)) => {
