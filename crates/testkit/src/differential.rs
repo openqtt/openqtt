@@ -173,6 +173,18 @@ pub fn r1_statements(report: &str) -> BTreeSet<String> {
         .collect()
 }
 
+/// The ids of the behaviours the specification leaves open that report R1 settles, `O1` and
+/// on: the first cell of its table of them.
+pub fn r1_open_choices(report: &str) -> BTreeSet<String> {
+    report
+        .lines()
+        .filter_map(|line| line.strip_prefix("| O"))
+        .filter_map(|rest| rest.split_once(' '))
+        .filter(|(number, _)| !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+        .map(|(number, _)| format!("O{number}"))
+        .collect()
+}
+
 /// The decision ids report R1 defines: `D1` from its heading, the rest from the first cell of
 /// its decision table.
 pub fn r1_decisions(report: &str) -> BTreeSet<String> {
@@ -255,7 +267,14 @@ mod tests {
 ### D1. What a client of an older MQTT version receives\n\
 | D2 | A denied PUBLISH | ... |\n\
 | D32 | Topic syntax errors | ... |\n\
+| O4 | Keep Alive bounds | ... |\n\
+| O26 | The reason code | ... |\n\
+| Open | not an id |\n\
 | Decision | not an id |\n";
+        assert_eq!(
+            r1_open_choices(report),
+            BTreeSet::from(["O4".to_owned(), "O26".to_owned()])
+        );
         assert_eq!(
             r1_statements(report),
             BTreeSet::from(["MQTT-1.5.4-1".to_owned(), "MQTT-3.1.2-22".to_owned()])

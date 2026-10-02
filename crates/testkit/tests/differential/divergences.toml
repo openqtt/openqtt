@@ -1,13 +1,15 @@
-# The intended differences between OpenQTT 2.0 and OpenQTT 1.x (EMQX 5.8.9), decisions D1 to
-# D32 of report R1 (docs/reports/R01-conformance.md), where each is argued. Once 2.0 runs, the
+# The intended differences between OpenQTT 2.0 and OpenQTT 1.x (EMQX 5.8.9), from report R1
+# (docs/reports/R01-conformance.md), where each is argued: the decisions D1 to D32, then the
+# behaviours the specification leaves open, O-entries, where OpenQTT chooses otherwise than
+# EMQX and no decision already explains the difference (O4 and O26). Once 2.0 runs, the
 # differential harness expects these differences in the traces of the scenarios listed, and
 # no others.
 #
-# Each entry: `id`, the decision; `statements`, the R1 statements it bears on; `summary`;
-# `emqx`, what OpenQTT 1.x does; `openqtt`, what 2.0 does; `scenarios`, the scenarios of
-# scenarios.rs whose traces show it (empty while none does). The test
-# the_divergences_are_d1_to_d32_once_each_and_name_what_exists keeps this file and the
-# catalogue consistent with each other and with R1.
+# Each entry: `id`, the decision or open choice; `statements`, the R1 statements it bears on;
+# `summary`; `emqx`, what OpenQTT 1.x does; `openqtt`, what 2.0 does; `scenarios`, the
+# scenarios of scenarios.rs whose traces show it (empty while none does). The test
+# the_divergences_list_d1_to_d32_and_the_differing_choices_and_name_what_exists keeps this
+# file and the catalogue consistent with each other and with R1.
 
 [[divergence]]
 id = "D1"
@@ -264,3 +266,19 @@ summary = "Topic syntax errors."
 emqx = "A bad Topic Name gets DISCONNECT 0x90 and a bad Response Topic DISCONNECT 0x82; one bad filter turns the whole SUBSCRIBE or UNSUBSCRIBE into DISCONNECT 0x8F."
 openqtt = "The one item is refused and the connection stays: PUBACK or PUBREC 0x90 for the PUBLISH, dropped and counted at QoS 0, and 0x8F in the SUBACK or UNSUBACK for that filter alone."
 scenarios = ["invalid_topic_filters", "invalid_topic_names"]
+
+[[divergence]]
+id = "O4"
+statements = ["MQTT-3.1.2-22", "MQTT-3.2.2-22"]
+summary = "Keep Alive bounds and Server Keep Alive."
+emqx = "Uses every client's Keep Alive as sent, 0 included; server_keepalive, off by default, would impose one value on every client."
+openqtt = "Uses values from 10 to 1,200 seconds as sent; 0 and values above 1,200 get Server Keep Alive 1,200, and values below 10 get 10, in CONNACK."
+scenarios = ["connect_and_connack", "keep_alive_timeout"]
+
+[[divergence]]
+id = "O26"
+statements = []
+summary = "The reason code of PUBACK and PUBREC for a message no subscription matched."
+emqx = "0x10 No matching subscribers whenever routing found no subscriber, even for a retained message it stored for later subscribers."
+openqtt = "0x00 whenever the message was accepted, retained or committed for a durable session included; 0x10 only when the message is not retained and nothing matched."
+scenarios = ["retained_after_subscribe", "retained_cleared_by_zero_bytes"]

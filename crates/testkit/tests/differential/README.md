@@ -20,8 +20,9 @@ Both need Docker, and neither is part of `make check`: the Docker tests are `#[i
 the Makefile targets run them alone with `cargo nextest run --run-ignored only`. The first run
 pulls the oracle image, about 110 MB. After that, the two runs take a little over a minute,
 most of it waiting out the quiet periods that let a missing packet show as missing. What `make check` does run here
-is the bookkeeping: every scenario and every entry of `divergences.toml` names statements and
-decisions that R1 defines, and the two files agree on which scenario shows which decision.
+is the bookkeeping: every scenario and every entry of `divergences.toml` names statements,
+decisions and open choices that R1 defines, and the two files agree on which scenario shows
+which.
 
 Each run writes its traces under `target/tmp/differential/`: `run-a/` and `run-b/` hold the
 normalized traces, and `run-a/raw/` and `run-b/raw/` the raw ones, with the time of every
@@ -54,8 +55,8 @@ packet or raw bytes, receive, expect, acknowledge whatever arrived, wait, close.
 topic, filter or Client Identifier is replaced by a namespace unique to each run, so runs never
 meet on the broker, and the normalized trace writes `{ns}` back.
 
-Each scenario names the R1 statements it exercises and the decisions, D1 to D32, whose
-difference from EMQX its trace shows. They are data, not `covers:` lines: a scenario proves a
+Each scenario names the R1 statements it exercises and the decisions, D1 to D32, or open
+choices, O-entries, whose difference from EMQX its trace shows. They are data, not `covers:` lines: a scenario proves a
 statement only once it runs against OpenQTT 2.0 with the kept trace and the divergences as its
 expected result, and `make conformance` should count it from then on, not before.
 
@@ -76,9 +77,11 @@ hash.
 
 ## Divergences
 
-`divergences.toml` lists D1 to D32 of R1: what OpenQTT 1.x does, what 2.0 does, the statements
-each bears on, and the scenarios whose traces show it. Once 2.0 runs, its traces are compared
-with `oracle/`, and every difference must be one these entries explain.
+`divergences.toml` lists D1 to D32 of R1, and the behaviours the specification leaves open
+where OpenQTT chooses otherwise than EMQX and no decision already explains the difference, O4
+and O26: what OpenQTT 1.x does, what 2.0 does, the statements each bears on, and the scenarios
+whose traces show it. Once 2.0 runs, its traces are compared with `oracle/`, and every
+difference must be one these entries explain.
 
 ## What OpenQTT 1.x does that R1 does not say
 

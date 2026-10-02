@@ -15,15 +15,21 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use openqtt_testkit::differential::{diff, parse_divergences, r1_decisions, r1_statements};
+use openqtt_testkit::differential::{
+    diff, parse_divergences, r1_decisions, r1_open_choices, r1_statements,
+};
 use openqtt_testkit::{ORACLE_IMAGE, Oracle, Outcome, Runner, Scenario};
 use serde_json::Value;
 
 /// Report R1, which every statement and decision a scenario names must come from.
 const R1: &str = include_str!("../../../../docs/reports/R01-conformance.md");
 
-/// The intended differences from OpenQTT 1.x, D1 to D32.
+/// The intended differences from OpenQTT 1.x: D1 to D32, and the open choices that differ.
 const DIVERGENCES: &str = include_str!("divergences.toml");
+
+/// The open choices of R1 where OpenQTT chooses otherwise than EMQX and no decision, D1 to
+/// D32, already explains it; `divergences.toml` lists each, after the decisions.
+const DIFFERING_CHOICES: [&str; 2] = ["O4", "O26"];
 
 /// How many scenarios the starter catalogue holds at least.
 const STARTER: usize = 15;
@@ -146,6 +152,7 @@ async fn bless_the_oracle_traces() {
 fn the_catalogue_names_what_r1_defines() {
     let statements = r1_statements(R1);
     let decisions = r1_decisions(R1);
+    let choices = r1_open_choices(R1);
     let catalogue = scenarios::catalogue();
     assert!(
         catalogue.len() >= STARTER,
@@ -174,7 +181,7 @@ fn the_catalogue_names_what_r1_defines() {
         }
         for id in &scenario.divergences {
             assert!(
-                decisions.contains(id),
+                decisions.contains(id) || choices.contains(id),
                 "{name} names {id}, which R1 does not define"
             );
         }
@@ -182,9 +189,10 @@ fn the_catalogue_names_what_r1_defines() {
 }
 
 #[test]
-fn the_divergences_are_d1_to_d32_once_each_and_name_what_exists() {
+fn the_divergences_list_d1_to_d32_and_the_differing_choices_and_name_what_exists() {
     let divergences = parse_divergences(DIVERGENCES).unwrap();
     let decisions = r1_decisions(R1);
+    let choices = r1_open_choices(R1);
     let statements = r1_statements(R1);
     let catalogue = scenarios::catalogue();
     let scenarios: BTreeMap<&str, &Scenario> = catalogue
@@ -193,13 +201,27 @@ fn the_divergences_are_d1_to_d32_once_each_and_name_what_exists() {
         .collect();
 
     let ids: Vec<&str> = divergences.iter().map(|d| d.id.as_str()).collect();
-    let expected: Vec<String> = (1..=32).map(|n| format!("D{n}")).collect();
-    assert_eq!(ids, expected, "divergences.toml lists D1 to D32 in order");
+    let expected: Vec<String> = (1..=32)
+        .map(|n| format!("D{n}"))
+        .chain(DIFFERING_CHOICES.iter().map(|id| (*id).to_owned()))
+        .collect();
+    assert_eq!(
+        ids, expected,
+        "divergences.toml lists D1 to D32, then the open choices that differ, in order"
+    );
     assert_eq!(
         decisions,
-        expected.iter().cloned().collect::<BTreeSet<_>>(),
+        expected[..32].iter().cloned().collect::<BTreeSet<_>>(),
         "R1 defines D1 to D32"
     );
+    for id in DIFFERING_CHOICES {
+        assert!(choices.contains(id), "R1 does not define {id}");
+        let entry = divergences.iter().find(|d| d.id == id);
+        assert!(
+            entry.is_some_and(|d| !d.scenarios.is_empty()),
+            "{id} is listed because a trace shows it, so it names a scenario"
+        );
+    }
 
     let em_dash = '\u{2014}';
     for divergence in &divergences {

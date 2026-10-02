@@ -161,7 +161,8 @@ pub struct Scenario {
     pub summary: String,
     /// The statements of report R1 it exercises, as `MQTT-x.y.z-n`.
     pub statements: Vec<String>,
-    /// The decisions of report R1 (D1 to D32) whose difference from EMQX it shows.
+    /// The decisions of report R1 (D1 to D32), and its open choices (O-entries), whose
+    /// difference from EMQX it shows.
     pub divergences: Vec<String>,
     /// The steps, in order.
     pub steps: Vec<Step>,
@@ -187,7 +188,7 @@ impl Scenario {
         self
     }
 
-    /// The R1 decisions the scenario shows.
+    /// The R1 decisions and open choices whose difference from EMQX the scenario shows.
     #[must_use]
     pub fn divergences(mut self, ids: &[&str]) -> Self {
         self.divergences

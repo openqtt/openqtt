@@ -1,6 +1,7 @@
 //! The starter catalogue of the differential harness: scenarios from report R1, played against
 //! OpenQTT 1.x today and against OpenQTT 2.0 once it runs. Each names the R1 statements it
-//! exercises and the decisions (D1 to D32) whose difference from EMQX its trace shows.
+//! exercises and the decisions (D1 to D32) and open choices (O-entries) whose difference from
+//! EMQX its trace shows.
 //!
 //! Steps wait for exactly what OpenQTT 1.x sends, so a run against it does not idle; where 2.0
 //! sends less, its run waits out [`DEFAULT_WAIT`](openqtt_testkit::DEFAULT_WAIT) instead, and
@@ -117,7 +118,7 @@ fn connect_and_connack() -> Scenario {
         "MQTT-3.1.2-28",
         "MQTT-3.12.4-1",
     ])
-    .divergences(&["D13", "D18", "D22", "D23", "D28"])
+    .divergences(&["D13", "D18", "D22", "D23", "D28", "O4"])
     .connect("full", full)
     .send("full", Packet::PingReq)
     .receive("full", 1)
@@ -517,7 +518,7 @@ fn retained_after_subscribe() -> Scenario {
         "MQTT-3.3.1-11",
         "MQTT-3.8.4-4",
     ])
-    .divergences(&["D15"])
+    .divergences(&["D15", "O26"])
     .connect("pub", connect("{ns}-pub"))
     .send("pub", retained("{ns}/ret/a", QoS::AtLeastOnce, 1, "kept"))
     .receive("pub", 1)
@@ -578,7 +579,7 @@ fn retained_cleared_by_zero_bytes() -> Scenario {
          message, so a later subscriber gets none",
     )
     .statements(&["MQTT-3.3.1-6", "MQTT-3.3.1-7"])
-    .divergences(&["D15"])
+    .divergences(&["D15", "O26"])
     .connect("pub", connect("{ns}-pub"))
     .send("pub", retained("{ns}/clear", QoS::AtLeastOnce, 1, "x"))
     .receive("pub", 1)
@@ -605,7 +606,7 @@ fn keep_alive_timeout() -> Scenario {
         "A client silent past 1.5 times a Keep Alive of 2 seconds gets DISCONNECT 0x8D",
     )
     .statements(&["MQTT-3.1.2-22"])
-    .divergences(&["D5"])
+    .divergences(&["D5", "O4"])
     .connect("idle", connect_with("{ns}-idle", |c| c.keep_alive = 2))
     .receive_within("idle", 1, Duration::from_secs(6))
     .await_end("idle", END)
