@@ -21,8 +21,15 @@ pub const ALPN: &[u8] = b"mqtt";
 
 /// Resumptions the server granted: tickets it decrypted, or sessions it found in its cache.
 pub static RESUMED: AtomicU64 = AtomicU64::new(0);
-/// Sessions the server stored for stateful resumption.
+/// Sessions the server stored for stateful resumption, ever.
 pub static STORED: AtomicU64 = AtomicU64::new(0);
+/// Sessions the server's cache holds now: stored, less those taken by a resumption and those
+/// the cache evicted.
+pub static LIVE_SESSIONS: AtomicU64 = AtomicU64::new(0);
+/// Sessions the cache evicted to make room.
+pub static EVICTED: AtomicU64 = AtomicU64::new(0);
+/// Bytes the cache allocated when it was made, before holding any session.
+pub static CACHE_PREALLOCATED: AtomicU64 = AtomicU64::new(0);
 
 /// aws-lc-rs, the only provider (ring is banned). With `pq` the key share is rustls's default,
 /// X25519MLKEM768 first; without it only the classical groups are offered.
@@ -119,25 +126,45 @@ impl ProducesTickets for CountingTicketer {
     }
 }
 
+/// rustls's session cache, counting what it holds. The cache does not say, so the count follows
+/// its rules: every put is a new key (rustls stores each ticket under 32 random bytes), a take
+/// that finds its key removes it, and an insertion that fills the cache's order queue evicts
+/// the oldest entry. That queue is made with exactly the capacity asked for, which `server`
+/// checks.
 #[derive(Debug)]
-struct CountingStore(Arc<ServerSessionMemoryCache>);
+struct CountingStore {
+    cache: Arc<ServerSessionMemoryCache>,
+    capacity: usize,
+    live: std::sync::Mutex<usize>,
+}
 
 impl StoresServerSessions for CountingStore {
     fn put(&self, key: Vec<u8>, value: Vec<u8>) -> bool {
+        let mut live = self.live.lock().expect("lock");
         STORED.fetch_add(1, Relaxed);
-        self.0.put(key, value)
+        let stored = self.cache.put(key, value);
+        *live += 1;
+        if *live == self.capacity {
+            *live -= 1;
+            EVICTED.fetch_add(1, Relaxed);
+        }
+        LIVE_SESSIONS.store(*live as u64, Relaxed);
+        stored
     }
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let r = self.0.get(key);
+        let r = self.cache.get(key);
         if r.is_some() {
             RESUMED.fetch_add(1, Relaxed);
         }
         r
     }
     fn take(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let r = self.0.take(key);
+        let mut live = self.live.lock().expect("lock");
+        let r = self.cache.take(key);
         if r.is_some() {
             RESUMED.fetch_add(1, Relaxed);
+            *live -= 1;
+            LIVE_SESSIONS.store(*live as u64, Relaxed);
         }
         r
     }
@@ -168,7 +195,21 @@ pub fn server(
             tls.max_early_data_size = 0;
         }
         Tickets::Stateful(n) => {
-            tls.session_storage = Arc::new(CountingStore(ServerSessionMemoryCache::new(n)));
+            // The eviction rule CountingStore follows assumes the queue's capacity is n.
+            let queue = std::collections::VecDeque::<Vec<u8>>::with_capacity(n);
+            if queue.capacity() != n {
+                return Err(format!("a VecDeque made for {n} holds {}", queue.capacity()).into());
+            }
+            drop(queue);
+            let before = crate::alloc::now().bytes;
+            let cache = ServerSessionMemoryCache::new(n);
+            let made = crate::alloc::now().bytes - before;
+            CACHE_PREALLOCATED.store(made as u64, Relaxed);
+            tls.session_storage = Arc::new(CountingStore {
+                cache,
+                capacity: n,
+                live: std::sync::Mutex::new(0),
+            });
             // QUIC allows only 0 or u32::MAX here; the latter accepts 0-RTT.
             tls.max_early_data_size = u32::MAX;
         }

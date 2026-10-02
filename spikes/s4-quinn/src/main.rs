@@ -3,7 +3,7 @@
 //!
 //! ```text
 //! s4 idle      --conns 1000,10000 --endpoints 1 --profiles default,lean --out FILE
-//! s4 handshake --lanes 128 --duration 20 --out FILE
+//! s4 handshake --lanes 128 --duration 20 [--cases full-pq,0rtt-cache,...] --out FILE
 //! s4 server ... and s4 client ...   the two processes the experiments start
 //! ```
 //!
@@ -348,16 +348,26 @@ fn handshake(a: &Args) -> Result<Value, pki::Error> {
     let warmup = a.num("warmup", 3);
     let duration = a.num("duration", 20);
     let mut rows = Vec::new();
-    // (client handshake, post-quantum key share, server session cache entries; 0 = tickets)
-    let cases: [(&str, u64, u64); 6] = [
-        ("full", 1, 0),
-        ("full", 0, 0),
-        ("resumed", 1, 0),
-        ("resumed", 0, 0),
-        ("resumed", 1, 100_000),
-        ("0rtt", 1, 100_000),
+    // (name, client handshake, post-quantum key share, server session cache entries; 0 means
+    // stateless tickets). The small cache keeps few sessions, to show what a full one costs
+    // per resumption: rustls finds a taken session's place in its eviction order by scanning.
+    let cases: [(&str, &str, u64, u64); 7] = [
+        ("full-pq", "full", 1, 0),
+        ("full-x25519", "full", 0, 0),
+        ("resumed-pq", "resumed", 1, 0),
+        ("resumed-x25519", "resumed", 0, 0),
+        ("resumed-cache", "resumed", 1, 100_000),
+        ("0rtt-cache", "0rtt", 1, 100_000),
+        ("0rtt-small-cache", "0rtt", 1, 4_096),
     ];
-    for (port, (kind, pq, sessions)) in (a.num("port", 16000)..).zip(cases) {
+    let only = a.list(
+        "cases",
+        "full-pq,full-x25519,resumed-pq,resumed-x25519,resumed-cache,0rtt-cache,0rtt-small-cache",
+    );
+    for (port, (name, kind, pq, sessions)) in (a.num("port", 16000)..).zip(cases) {
+        if !only.iter().any(|c| c == name) {
+            continue;
+        }
         let server = Child::spawn(&[
             "server".into(),
             "--pki".into(),
@@ -373,7 +383,7 @@ fn handshake(a: &Args) -> Result<Value, pki::Error> {
             "--stats-ms".into(),
             "100".into(),
         ])?;
-        server
+        let listening = server
             .wait_mark("listening", Duration::from_secs(20))
             .ok_or("server did not start")?;
         std::thread::sleep(Duration::from_secs(2));
@@ -414,10 +424,13 @@ fn handshake(a: &Args) -> Result<Value, pki::Error> {
         let dt = f(&s2, "t") - f(&s1, "t");
         let hs = f(&s2, "handshakes") - f(&s1, "handshakes");
         let busy = cpu(&s2) - cpu(&s1);
-        let stored = f(&s3, "stored_sessions").min(sessions as f64);
+        // Sessions the cache holds after the run, counted as CountingStore follows the cache.
+        let stored = f(&s3, "live_sessions");
         let row = json!({
-            "handshake": kind, "pq": pq == 1,
+            "case": name, "handshake": kind, "pq": pq == 1,
             "server_resumption": if sessions > 0 { "stateful cache" } else { "stateless tickets" },
+            "cache_capacity": sessions,
+            "cache_preallocated": listening["cache_preallocated"],
             "server_threads": 1, "client": summary,
             "server_handshakes_per_second": hs / dt,
             "server_cpu_cores": busy / dt,
@@ -425,7 +438,10 @@ fn handshake(a: &Args) -> Result<Value, pki::Error> {
             "handshakes_per_server_core_second": hs / busy.max(1e-9),
             "resumed_fraction": (f(&s2, "resumed") - f(&s1, "resumed")) / hs.max(1.0),
             "live_after_drain": f(&s3, "live"),
+            "baseline_heap": f(&base, "heap"),
             "heap_after_drain": f(&s3, "heap") - f(&base, "heap"),
+            "sessions_ever_stored": f(&s3, "stored_sessions"),
+            "sessions_evicted": f(&s3, "evicted_sessions"),
             "stored_sessions": stored,
             "heap_per_stored_session": if stored > 0.0 {
                 json!((f(&s3, "heap") - f(&base, "heap")) / stored)

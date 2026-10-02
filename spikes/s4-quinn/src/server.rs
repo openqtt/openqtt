@@ -80,6 +80,8 @@ fn stats_line(start: Instant) -> serde_json::Value {
         "pings": PINGS.load(Relaxed),
         "resumed": config::RESUMED.load(Relaxed),
         "stored_sessions": config::STORED.load(Relaxed),
+        "live_sessions": config::LIVE_SESSIONS.load(Relaxed),
+        "evicted_sessions": config::EVICTED.load(Relaxed),
         "heap": heap.bytes,
         "allocs": heap.allocs,
         "footprint": footprint,
@@ -115,7 +117,8 @@ pub fn run(a: &Args) -> Result<(), crate::pki::Error> {
     println!(
         "{}",
         json!({ "listening": buffers, "endpoints": endpoints, "profile": profile,
-        "pq": pq, "tickets": format!("{tickets:?}") })
+        "pq": pq, "tickets": format!("{tickets:?}"),
+        "cache_preallocated": config::CACHE_PREALLOCATED.load(Relaxed) })
     );
 
     let start = Instant::now();
