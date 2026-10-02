@@ -249,7 +249,8 @@ Where 2.0 decides differently on purpose, always by refusing what 1.x allowed:
 - a placeholder whose value is empty, holds `+`, `#` or U+0000, or would begin the filter with
   `$` matches nothing, where 1.x put the value in as it was, so that a user named `+` turned
   `${username}/t` into `+/t`;
-- an allow rule on the client's address alone is left out (R2 rule 14).
+- an allow rule on the client's address alone is left out, and so is such a branch of an
+  `'or'`, whose other branches are kept (R2 rule 14).
 
 What is left out, with a note:
 
@@ -266,8 +267,8 @@ was set to deny. When the last rule does not match everything, the converter say
 
 The converter also holds the result against R2 rules 13 to 16 and names every rule that
 conflicts: an allow rule that lets a device publish to its command topics (13) or set RETAIN
-(16) with no earlier deny for every client taking that away, an allow rule on an address alone
-(14), and an allow rule a client could claim by naming itself (15): by client identifier alone,
+(16) with no earlier deny for every client taking that away, an allow rule or a branch of one on
+an address alone, left out as above (14), and an allow rule a client could claim by naming itself (15): by client identifier alone,
 by a prefix shorter than the reserved one, or by a pattern that may match a name with the
 reserved prefix. A pattern is held to keep away from the prefix only when every name it matches
 provably begins otherwise: `dev-[0-9]+` does, `^(svc:admin|device)$` and `.*admin` do not. A

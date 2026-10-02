@@ -198,6 +198,28 @@ fn r2_rule_15_a_pattern_that_can_name_a_service_conflicts() {
 }
 
 #[test]
+fn r2_rule_14_an_address_branch_left_out_of_an_or_is_a_conflict() {
+    let source = "{allow, {'or', [{ipaddr, \"127.0.0.1\"}, {username, \"monitor\"}]}, \
+                  subscribe, [\"$SYS/#\"]}.\n";
+    let converted = convert_acl(source, &Contract::default()).expect("converts");
+    // The branch that names a client is kept; the one on an address alone is left out, and
+    // --strict refuses the file for it.
+    assert_eq!(converted.rules.len(), 1);
+    let r14: Vec<_> = converted
+        .conflicts
+        .iter()
+        .filter(|note| note.message.starts_with("R2 rule 14:"))
+        .collect();
+    assert_eq!(r14.len(), 1, "{:?}", converted.conflicts);
+    assert_eq!(r14[0].line, 1);
+    assert!(
+        converted.text.contains("# Part not converted (R2 rule 14)"),
+        "{}",
+        converted.text
+    );
+}
+
+#[test]
 fn r2_rule_30_what_1x_would_not_load_is_refused() {
     for (source, reason) in [
         (

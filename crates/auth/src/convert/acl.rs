@@ -50,12 +50,14 @@ pub struct AclConversion {
 
 /// What one 1.x rule became.
 enum Converted {
-    Rules(Vec<RuleSpec>),
-    /// Left out: it matches nothing in 1.x either, or 2.0 refuses what it grants.
-    Dropped {
-        reason: String,
-        r2_rule: Option<u8>,
+    /// The 2.0 rules, and, when part of the 1.x rule was left out because it conflicts with R2,
+    /// which rule and why.
+    Rules {
+        specs: Vec<RuleSpec>,
+        left_out: Option<(u8, String)>,
     },
+    /// Left out: it matches nothing in 1.x either, or 2.0 refuses what it grants.
+    Dropped { reason: String, r2_rule: Option<u8> },
 }
 
 /// Converts `source`, an `acl.conf`, checking the result against `contract`.
@@ -94,7 +96,14 @@ pub fn convert_acl(source: &str, contract: &Contract) -> Result<AclConversion, E
         warnings.extend(notes.into_iter().map(|message| Note { line, message }));
         let _ = write!(text, "\n# line {line}: {}.\n", form.term);
         match converted {
-            Ok(Converted::Rules(specs)) => {
+            Ok(Converted::Rules { specs, left_out }) => {
+                if let Some((r2_rule, reason)) = left_out {
+                    let _ = writeln!(text, "# Part not converted (R2 rule {r2_rule}): {reason}");
+                    conflicts.push(Note {
+                        line,
+                        message: format!("R2 rule {r2_rule}: part not converted: {reason}"),
+                    });
+                }
                 for (i, spec) in specs.into_iter().enumerate() {
                     if i > 0 {
                         text.push('\n');
@@ -214,6 +223,7 @@ fn convert_rule(term: &Term, notes: &mut Vec<String>) -> Result<Converted, Strin
             topics: topics.clone(),
         });
     }
+    let mut left_out = None;
     if address_alone {
         let reason = "an allow rule on the client's address alone, which grants nothing by \
                       itself in 2.0: name the clients as well";
@@ -223,11 +233,11 @@ fn convert_rule(term: &Term, notes: &mut Vec<String>) -> Result<Converted, Strin
                 r2_rule: Some(14),
             });
         }
-        notes.push(format!(
-            "part of the rule is left out (R2 rule 14): {reason}"
-        ));
+        // The branches that name a client are kept; the address alone is a conflict
+        // all the same, so that --strict refuses the file.
+        left_out = Some((14, reason.to_owned()));
     }
-    Ok(Converted::Rules(specs))
+    Ok(Converted::Rules { specs, left_out })
 }
 
 const RULE_FORMS: &str = "a rule is {Permission, Who, Action, Topics} or {Permission, all}";
