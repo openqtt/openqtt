@@ -658,6 +658,9 @@ dependencies = [
 [[package]]
 name = "openqtt-topic"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "openqtt-transport"

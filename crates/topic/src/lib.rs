@@ -1,8 +1,28 @@
 //! MQTT topic names and topic filters.
 //!
-//! Validation of names and filters, the `$share/<group>/` form of shared subscriptions, the
-//! rule that wildcards do not match topics beginning with `$`, mounting a client's mountpoint
-//! onto its topics and stripping it on delivery, and `TopicIndex<V>`, a generic trie that finds
-//! every filter matching a topic.
+//! Validation of names and filters (section 4.7 of MQTT 5.0), the `$share/{ShareName}/` form of
+//! shared subscriptions (section 4.8), and matching a name against a filter, including the rule
+//! that a filter starting with a wildcard does not match a topic beginning with `$`.
 //!
-//! Topics are strings here, not packets, so this crate must not depend on `openqtt-codec`.
+//! Topics are strings here, not packets, so this crate must not depend on `openqtt-codec`. The
+//! codec checks that a Topic Name or a Topic Filter is a UTF-8 Encoded String and no more; the
+//! rest of its syntax is checked here, so that the session can refuse one message or one
+//! subscription with its own reason code and keep the connection (report R1, O25).
+//!
+//! Statement numbers such as `[MQTT-4.7.1-1]` refer to the OASIS MQTT Version 5.0 standard of
+//! 7 March 2019.
+//!
+//! # Where the topic types live
+//!
+//! [`TopicName`] and [`TopicFilter`] are defined here, and `openqtt-core` re-exports them with
+//! its other domain types. Core depends on this crate rather than the other way round, so the
+//! roles that never parse MQTT (router, log) reach the topic types through core without
+//! reaching the codec, and this crate stays a leaf with nothing below it.
+
+mod error;
+mod filter;
+mod name;
+
+pub use error::Error;
+pub use filter::TopicFilter;
+pub use name::{MAX_TOPIC_LEN, TopicName};
