@@ -471,3 +471,40 @@ fn settings_that_cannot_work_are_refused() {
         assert!(matches!(error, Error::Setting { .. }), "{error}");
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn endpoints_bound_at_once_from_their_own_runtimes_share_one_port() {
+    let pki = TestPki::new("Control CA").unwrap();
+    // One endpoint per core binds from that core's runtime, all at the same moment, on a port
+    // the system chooses: the first to bind must choose it for all.
+    for _ in 0..10 {
+        let endpoints = 8;
+        let listener =
+            Listener::new(config(&pki).endpoints(NonZeroU8::new(endpoints).unwrap())).unwrap();
+        let start = Arc::new(std::sync::Barrier::new(usize::from(endpoints)));
+        let threads: Vec<_> = (0..endpoints)
+            .map(|index| {
+                let listener = listener.clone();
+                let start = Arc::clone(&start);
+                std::thread::spawn(move || {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
+                    let _entered = runtime.enter();
+                    start.wait();
+                    listener.bind(index).unwrap().local_address()
+                })
+            })
+            .collect();
+        let addresses: Vec<std::net::SocketAddr> = threads
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect();
+        assert!(
+            addresses.iter().all(|address| *address == addresses[0]),
+            "{addresses:?}"
+        );
+    }
+}

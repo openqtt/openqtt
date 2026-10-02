@@ -145,20 +145,28 @@ impl Listener {
                 ),
             });
         }
-        let address = {
-            let bound = self
+        // The first endpoint chooses the port when the configured one is 0, and the others take
+        // it. Choosing, binding and publishing happen under one lock, or endpoints bound at once
+        // from their cores' runtimes would each choose a port of their own.
+        let (socket, address) = {
+            let mut bound = self
                 .shared
                 .bound
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner);
-            match *bound {
+            let address = match *bound {
                 Some(bound) if self.shared.config.address.port() == 0 => bound,
                 _ => self.shared.config.address,
-            }
+            };
+            let socket = self
+                .socket(address)
+                .map_err(|source| Error::Bind { address, source })?;
+            let local_address = socket
+                .local_addr()
+                .map_err(|source| Error::Bind { address, source })?;
+            bound.get_or_insert(local_address);
+            (socket, address)
         };
-        let socket = self
-            .socket(address)
-            .map_err(|source| Error::Bind { address, source })?;
         let endpoint = quinn::Endpoint::new(
             self.shared.config.endpoint_config(index),
             Some(self.shared.server.clone()),
@@ -169,11 +177,6 @@ impl Listener {
         let local_address = endpoint
             .local_addr()
             .map_err(|source| Error::Bind { address, source })?;
-        self.shared
-            .bound
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get_or_insert(local_address);
         Ok(Endpoint {
             endpoint,
             shared: Arc::clone(&self.shared),
