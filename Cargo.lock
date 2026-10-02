@@ -580,6 +580,7 @@ version = "2.0.0-alpha.0"
 dependencies = [
  "bytes",
  "openqtt-codec",
+ "openqtt-testkit",
  "quinn",
  "rustls",
  "thiserror",

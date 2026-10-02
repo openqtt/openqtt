@@ -19,6 +19,7 @@ tokio = { workspace = true, features = ["io-util", "macros", "rt", "sync", "time
 tracing.workspace = true
 
 [dev-dependencies]
+openqtt-testkit.workspace = true
 tokio = { workspace = true, features = ["io-util", "macros", "rt", "sync", "test-util", "time"] }
 
 [lints]
