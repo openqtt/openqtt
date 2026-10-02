@@ -90,6 +90,13 @@ pub enum Error {
         flags: u8,
     },
 
+    /// Subscription Options set a reserved bit, bit 6 or 7 ([MQTT-3.8.3-5]). Malformed.
+    #[error("the Subscription Options {options:#010b} set a reserved bit")]
+    ReservedSubscriptionOptions {
+        /// The options byte.
+        options: u8,
+    },
+
     // Protocol Error, 0x82.
     /// A property other than User Property, or Subscription Identifier in a PUBLISH, appears
     /// twice. Each property's section makes that a Protocol Error.
@@ -111,6 +118,21 @@ pub enum Error {
     /// A Packet Identifier of 0 ([MQTT-2.2.1-3], [MQTT-2.2.1-4]). Protocol Error.
     #[error("the {packet_type} has Packet Identifier 0")]
     ZeroPacketIdentifier {
+        /// The packet.
+        packet_type: PacketType,
+    },
+    /// Subscription Options with a Maximum QoS of 3 or a Retain Handling of 3 (section
+    /// 3.8.3.1). Protocol Error.
+    #[error("the Subscription Options {options:#010b} ask for QoS 3 or Retain Handling 3")]
+    InvalidSubscriptionOptions {
+        /// The options byte.
+        options: u8,
+    },
+    /// A SUBSCRIBE or UNSUBSCRIBE without a Topic Filter ([MQTT-3.8.3-2], [MQTT-3.10.3-2]),
+    /// or a SUBACK or UNSUBACK without a reason code, though Table 2-5 requires each a
+    /// payload. Protocol Error.
+    #[error("the {packet_type} has an empty payload")]
+    EmptyPayload {
         /// The packet.
         packet_type: PacketType,
     },
@@ -217,10 +239,13 @@ impl Error {
             | Self::NullCharacter { .. }
             | Self::InvalidPropertyId { .. }
             | Self::InvalidConnectFlags { .. }
-            | Self::InvalidConnAckFlags { .. } => Class::Malformed,
+            | Self::InvalidConnAckFlags { .. }
+            | Self::ReservedSubscriptionOptions { .. } => Class::Malformed,
             Self::DuplicateProperty { .. }
             | Self::InvalidPropertyValue { .. }
             | Self::ZeroPacketIdentifier { .. }
+            | Self::InvalidSubscriptionOptions { .. }
+            | Self::EmptyPayload { .. }
             | Self::EmptyTopicName
             | Self::InvalidReasonCode { .. }
             | Self::MissingAuthenticationMethod { .. }

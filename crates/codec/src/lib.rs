@@ -19,6 +19,7 @@ mod primitives;
 mod property;
 mod publish;
 mod reason;
+mod subscribe;
 #[cfg(test)]
 mod test_util;
 mod types;
@@ -39,5 +40,9 @@ pub use publish::{Publish, PublishProperties};
 pub use reason::{
     AuthReasonCode, ConnectReasonCode, DisconnectReasonCode, PubAckReasonCode, PubCompReasonCode,
     PubRecReasonCode, PubRelReasonCode, ReasonCode, SubAckReasonCode, UnsubAckReasonCode,
+};
+pub use subscribe::{
+    RetainHandling, SubAck, Subscribe, SubscribeProperties, Subscription, SubscriptionOptions,
+    UnsubAck, Unsubscribe, UnsubscribeProperties,
 };
 pub use types::{PacketId, PacketType, PayloadFormat, QoS, Sender, SubscriptionId};
