@@ -17,8 +17,9 @@ use crate::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Receive Maximum announced in CONNACK: the most QoS 1 and 2 PUBLISH packets a client may
-    /// leave unacknowledged, held to with DISCONNECT 0x93. It also caps the client's own Receive
-    /// Maximum when the server sends (R1, O3 and D13). 32 by default.
+    /// leave unacknowledged, held to with DISCONNECT 0x93 as each arrives. A QoS 2 PUBLISH that
+    /// repeats one whose exchange is still open counts once with it. It also caps the client's
+    /// own Receive Maximum when the server sends (R1, O3 and D13). 32 by default.
     pub receive_maximum: NonZeroU16,
     /// Maximum Packet Size announced in CONNACK, for the whole packet (R1, O5 and D23). The
     /// transport's decoder refuses a larger packet, which reaches the machine as a decoding

@@ -316,6 +316,37 @@ fn early_packet(packet: impl Into<Packet>) -> Input {
 }
 
 #[test]
+fn a_repeat_takes_the_slot_of_a_first_publish_dropped_with_rejected_early_data() {
+    let config = Config {
+        receive_maximum: NonZeroU16::new(2).unwrap(),
+        ..Config::default()
+    };
+    let peer = Peer {
+        handshake_complete: false,
+        ..Peer::new(0)
+    };
+    let mut harness = Harness::with_peer(config, peer);
+    harness.auto.authorize = None;
+    harness.send(connect("c"));
+    harness.send(publish1("t", 5, "held"));
+    harness.input(early_packet(publish2("t", 7, "first")));
+    // A repeat of 7 outside the early data: it holds no slot while its first PUBLISH waits.
+    assert!(harness.send(publish2("t", 7, "first")).is_empty());
+    // The early data is rejected and the first PUBLISH with it. The repeat is the first now, and
+    // takes the slot: with 5 being authorized, a third PUBLISH is one too many.
+    let packets = harness.input(Input::HandshakeComplete {
+        early_data_accepted: false,
+    });
+    assert!(matches!(packets[..], [Packet::ConnAck(_)]), "{packets:?}");
+    let packets = harness.send(publish1("t", 8, "third"));
+    assert!(
+        matches!(&packets[..], [Packet::Disconnect(disconnect)]
+            if disconnect.reason_code == DisconnectReasonCode::ReceiveMaximumExceeded),
+        "{packets:?}"
+    );
+}
+
+#[test]
 fn connack_waits_for_the_handshake_and_early_publishes_wait_with_it() {
     let mut harness = early();
     assert!(harness.input(early_packet(connect("c"))).is_empty());

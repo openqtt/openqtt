@@ -3,7 +3,7 @@
 use openqtt_codec::{Packet, QoS};
 use openqtt_core::Timestamp;
 
-use super::{Authorizing, Phase, Received, Session};
+use super::{Authorizing, InboundState, Phase, Received, Session};
 use crate::{Effect, Effects, StreamEnd, StreamId};
 
 impl Session {
@@ -34,10 +34,13 @@ impl Session {
             .outbound
             .iter()
             .any(|outbound| outbound.stream == stream)
-            || self
-                .inbound
-                .values()
-                .any(|inbound| inbound.stream == stream)
+            || self.inbound.values().any(|inbound| {
+                inbound.stream == stream
+                    && !matches!(
+                        inbound.state,
+                        InboundState::Refusing(_) | InboundState::Refused(_)
+                    )
+            })
             || self.unprocessed_qos2(stream);
         if client_finished && waiting_on_client {
             return self.protocol_error(now, fx);

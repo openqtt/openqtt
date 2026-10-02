@@ -14,6 +14,9 @@
 //!   ([MQTT-3.14.4-1]);
 //! - QoS 1 and 2 messages in flight to the client never exceed its Receive Maximum
 //!   ([MQTT-3.3.4-9]), and those from it never exceed the server's ([MQTT-3.3.4-7]);
+//! - a QoS 2 PUBLISH repeating one whose exchange is still open, as far as the server has
+//!   told the client, takes no slot of the server's Receive Maximum, however far the first one
+//!   got ([MQTT-4.3.3-10]);
 //! - Packet Identifiers in flight are never reused ([MQTT-2.2.1-4]);
 //! - every QoS 1 and 2 PUBLISH from the client is acknowledged at most once, and exactly once
 //!   when the connection is still open after every request is answered ([MQTT-3.3.4-1]);
@@ -21,13 +24,14 @@
 //! - the connection closes once at most, and a claim that succeeded is released exactly once.
 
 use std::collections::{BTreeMap, VecDeque};
+use std::num::NonZeroU16;
 
 use bytes::{Bytes, BytesMut};
 use openqtt_codec::{
     Auth, AuthProperties, AuthReasonCode, Connect, ConnectProperties, ConnectReasonCode, Decoder,
     Disconnect, DisconnectProperties, DisconnectReasonCode, MAX_PACKET_SIZE, Packet, PacketType,
-    PubAck, PubAckReasonCode, PubComp, PubRec, PubRecReasonCode, PubRel, Publish,
-    PublishProperties, QoS, Sender, Subscribe, SubscribeProperties, Subscription,
+    PubAck, PubAckReasonCode, PubComp, PubCompReasonCode, PubRec, PubRecReasonCode, PubRel,
+    Publish, PublishProperties, QoS, Sender, Subscribe, SubscribeProperties, Subscription,
     SubscriptionOptions, Unsubscribe, UnsubscribeProperties, Will, WillProperties,
 };
 use openqtt_core::{ClientId, Deadline, Message, Timestamp, TopicFilter, TopicName};
@@ -423,6 +427,8 @@ fn script() -> impl Strategy<Value = (bool, Packet, Vec<Step>)> {
 /// The edge around the machine, answering only when a step says so, and the invariants.
 struct Driver {
     session: Session,
+    /// The server's Receive Maximum.
+    receive_maximum: u16,
     now: Timestamp,
     authenticating: bool,
     authorizations: VecDeque<crate::Authorization>,
@@ -461,18 +467,37 @@ struct Driver {
     out: BTreeMap<u16, PacketType>,
     /// QoS 2 messages of the client's that the server acknowledged with PUBREC.
     releasable: Vec<u16>,
+    /// The client's QoS 2 exchanges the server has not ended, as far as it told the client: from
+    /// the arrival of a PUBLISH until a PUBREC refusing one with the identifier or a PUBCOMP
+    /// ending it went out. With each, whether a PUBLISH of it arrived outside early data, so
+    /// that it outlives early data being rejected.
+    exchanges: BTreeMap<u16, bool>,
+    /// PUBREL packets that arrived and are not answered, by identifier.
+    releasing: BTreeMap<u16, usize>,
+    /// Those of them that came in early data, which rejecting it drops.
+    early_releasing: BTreeMap<u16, usize>,
+    /// Whether the handshake completed, so that no early data can be rejected any more.
+    handshake_done: bool,
+    /// Whether the PUBLISH going in repeats an exchange that is open, with no PUBREL of it
+    /// waiting: it may not be taken for one PUBLISH too many.
+    repeat_arriving: bool,
 }
 
 impl Driver {
-    fn new(early: bool) -> Self {
+    fn new(early: bool, receive_maximum: u16) -> Self {
         let now = at(0);
         let peer = Peer {
             handshake_complete: !early,
             ..Peer::new(99)
         };
-        let (session, effects) = Session::new(Config::default(), peer, now);
+        let config = Config {
+            receive_maximum: NonZeroU16::new(receive_maximum).unwrap_or(NonZeroU16::MIN),
+            ..Config::default()
+        };
+        let (session, effects) = Session::new(config, peer, now);
         let mut driver = Self {
             session,
+            receive_maximum,
             now,
             authenticating: false,
             authorizations: VecDeque::new(),
@@ -498,6 +523,11 @@ impl Driver {
             unread: VecDeque::new(),
             out: BTreeMap::new(),
             releasable: Vec::new(),
+            exchanges: BTreeMap::new(),
+            releasing: BTreeMap::new(),
+            early_releasing: BTreeMap::new(),
+            handshake_done: !early,
+            repeat_arriving: false,
         };
         driver.check(effects.into_vec());
         driver
@@ -551,10 +581,49 @@ impl Driver {
                 self.pipelined = self.pipelined.saturating_add(1);
             }
         }
+        // Early data still to be accepted or rejected.
+        let droppable = early && !self.handshake_done;
+        match &decoded {
+            Packet::Publish(publish) if publish.qos == QoS::ExactlyOnce => {
+                if let Some(packet_id) = publish.packet_id {
+                    let id = packet_id.get();
+                    self.repeat_arriving = self.exchanges.contains_key(&id)
+                        && self.releasing.get(&id).copied().unwrap_or(0) == 0;
+                    *self.exchanges.entry(id).or_default() |= !droppable;
+                }
+            }
+            Packet::PubRel(pubrel) => {
+                *self.releasing.entry(pubrel.packet_id.get()).or_default() += 1;
+                if droppable {
+                    *self
+                        .early_releasing
+                        .entry(pubrel.packet_id.get())
+                        .or_default() += 1;
+                }
+            }
+            _ => {}
+        }
         self.feed(Input::Packet {
             stream,
             packet: decoded,
             early,
+        });
+        self.repeat_arriving = false;
+    }
+
+    /// The handshake completes. What came in early data is dropped if it is rejected.
+    fn handshake(&mut self, accepted: bool) {
+        if !self.handshake_done && !accepted {
+            self.exchanges.retain(|_, outlives| *outlives);
+            for (id, count) in std::mem::take(&mut self.early_releasing) {
+                if let Some(releasing) = self.releasing.get_mut(&id) {
+                    *releasing = releasing.saturating_sub(count);
+                }
+            }
+        }
+        self.handshake_done = true;
+        self.feed(Input::HandshakeComplete {
+            early_data_accepted: accepted,
         });
     }
 
@@ -757,9 +826,7 @@ impl Driver {
                 }
                 self.now = until;
             }
-            Step::Handshake(accepted) => self.feed(Input::HandshakeComplete {
-                early_data_accepted: accepted,
-            }),
+            Step::Handshake(accepted) => self.handshake(accepted),
             Step::StreamEnded(stream, finished) => self.feed(Input::StreamEnded {
                 stream,
                 end: if finished {
@@ -800,9 +867,7 @@ impl Driver {
             } else if !self.reads.is_empty() {
                 self.step(Step::Retained { count: 0 });
             } else {
-                self.feed(Input::HandshakeComplete {
-                    early_data_accepted: true,
-                });
+                self.handshake(true);
                 if self.authenticating
                     || !self.authorizations.is_empty()
                     || self.claim.is_some()
@@ -939,15 +1004,31 @@ impl Driver {
                     self.accepted = true;
                 }
             }
-            Packet::Disconnect(_) => {
+            Packet::Disconnect(disconnect) => {
                 assert!(self.accepted, "no DISCONNECT before CONNACK 0x00");
+                assert!(
+                    !(self.repeat_arriving
+                        && disconnect.reason_code == DisconnectReasonCode::ReceiveMaximumExceeded),
+                    "a repeat taken for one PUBLISH too many"
+                );
                 self.silenced = true;
             }
             Packet::PubAck(ack) => self.acknowledged(PacketType::PubAck, ack.packet_id.get()),
             Packet::PubRec(rec) => {
                 self.acknowledged(PacketType::PubRec, rec.packet_id.get());
-                if !rec.reason_code.is_error() {
+                if rec.reason_code.is_error() {
+                    self.exchanges.remove(&rec.packet_id.get());
+                } else {
                     self.releasable.push(rec.packet_id.get());
+                }
+            }
+            Packet::PubComp(comp) => {
+                let id = comp.packet_id.get();
+                if let Some(releasing) = self.releasing.get_mut(&id) {
+                    *releasing = releasing.saturating_sub(1);
+                }
+                if comp.reason_code == PubCompReasonCode::Success {
+                    self.exchanges.remove(&id);
                 }
             }
             Packet::PubRel(rel) => {
@@ -1003,7 +1084,11 @@ impl Driver {
             .min(Config::RECEIVE_MAXIMUM);
         assert!(self.session.in_flight_out() <= usize::from(receive_maximum));
         assert!(
-            self.session.in_flight_in() <= Config::RECEIVE_MAXIMUM.saturating_add(self.pipelined)
+            self.session.in_flight_in() <= self.receive_maximum.saturating_add(self.pipelined),
+            "{} in flight from the client, against a Receive Maximum of {} and {} sent before it",
+            self.session.in_flight_in(),
+            self.receive_maximum,
+            self.pipelined
         );
         if let Some(state) = self.session.snapshot() {
             let mut ids: Vec<_> = state
@@ -1042,9 +1127,10 @@ proptest! {
 
     #[test]
     fn a_connected_session_keeps_the_invariants(
-        (first, steps) in (calm_connect(), vec(calm_step(), 0..150))
+        (first, steps) in (calm_connect(), vec(calm_step(), 0..150)),
+        receive_maximum in select(&[1u16, 2, Config::RECEIVE_MAXIMUM][..]),
     ) {
-        let mut driver = Driver::new(false);
+        let mut driver = Driver::new(false, receive_maximum);
         driver.honour_pause = true;
         driver.client(StreamId::Control, Packet::from(first), false);
         driver.step(Step::Authenticate(7));
@@ -1058,8 +1144,11 @@ proptest! {
     }
 
     #[test]
-    fn random_sequences_keep_the_invariants((early, first, steps) in script()) {
-        let mut driver = Driver::new(early);
+    fn random_sequences_keep_the_invariants(
+        (early, first, steps) in script(),
+        receive_maximum in select(&[1u16, 2, Config::RECEIVE_MAXIMUM][..]),
+    ) {
+        let mut driver = Driver::new(early, receive_maximum);
         driver.client(StreamId::Control, first, early);
         for step in steps {
             driver.step(step);

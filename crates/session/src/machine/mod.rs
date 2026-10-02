@@ -241,8 +241,9 @@ struct Arrival {
     at: Timestamp,
     /// Its size as encoded, which counts against the backlog.
     size: usize,
-    /// Whether it is a QoS 1 or 2 PUBLISH that will take a slot of the server's Receive
-    /// Maximum: every one but a QoS 2 repeat of a message already received.
+    /// Whether it is a QoS 1 or 2 PUBLISH that takes a slot of the server's Receive Maximum:
+    /// every one but a QoS 2 repeat of an exchange still open when the machine gets to it. One
+    /// that turns out to be a repeat all the same gives its slot back.
     slot: bool,
 }
 
@@ -437,6 +438,13 @@ enum InboundState {
     /// identifier stays reserved: a repeat is published again under its receipt, and the log
     /// decides by the receipt whether it is new.
     Reserved,
+    /// Refused with this code, by a PUBREC that has not gone out. A PUBLISH with the identifier
+    /// arriving now was sent before the client could know: a repeat, with the same refusal.
+    Refusing(AckCode),
+    /// Refused with this code by a PUBREC that went out, while PUBLISH packets that arrived as
+    /// repeats before it still wait: each gets the same refusal, and the entry goes with the
+    /// last. One arriving now is a new message ([MQTT-4.3.3-9]).
+    Refused(AckCode),
 }
 
 /// A QoS 1 or 2 message to the client.
@@ -672,10 +680,8 @@ impl Session {
         let slot = match &packet {
             Packet::Publish(publish) => match (publish.qos, publish.packet_id) {
                 (codec::QoS::AtMostOnce, _) | (_, None) => false,
-                (codec::QoS::ExactlyOnce, Some(id)) => self
-                    .inbound
-                    .get(&id.get())
-                    .is_none_or(|inbound| inbound.state == InboundState::Reserved),
+                // A repeat takes no slot, however far its first PUBLISH got.
+                (codec::QoS::ExactlyOnce, Some(id)) => !self.arrives_as_repeat(id.get()),
                 (codec::QoS::AtLeastOnce, Some(_)) => true,
             },
             _ => false,
@@ -735,6 +741,64 @@ impl Session {
         }
     }
 
+    /// Whether a QoS 2 PUBLISH with this Packet Identifier, arriving now, is a repeat the
+    /// machine will answer from the exchange open for the identifier ([MQTT-4.3.3-10]), and so
+    /// takes no slot of Receive Maximum. The exchange is open from the arrival of its first
+    /// PUBLISH, through authorization and the commit, until the PUBREC refusing it or the
+    /// PUBCOMP ending it goes out ([MQTT-4.3.3-9], [MQTT-4.3.3-12]). It is not counted on while
+    /// a PUBREL with the identifier waits, which may end it first, nor for a reserved
+    /// identifier, which is published again. The backlog is bounded, so looking through it
+    /// costs little.
+    fn arrives_as_repeat(&self, id: u16) -> bool {
+        let state = self.inbound.get(&id).map(|inbound| inbound.state);
+        let open = matches!(
+            state,
+            Some(
+                InboundState::Committing(_)
+                    | InboundState::AwaitingRelease
+                    | InboundState::Refusing(_)
+            )
+        ) || matches!(
+            &self.authorizing,
+            Some(Authorizing::Publish { publish, .. }) if exactly_once(publish, id)
+        ) || self.inbox.iter().any(|received| {
+            matches!(
+                received,
+                Received::Packet {
+                    packet: Packet::Publish(publish),
+                    arrival,
+                    ..
+                } if arrival.slot && exactly_once(publish, id)
+            )
+        });
+        let releasing = self.inbox.iter().any(|received| {
+            matches!(
+                received,
+                Received::Packet {
+                    packet: Packet::PubRel(pubrel),
+                    ..
+                } if pubrel.packet_id.get() == id
+            )
+        });
+        open && !releasing
+    }
+
+    /// Whether a PUBLISH that arrived as a repeat of a refused exchange still waits: a QoS 2
+    /// one with the identifier ahead of any that arrived as the first of a new exchange.
+    fn refused_repeats_queued(&self, id: u16) -> bool {
+        self.inbox
+            .iter()
+            .find_map(|received| match received {
+                Received::Packet {
+                    packet: Packet::Publish(publish),
+                    arrival,
+                    ..
+                } if exactly_once(publish, id) => Some(!arrival.slot),
+                _ => None,
+            })
+            .unwrap_or(false)
+    }
+
     /// The next thing the client sent, out of the backlog.
     fn next_received(&mut self) -> Option<Received> {
         let received = self.inbox.pop_front()?;
@@ -745,6 +809,33 @@ impl Session {
             }
         }
         Some(received)
+    }
+
+    /// Drops what came in rejected early data. A QoS 2 repeat whose first PUBLISH is dropped
+    /// takes its place in the exchange, and its slot.
+    fn drop_early(&mut self) {
+        let mut orphaned = BTreeSet::new();
+        for mut received in std::mem::take(&mut self.inbox) {
+            let early = received.is_early();
+            if let Received::Packet {
+                packet: Packet::Publish(publish),
+                arrival,
+                ..
+            } = &mut received
+                && publish.qos == codec::QoS::ExactlyOnce
+                && let Some(id) = publish.packet_id
+            {
+                if early && arrival.slot {
+                    orphaned.insert(id.get());
+                } else if !early && !arrival.slot && orphaned.remove(&id.get()) {
+                    arrival.slot = true;
+                }
+            }
+            if !early {
+                self.inbox.push_back(received);
+            }
+        }
+        self.recount_inbox();
     }
 
     /// Counts the backlog again, after packets left it other than in order.
@@ -1316,6 +1407,14 @@ impl Session {
         self.next_token += 1;
         token
     }
+}
+
+/// Whether `publish` is a QoS 2 PUBLISH with the Packet Identifier `id`.
+fn exactly_once(publish: &Publish, id: u16) -> bool {
+    publish.qos == codec::QoS::ExactlyOnce
+        && publish
+            .packet_id
+            .is_some_and(|packet_id| packet_id.get() == id)
 }
 
 /// Drops the Reason String and User Properties from a packet that may not carry them when the

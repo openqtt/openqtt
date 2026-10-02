@@ -66,12 +66,17 @@ impl Session {
                 Some(inbound) if publish.qos == QoS::ExactlyOnce => match inbound.state {
                     InboundState::Committing(token) => Some(ReplyState::Waiting(token)),
                     InboundState::AwaitingRelease => Some(ReplyState::Ready(AckCode::Success)),
+                    // Sent before the client could know of the refusal: the same refusal.
+                    InboundState::Refusing(code) | InboundState::Refused(code) => {
+                        Some(ReplyState::Ready(code))
+                    }
                     InboundState::Reserved => None,
                 },
                 _ => None,
             };
             if let Some(state) = repeat {
                 self.push_reply(stream, packet_id, ReplyKind::PubRec, state, false);
+                self.settle_refusal(packet_id.get());
                 return self.flush(stream, now, fx);
             }
             // Held to Receive Maximum when it arrived ([MQTT-3.3.4-7]); it takes its slot now.
@@ -282,13 +287,7 @@ impl Session {
             // ([MQTT-4.3.3-9]), so whatever the log holds under it goes too: nothing from this
             // PUBLISH, but a receipt a cut-off commit of a reserved identifier may have left,
             // which would swallow the next message sent with it.
-            let reserved = self
-                .inbound
-                .get(&packet_id.get())
-                .is_some_and(|inbound| inbound.state == InboundState::Reserved);
-            if reserved {
-                self.inbound.remove(&packet_id.get());
-            }
+            self.refusing(stream, packet_id, code);
             fx.push(Effect::ReleaseReceipt(packet_id));
             ReplyKind::PubRec
         } else {
@@ -329,7 +328,7 @@ impl Session {
                     // nothing, but a repeat of a reserved identifier may find the log still
                     // holding the receipt of the first, cut-off commit: it goes with the
                     // exchange.
-                    self.inbound.remove(&id);
+                    self.refusing(commit.stream, commit.packet_id, code);
                     fx.push(Effect::ReleaseReceipt(commit.packet_id));
                 } else {
                     inbound.state = InboundState::AwaitingRelease;
@@ -352,6 +351,42 @@ impl Session {
         }
         for stream in streams {
             self.flush(stream, now, fx);
+        }
+    }
+
+    /// A QoS 2 exchange is refused with `code`. Until a PUBREC refusing it goes out, a PUBLISH
+    /// with the identifier is a repeat and gets the same refusal.
+    fn refusing(&mut self, stream: StreamId, packet_id: PacketId, code: AckCode) {
+        self.inbound.insert(
+            packet_id.get(),
+            Inbound {
+                state: InboundState::Refusing(code),
+                stream,
+                counted: false,
+            },
+        );
+    }
+
+    /// A PUBREC refusing a PUBLISH with this identifier went out, the first one's or a
+    /// repeat's: the client may take the identifier for a new message from now on
+    /// ([MQTT-4.3.3-9]).
+    fn refusal_sent(&mut self, id: u16) {
+        if let Some(inbound) = self.inbound.get_mut(&id)
+            && let InboundState::Refusing(code) = inbound.state
+        {
+            inbound.state = InboundState::Refused(code);
+            self.settle_refusal(id);
+        }
+    }
+
+    /// Forgets a refused exchange once its refusal went out and no repeat of it waits.
+    fn settle_refusal(&mut self, id: u16) {
+        let refused = self
+            .inbound
+            .get(&id)
+            .is_some_and(|inbound| matches!(inbound.state, InboundState::Refused(_)));
+        if refused && !self.refused_repeats_queued(id) {
+            self.inbound.remove(&id);
         }
     }
 
@@ -415,16 +450,21 @@ impl Session {
                     now,
                     fx,
                 ),
-                ReplyKind::PubRec => self.send(
-                    stream,
-                    PubRec {
-                        packet_id: reply.packet_id,
-                        reason_code: code.pubrec(),
-                        properties,
-                    },
-                    now,
-                    fx,
-                ),
+                ReplyKind::PubRec => {
+                    self.send(
+                        stream,
+                        PubRec {
+                            packet_id: reply.packet_id,
+                            reason_code: code.pubrec(),
+                            properties,
+                        },
+                        now,
+                        fx,
+                    );
+                    if code.is_error() {
+                        self.refusal_sent(reply.packet_id.get());
+                    }
+                }
             }
             if self.phase == Phase::Closed {
                 return;

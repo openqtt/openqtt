@@ -623,8 +623,7 @@ impl Session {
         self.handshake_complete = true;
         if !accepted {
             // What came in rejected early data is not acted on; the client sends it again.
-            self.inbox.retain(|received| !received.is_early());
-            self.recount_inbox();
+            self.drop_early();
             if self.connect_early && self.phase != Phase::Closed {
                 return self.finish(Ending::NotAccepted, CloseCode::ProtocolError, fx);
             }

@@ -179,6 +179,158 @@ fn mqtt_4_3_3_10_a_qos_2_publish_repeated_before_pubrel_gets_pubrec_and_no_secon
     assert_eq!(harness.published().len(), 2);
 }
 
+/// A session connected with a Receive Maximum of `receive_maximum`, whose authorizations the
+/// test answers.
+fn authorizing(receive_maximum: u16) -> Harness {
+    let config = Config {
+        receive_maximum: NonZeroU16::new(receive_maximum).unwrap(),
+        ..Config::default()
+    };
+    let mut harness = Harness::connected_with(config);
+    harness.auto.authorize = None;
+    harness
+}
+
+fn decide(harness: &mut Harness, decision: Decision) -> Vec<Packet> {
+    let request = harness.authorizations.remove(0);
+    harness.input(Input::Authorized {
+        request: request.request,
+        decisions: vec![decision],
+    })
+}
+
+// covers: MQTT-4.3.3-10
+#[test]
+fn a_repeat_that_arrives_while_its_first_is_authorized_takes_no_second_slot() {
+    let mut harness = authorizing(1);
+    harness.send(publish2("t", 7, "once"));
+    let mut repeat = publish2("t", 7, "once");
+    repeat.dup = true;
+    // The first holds the one slot; its repeat is the same exchange and waits with it.
+    assert!(harness.send(repeat).is_empty());
+    let packets = decide(&mut harness, Decision::Allow);
+    assert_eq!(packets.len(), 2, "{packets:?}");
+    for packet in packets {
+        assert_eq!(pubrec_code(packet).0, 7);
+    }
+    assert_eq!(harness.published().len(), 1);
+    assert!(harness.authorizations.is_empty());
+}
+
+#[test]
+fn a_repeat_queued_with_its_first_behind_another_takes_no_second_slot() {
+    let mut harness = authorizing(1);
+    // A QoS 0 PUBLISH waits for its authorization, and the QoS 2 one and its repeat behind it.
+    harness.send(publish0("held", "x"));
+    harness.send(publish2("t", 7, "once"));
+    let mut repeat = publish2("t", 7, "once");
+    repeat.dup = true;
+    assert!(harness.send(repeat).is_empty());
+    decide(&mut harness, Decision::Allow);
+    let packets = decide(&mut harness, Decision::Allow);
+    assert_eq!(packets.len(), 2, "{packets:?}");
+    assert_eq!(harness.published().len(), 2);
+}
+
+#[test]
+fn a_repeat_of_a_refused_publish_gets_the_same_refusal() {
+    let mut harness = authorizing(2);
+    harness.send(publish2("t", 7, "once"));
+    let mut repeat = publish2("t", 7, "once");
+    repeat.dup = true;
+    harness.send(repeat);
+    // The first is refused; the repeat, sent before the client could know, is part of the same
+    // exchange: the same refusal, no authorization of its own, nothing published.
+    let packets = decide(&mut harness, Decision::Deny);
+    assert_eq!(packets.len(), 2, "{packets:?}");
+    for packet in packets {
+        assert_eq!(pubrec_code(packet), (7, PubRecReasonCode::NotAuthorized));
+    }
+    assert!(harness.authorizations.is_empty());
+    assert!(harness.published().is_empty());
+    assert_eq!(harness.session.in_flight_in(), 0);
+    // Once answered, 7 is free: the next PUBLISH with it is a new message.
+    harness.send(publish2("t", 7, "again"));
+    decide(&mut harness, Decision::Allow);
+    assert_eq!(harness.published().len(), 1);
+}
+
+// covers: MQTT-4.3.3-9
+#[test]
+fn a_publish_after_the_refusal_went_out_is_new_though_an_earlier_repeat_waits() {
+    let mut harness = authorizing(3);
+    harness.send(publish2("t", 7, "first"));
+    // A QoS 1 PUBLISH waits behind it, and a repeat of 7 behind that.
+    harness.send(publish1("u", 9, "other"));
+    let mut repeat = publish2("t", 7, "first");
+    repeat.dup = true;
+    harness.send(repeat);
+    assert_eq!(
+        pubrec_code(one(decide(&mut harness, Decision::Deny))),
+        (7, PubRecReasonCode::NotAuthorized)
+    );
+    // The client read the refusal and sends a new message with 7, while the repeat it sent
+    // before still waits behind 9.
+    assert!(harness.send(publish2("t", 7, "second")).is_empty());
+    let packets = decide(&mut harness, Decision::Allow);
+    assert!(
+        matches!(&packets[..], [Packet::PubAck(ack), Packet::PubRec(rec)]
+            if ack.packet_id == id(9)
+                && (rec.packet_id, rec.reason_code) == (id(7), PubRecReasonCode::NotAuthorized)),
+        "{packets:?}"
+    );
+    // The repeat had the refusal; the new message is authorized on its own and published.
+    assert_eq!(
+        pubrec_code(one(decide(&mut harness, Decision::Allow))),
+        (7, PubRecReasonCode::NoMatchingSubscribers)
+    );
+    let payloads: Vec<_> = harness
+        .published()
+        .iter()
+        .map(|message| message.payload.clone())
+        .collect();
+    assert_eq!(
+        payloads,
+        [Bytes::from_static(b"other"), Bytes::from_static(b"second")]
+    );
+}
+
+// covers: MQTT-4.3.3-12
+#[test]
+fn a_publish_behind_a_pubrel_with_its_identifier_is_counted_as_a_new_message() {
+    let mut harness = authorizing(2);
+    harness.send(publish2("t", 7, "first"));
+    pubrec_code(one(decide(&mut harness, Decision::Allow)));
+    // A QoS 0 PUBLISH waits for its authorization, the PUBREL for 7 behind it, and a PUBLISH
+    // with 7 behind that. The PUBREL ends the exchange before the machine gets to the PUBLISH,
+    // which is then a new message ([MQTT-4.3.3-12]) and holds a slot from its arrival.
+    harness.send(publish0("held", "x"));
+    harness.send(pubrel(7));
+    assert!(harness.send(publish2("t", 7, "second")).is_empty());
+    let packets = decide(&mut harness, Decision::Allow);
+    assert!(matches!(packets[..], [Packet::PubComp(_)]), "{packets:?}");
+    assert_eq!(
+        pubrec_code(one(decide(&mut harness, Decision::Allow))),
+        (7, PubRecReasonCode::NoMatchingSubscribers)
+    );
+    assert_eq!(harness.published().len(), 3);
+
+    // So with 5 also sent, the client has three in flight against a Receive Maximum of two:
+    // 7 until its PUBCOMP, 5, and the new 7.
+    let mut harness = authorizing(2);
+    harness.send(publish2("t", 7, "first"));
+    pubrec_code(one(decide(&mut harness, Decision::Allow)));
+    harness.send(publish0("held", "x"));
+    harness.send(pubrel(7));
+    harness.send(publish1("t", 5, "other"));
+    let packets = harness.send(publish2("t", 7, "second"));
+    assert!(
+        matches!(&packets[..], [Packet::Disconnect(disconnect)]
+            if disconnect.reason_code == DisconnectReasonCode::ReceiveMaximumExceeded),
+        "{packets:?}"
+    );
+}
+
 #[test]
 fn a_qos_2_publish_repeated_while_it_commits_gets_its_pubrec_after_the_commit() {
     let mut harness = Harness::connected();
