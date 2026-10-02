@@ -256,7 +256,8 @@ fn split_number(text: &str) -> (&str, &str) {
     text.split_at(end)
 }
 
-/// An `http://` or `https://` URL with no credentials, query or fragment.
+/// An `http://` or `https://` URL with no credentials, query or fragment, valid by the WHATWG
+/// URL rules that browsers and the `url` crate follow.
 ///
 /// A URL carrying a user or password is refused, because the setting would then hold a secret
 /// inline: credentials go in a file. No error about a URL repeats it, so a password typed into
@@ -295,6 +296,10 @@ impl fmt::Display for Endpoint {
 impl FromStr for Endpoint {
     type Err = String;
 
+    /// Checks the text as written first, so that no message about it can repeat a credential and
+    /// so that nothing the WHATWG rules would quietly repair, an extra slash, a tab, a backslash,
+    /// passes as something else; then parses it by those rules, which hold the host, the IP
+    /// address and the port to their full syntax.
     fn from_str(text: &str) -> Result<Self, String> {
         let rest = text
             .strip_prefix("https://")
@@ -306,19 +311,24 @@ impl FromStr for Endpoint {
                 "a URL must not carry credentials; give them in the headers file instead".into(),
             );
         }
-        if text.chars().any(|c| c.is_whitespace() || c.is_control()) {
-            return Err("a URL cannot contain spaces or control characters".into());
+        if text
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == '\\')
+        {
+            return Err("a URL cannot contain spaces, backslashes or control characters".into());
         }
         if text.contains(['?', '#']) {
             return Err("the URL must not have a query or a fragment".into());
         }
-        let (host, port) = split_host_port(authority);
-        if host.is_empty() {
+        if authority.is_empty() {
             return Err("the URL names no host".into());
         }
-        if let Some(port) = port
-            && !port.parse::<u16>().is_ok_and(|port| port > 0)
-        {
+        // A parse error names what is wrong, never the text.
+        let url = url::Url::parse(text).map_err(|error| format!("not a valid URL: {error}"))?;
+        if url.host_str().is_none_or(str::is_empty) {
+            return Err("the URL names no host".into());
+        }
+        if url.port() == Some(0) {
             return Err("the URL's port is not a number from 1 to 65535".into());
         }
         Ok(Self(text.to_owned()))
@@ -585,6 +595,12 @@ mod tests {
             ("http://collector:4318?x=1", "query"),
             ("http://collector:4318#top", "fragment"),
             ("http://collector 4318", "spaces"),
+            ("http://[not-ipv6]", "not a valid URL"),
+            ("http://[::1", "not a valid URL"),
+            ("http://999.1.1.1:4318", "not a valid URL"),
+            ("http://collector:65536", "port"),
+            ("http://col\tlector:4318", "control characters"),
+            ("http://exa%mple:4318", "not a valid URL"),
         ] {
             let error = text.parse::<Endpoint>().unwrap_err();
             assert!(error.contains(why), "{text}: {error}");
@@ -597,6 +613,9 @@ mod tests {
             "https://user:hunter2@collector:4318",
             "http://hunter2@collector",
             "ftp://user:hunter2@collector",
+            "https://user:hunter2@[not-ipv6]",
+            "https://user:hunter2@collector:99999",
+            "https://hunter2:@collector",
         ] {
             let error = text.parse::<Endpoint>().unwrap_err();
             assert!(!error.contains("hunter2"), "{error}");

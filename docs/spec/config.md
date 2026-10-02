@@ -70,7 +70,7 @@ unknown variable, not a second listener.
 | size | bytes as an integer, or a whole number and a binary unit, `B`, `KiB`, `MiB` or `GiB`: `65536`, `64KiB`, `1MiB` |
 | address | an IP address and a port: `0.0.0.0:14567`, `[::]:14567` |
 | `host:port` | a host name or IP address and a port, an IPv6 address in brackets: `openqtt-log:7000` |
-| URL | `http://` or `https://`, without credentials, query or fragment |
+| URL | `http://` or `https://`, valid by the WHATWG URL rules, without credentials, query, fragment, spaces or backslashes |
 | path | a file or directory |
 | path of a secret file | a file holding a secret; see [Secrets](#secrets) |
 

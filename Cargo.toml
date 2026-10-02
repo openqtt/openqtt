@@ -65,6 +65,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 # The configuration file's format. Without `preserve_order`, tables keep their keys sorted, so
 # errors about a file come out in the same order every time.
 toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
+# URLs parsed by the WHATWG rules, which openqtt-config checks the OTLP endpoint against. It is
+# in the tree anyway, under reqwest.
+url = "2.5"
 # The OpenTelemetry API, which every crate records metrics on. It records nothing until the
 # binary installs a provider, so a library takes only this; openqtt-observe must never take the
 # SDK (`make layers`).
