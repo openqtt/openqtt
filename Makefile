@@ -4,7 +4,7 @@
 CARGO ?= cargo
 
 .PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance differential \
-	differential-bless semver tools need-nextest need-deny need-semver-checks
+	differential-bless config-doc semver tools need-nextest need-deny need-semver-checks
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -156,6 +156,13 @@ semver: need-semver-checks
 	echo "semver: API_VERSION major $${base:-absent} at $(SEMVER_BASE), $$head here: a $$release release"; \
 	$(CARGO) semver-checks check-release -p openqtt-ext --baseline-rev $(SEMVER_BASE) \
 		--release-type $$release
+
+# --- Configuration reference -------------------------------------------------------------
+
+# Rewrites the settings tables of docs/spec/config.md from the declarations in
+# crates/config/src/settings.rs. A test in openqtt-config fails while the two differ.
+config-doc:
+	$(CARGO) run --locked --quiet -p openqtt-config --example config-doc
 
 # --- Tools --------------------------------------------------------------------------------
 

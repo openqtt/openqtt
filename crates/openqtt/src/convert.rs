@@ -5,13 +5,14 @@
 //! be or, with `--strict`, when a rule conflicts with R2 rules 13 to 16, and 2 for a command
 //! line clap refuses.
 
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Subcommand;
 use openqtt_auth::acl::contract::Contract;
 use openqtt_auth::convert::{Note, convert_acl, convert_authn};
+
+use crate::write_stdout;
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum ConvertCommand {
@@ -125,21 +126,6 @@ fn report(file: &Path, kind: &str, notes: &[Note]) {
             eprintln!("{}: {kind}{}", file.display(), note.message);
         } else {
             eprintln!("{}:{}: {kind}{}", file.display(), note.line, note.message);
-        }
-    }
-}
-
-/// Writes the converted file to stdout, where the operator redirects it.
-fn write_stdout(text: &str) -> ExitCode {
-    let mut stdout = std::io::stdout().lock();
-    match stdout
-        .write_all(text.as_bytes())
-        .and_then(|()| stdout.flush())
-    {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("openqtt convert: cannot write to stdout: {error}");
-            ExitCode::FAILURE
         }
     }
 }
