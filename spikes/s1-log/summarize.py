@@ -28,6 +28,8 @@ def load():
 def ms(us):
     if us is None:
         return "-"
+    if us < 1000:
+        return f"{us / 1000:.2f}"
     return f"{us / 1000:.1f}" if us < 100_000 else f"{us / 1000:.0f}"
 
 
@@ -52,7 +54,9 @@ def fsync(rows):
     print("| --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         L = r["lat_us"]
-        print(f"| {r['primitive']} | {r['mode'].lower()} | {r['size']} | {r['threads']} | "
+        names = {"StdSyncData": "std sync_data", "Fsync": "fsync", "Fullfsync": "F_FULLFSYNC",
+                 "Barrier": "F_BARRIERFSYNC"}
+        print(f"| {names.get(r['primitive'], r['primitive'])} | {r['mode'].lower()} | {r['size']} | {r['threads']} | "
               f"{r['per_s']:.0f} | {ms(L['p50'])} | {ms(L['p99'])} |")
 
 
@@ -132,6 +136,20 @@ def claims(rows):
         if r["exp"] == "claims-preload":
             print(f"\npreload {r['engine']}: {r['sessions']} sessions in {r['secs']} s, "
                   f"{mib(r['disk_allocated'])} MiB")
+    # The highest offered rate an engine kept up with (99% done, nothing left queued beyond a
+    # second of work) and its p99 there.
+    print("\n| Engine | Workers | Highest rate kept up with | p99 ms there |")
+    print("| --- | --- | --- | --- |")
+    best = {}
+    for r in rows:
+        if r["exp"] != "claims" or not r["lat_us"]:
+            continue
+        ok = r["per_s"] >= 0.99 * r["rate"] and r["backlog_at_end"] <= r["rate"]
+        key = (r["engine"], r["workers"])
+        if ok and r["rate"] > best.get(key, (0, None))[0]:
+            best[key] = (r["rate"], r["lat_us"]["p99"])
+    for (eng, w), (rate, p99) in sorted(best.items()):
+        print(f"| {eng} | {w} | {k(rate)} | {ms(p99)} |")
 
 
 def footprint(rows):
@@ -139,17 +157,35 @@ def footprint(rows):
     idles = {(r["engine"], r["sessions"]): r for r in rows if r["exp"] == "footprint-idle"}
     print("\n### Footprint per idle session (own plus sess)\n")
     print("| Engine | Sessions | Load s | Disk B/session (loaded) | Disk B/session (compacted) | "
-          "RSS settled MiB | RSS B/session | Footprint B/session | Open s |")
-    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+          "Memory after reads MiB | Open s |")
+    print("| --- | --- | --- | --- | --- | --- | --- |")
     for key in sorted(loads):
         l = loads[key]
         i = idles.get(key, {})
-        rss = i.get("rss", {}).get("settled")
+        fp = i.get("footprint", {})
+        mem = (fp.get("warm") or 0) - (fp.get("base") or 0)
         print(f"| {key[0]} | {key[1]:,} | {l['load_s']} | {l['loaded']['per_session']} | "
-              f"{l['compacted']['per_session']} | {mib(rss) if rss else '-'} | "
-              f"{i.get('rss_per_session', '-')} | {i.get('footprint_per_session', '-')} | {i.get('open_s', '-')} |")
+              f"{l['compacted']['per_session']} | {mib(mem) if fp else '-'} | {i.get('open_s', '-')} |")
     if loads:
-        print(f"\nlogical bytes per session: {next(iter(loads.values()))['logical_bytes'] / next(iter(loads.values()))['sessions']:.0f}")
+        first = next(iter(loads.values()))
+        print(f"\nlogical bytes per session: {first['logical_bytes'] / first['sessions']:.0f}")
+    # Memory that grows with sessions: the slope between the two sizes, so the fixed cache and
+    # runtime cancel out.
+    print("\n| Engine | Disk B/session (compacted, largest run) | Memory B/session (slope) | "
+          "Disk at 10^8 GiB | Disk at 10^9 GiB | Memory at 10^8 GiB | Memory at 10^9 GiB |")
+    print("| --- | --- | --- | --- | --- | --- | --- |")
+    for eng in sorted({e for e, _ in loads}):
+        sizes = sorted(n for e, n in loads if e == eng)
+        if len(sizes) < 2:
+            continue
+        lo, hi = sizes[0], sizes[-1]
+        disk = loads[(eng, hi)]["compacted"]["allocated"] / hi
+        def mem(n):
+            fp = idles.get((eng, n), {}).get("footprint", {})
+            return (fp.get("warm") or 0) - (fp.get("base") or 0)
+        slope = max(0.0, (mem(hi) - mem(lo)) / (hi - lo))
+        print(f"| {eng} | {disk:.0f} | {slope:.1f} | {disk * 1e8 / 2**30:.1f} | {disk * 1e9 / 2**30:.0f} | "
+              f"{slope * 1e8 / 2**30:.2f} | {slope * 1e9 / 2**30:.1f} |")
 
 
 def churn(rows):

@@ -18,8 +18,10 @@ use anyhow::{Result, anyhow};
 use futures_util::{Stream, StreamExt as _};
 use openraft10::errors::{RPCError, ReplicationClosed, StreamingError, Unreachable};
 use openraft10::network::{RPCOption, RaftNetworkFactory, v2::RaftNetworkV2};
+use openraft10::base::{BoxFuture, BoxStream};
 use openraft10::raft::{
-    AppendEntriesRequest, AppendEntriesResponse, SnapshotResponse, VoteRequest, VoteResponse,
+    AppendEntriesRequest, AppendEntriesResponse, SnapshotResponse, StreamAppendResult,
+    VoteRequest, VoteResponse,
 };
 use openraft10::storage::{EntryResponder, IOFlushed, LogState, RaftLogStorage, RaftStateMachine};
 use openraft10::type_config::alias::{
@@ -236,6 +238,8 @@ pub struct Router {
     line: DelayLine,
     delay: Duration,
     pub rpcs: AtomicU64,
+    /// Send each append and wait for its answer before the next, as openraft's default does.
+    sequential: bool,
 }
 
 impl Router {
@@ -276,8 +280,66 @@ impl Conn {
     }
 }
 
+/// Stamps each item with when it is due as it arrives, then yields it no sooner, in order. Every
+/// item waits the same delay, so order is kept and items in flight overlap, like a TCP stream or
+/// a QUIC stream does.
+fn delayed<T: Send + 'static>(
+    input: impl Stream<Item = T> + Send + 'static,
+    line: DelayLine,
+    delay: Duration,
+    sent: Option<Arc<Router>>,
+) -> impl Stream<Item = T> + Send + 'static {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<(std::time::Instant, T)>();
+    tokio::spawn(async move {
+        futures_util::pin_mut!(input);
+        while let Some(x) = input.next().await {
+            if let Some(r) = &sent {
+                r.rpcs.fetch_add(1, Ordering::Relaxed);
+            }
+            if tx.send((std::time::Instant::now() + delay, x)).is_err() {
+                return;
+            }
+        }
+    });
+    futures_util::stream::unfold(rx, move |mut rx| {
+        let line = line.clone();
+        async move {
+            let (at, x) = rx.recv().await?;
+            line.sleep_until(at).await;
+            Some((x, rx))
+        }
+    })
+}
+
 impl RaftNetworkV2<C10> for Conn {
     type SnapshotData = Snap;
+
+    /// Pipelined: requests go out as the leader produces them, the follower takes them through
+    /// its own pipelined `stream_append`, and the answers come back in order, each one hop later.
+    /// openraft's default sends one request and waits for its answer before the next.
+    fn stream_append<'s, S>(
+        &'s mut self,
+        input: S,
+        _option: RPCOption,
+    ) -> BoxFuture<'s, Result<BoxStream<'s, Result<StreamAppendResult<C10>, RPCError<C10>>>, RPCError<C10>>>
+    where
+        S: Stream<Item = AppendEntriesRequest<C10>> + OptionalSend + Unpin + 'static,
+    {
+        if self.router.sequential {
+            return openraft10::network::stream_append_sequential(self, input, _option);
+        }
+        Box::pin(async move {
+            let raft = self.raft()?;
+            let line = self.router.line.clone();
+            let delay = self.router.delay;
+            let there = delayed(input, line.clone(), delay, Some(self.router.clone()));
+            let answers = raft.stream_append(there);
+            let back = delayed(answers, line, delay, None)
+                .map(|r| r.map_err(|e| RPCError::Unreachable(Unreachable::new(&e))));
+            let out: BoxStream<'s, Result<StreamAppendResult<C10>, RPCError<C10>>> = Box::pin(back);
+            Ok(out)
+        })
+    }
 
     async fn append_entries(
         &mut self,
@@ -322,7 +384,14 @@ pub struct Cluster {
 }
 
 impl Cluster {
-    pub async fn start(groups: u32, line: DelayLine, delay: Duration, flush: Duration, timing: &Timing) -> Result<Self> {
+    pub async fn start(
+        groups: u32,
+        line: DelayLine,
+        delay: Duration,
+        flush: Duration,
+        timing: &Timing,
+        sequential: bool,
+    ) -> Result<Self> {
         let config = Arc::new(
             Config {
                 cluster_name: "s1".into(),
@@ -340,6 +409,7 @@ impl Cluster {
             line: line.clone(),
             delay,
             rpcs: AtomicU64::new(0),
+            sequential,
         });
         let disks: Vec<Disk> = (0..3).map(|_| Disk::new(line.clone(), flush)).collect();
         for g in 0..groups {

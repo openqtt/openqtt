@@ -30,8 +30,10 @@ pub enum Scheme {
     Raft,
     /// openraft 0.9.25 behind a proposer that batches waiting claims into one entry
     RaftBatched,
-    /// openraft 0.10.0-alpha.36
+    /// openraft 0.10.0-alpha.36, appends pipelined through `stream_append`
     Raft10,
+    /// openraft 0.10.0-alpha.36 with its default sequential append
+    Raft10Seq,
     Pb,
 }
 
@@ -41,6 +43,7 @@ impl Scheme {
             Scheme::Raft => "raft",
             Scheme::RaftBatched => "raft-batched",
             Scheme::Raft10 => "raft10",
+            Scheme::Raft10Seq => "raft10-seq",
             Scheme::Pb => "pb",
         }
     }
@@ -68,9 +71,10 @@ impl AnyCluster {
                     .await?
                     .with_batching(),
             ),
-            Scheme::Raft10 => {
-                AnyCluster::Raft10(raft10::Cluster::start(groups, line, delay, flush, timing).await?)
-            }
+            Scheme::Raft10 | Scheme::Raft10Seq => AnyCluster::Raft10(
+                raft10::Cluster::start(groups, line, delay, flush, timing, scheme == Scheme::Raft10Seq)
+                    .await?,
+            ),
             Scheme::Pb => AnyCluster::Pb(pb::Cluster::start(groups, line, delay, flush)),
         })
     }
@@ -325,6 +329,7 @@ pub fn latency(out: &std::path::Path, a: &LatencyArgs) -> Result<()> {
                             let late = line.lateness.lock().expect("not poisoned").summary();
                             anyhow::Ok(json!({
                                 "exp": "repl", "scheme": scheme.name(), "groups": groups,
+                                "append": if matches!(scheme, Scheme::Raft10 | Scheme::Pb) { "pipelined" } else { "sequential" },
                                 "delay_us": d, "flush_us": f, "load": load.label(),
                                 "heartbeat_ms": a.timing.heartbeat_ms,
                                 "result": r, "delay_lateness_us": late, "extra": extra,

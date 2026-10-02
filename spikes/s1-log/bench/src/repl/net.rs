@@ -84,6 +84,22 @@ impl DelayLine {
         }
     }
 
+    /// Completes at `at`, or at once if that has passed.
+    pub fn sleep_until(&self, at: Instant) -> impl Future<Output = ()> + Send + 'static {
+        let rx = if at <= Instant::now() {
+            None
+        } else {
+            let (tx, rx) = oneshot::channel();
+            let _ = self.tx.send((at, tx));
+            Some(rx)
+        };
+        async move {
+            if let Some(rx) = rx {
+                let _ = rx.await;
+            }
+        }
+    }
+
     pub fn cpu_s(&self) -> f64 {
         f64::from_bits(self.cpu_bits.load(Ordering::Relaxed))
     }
