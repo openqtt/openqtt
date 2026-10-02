@@ -49,9 +49,10 @@ counting allocator in the server process and does not depend on the machine; CPU
   may open brings it to 28.6 KiB (35.6 KiB of footprint).
 - **CPU.** An idle connection costs CPU only at its keepalive: 44 to 114 µs each at 10^4
   connections, 55 µs at 5×10^4. Budget 0.4 of a core per 10^5 idle connections.
-- **Handshakes.** One core completes 2,867 full handshakes a second with client certificates,
-  3,986 resumed ones with stateless tickets, and 3,041 0-RTT ones, which rustls allows only
-  from its stateful session cache.
+- **Handshakes.** One core completes 2,867 full handshakes a second with client certificates
+  and 3,986 resumed ones with stateless tickets. 0-RTT, which rustls allows only from its
+  stateful session cache, managed 2,983 with 70,000 sessions stored and 3,818 with 4,095: the
+  cache costs more the more it holds.
 - **Settings.** Only the stream limits matter for memory (a fifth less); windows, datagrams and
   the ACK frequency extension do not. MTU discovery costs 1.2 KiB and setup CPU.
 - **Operating system.** 8 MiB socket buffers without root, no datagram dropped for full
@@ -93,8 +94,11 @@ orchestrator that starts both and writes JSON.
   warm-up, 20 s are measured from the server's own handshake counter and CPU time. The server
   issues two tickets per handshake, rustls's default. *Full*: the client keeps no tickets.
   *Resumed*: every handshake after a lane's first resumes from that lane's ticket, with the
-  server using stateless tickets or a session cache of 100,000 entries. *0-RTT*: as resumed, with
-  the session cache, and CONNECT sent in 0-RTT.
+  server using stateless tickets or a session cache of 100,000 entries. *0-RTT*: as resumed,
+  with the session cache, and CONNECT sent in 0-RTT; once more with a cache of 4,096 entries.
+  The server counts the sessions its cache holds by following the cache's own rules (a stored
+  ticket adds one, a resumption that finds its session removes one, an insertion into a full
+  cache evicts one), and records what the cache allocates when it is made.
 - **Operating system.** Each UDP socket's buffers are set to 8 MiB, `kern.ipc.maxsockbuf`, the
   most macOS allows without root (the default receive buffer here is
   `net.inet.udp.recvspace` = 786,896 bytes). Datagrams dropped for full socket buffers are read
@@ -185,23 +189,31 @@ runs without it spent 486 and 677 µs of server CPU per connection setting up, a
 
 #### Handshakes
 
-| Handshake | Key share | Server resumption | Handshakes a second, one server thread | Server CPU | CPU per handshake | Resumed | 0-RTT accepted |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| full | X25519MLKEM768 | stateless tickets | 2,867 | 0.99 cores | 347 µs | 0.0% |  |
-| full | X25519 | stateless tickets | 3,051 | 0.99 cores | 326 µs | 0.0% |  |
-| resumed | X25519MLKEM768 | stateless tickets | 3,986 | 1.00 cores | 250 µs | 100.0% |  |
-| resumed | X25519 | stateless tickets | 4,305 | 0.98 cores | 228 µs | 100.0% |  |
-| resumed | X25519MLKEM768 | session cache | 3,028 | 0.99 cores | 326 µs | 99.9% |  |
-| 0-RTT | X25519MLKEM768 | session cache | 3,041 | 0.99 cores | 324 µs | 100.0% | 60,754 of 60,754 |
+| Handshake | Key share | Server resumption | Handshakes a second, one server thread | Server CPU | CPU per handshake | Resumed | 0-RTT accepted | Sessions held at the end |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| full | X25519MLKEM768 | stateless tickets | 2,867 | 0.99 cores | 347 µs | 0.0% |  |  |
+| full | X25519 | stateless tickets | 3,051 | 0.99 cores | 326 µs | 0.0% |  |  |
+| resumed | X25519MLKEM768 | stateless tickets | 3,986 | 1.00 cores | 250 µs | 100.0% |  |  |
+| resumed | X25519 | stateless tickets | 4,305 | 0.98 cores | 228 µs | 100.0% |  |  |
+| resumed | X25519MLKEM768 | session cache of 100,000 | 3,008 | 0.98 cores | 326 µs | 100.0% |  | 70,633 |
+| 0-RTT | X25519MLKEM768 | session cache of 100,000 | 2,983 | 0.97 cores | 326 µs | 100.0% | 59,684 of 59,684 | 70,427 |
+| 0-RTT | X25519MLKEM768 | session cache of 4,096 | 3,818 | 0.99 cores | 258 µs | 100.0% | 76,385 of 76,385 | 4,095 |
 
 One server thread completes 2,867 full handshakes a second with a client certificate (347 µs
-each), 3,986 resumed ones with stateless tickets (250 µs), and about 3,040 with the session
-cache, resumed or 0-RTT (325 µs). Each figure includes issuing two tickets. The post-quantum key
-share costs 6% of a full handshake and 10% of a resumed one. The session cache holds 666 bytes
-per stored session, and a client that keeps both of its tickets takes two. 0-RTT was accepted
-every time it was offered and costs the same CPU as resuming from the cache: it saves the
-client a round trip, not the server work. Latency is not reported: on loopback, with 128 lanes
-queued on one server thread, it measures the queue.
+each) and 3,986 resumed ones with stateless tickets (250 µs). Each figure includes issuing two
+tickets. The post-quantum key share costs 6% of a full handshake and 10% of a resumed one. With
+rustls's session cache, resumed and 0-RTT handshakes cost the same, and what they cost depends
+on how many sessions the cache holds: 326 µs each with 70,000 sessions stored, 258 µs with
+4,095, close to stateless resumption. rustls takes a resumed session out of its eviction order
+by a linear search (`LimitedCache::remove`), which here cost about 1 ns for every session held,
+so a cache of 10^6 sessions would add about 1 ms to every resumption. A stored session takes 933
+bytes of heap, and the cache allocates 88 bytes more for every session it may hold when it is
+made (8.8 MB for 100,000); a client that keeps both of its tickets takes two sessions. 0-RTT was
+accepted every time it was offered: it saves the client a round trip, not the server work.
+Latency is not reported: on loopback, with 128 lanes queued on one server thread, it measures
+the queue. The rows with the session cache were measured again after a fix to how stored
+sessions are counted, and the 4,096 row was added then (the file's `reruns` entry); the other
+rows are from the first run.
 
 #### Operating-system limits
 
@@ -228,7 +240,8 @@ queued on one server thread, it measures the queue.
   something shares it, so a client that resumes on another edge gets 1-RTT resumption at best.
   Sharing ticket keys across edges, the obvious way to resume anywhere, gives resumption across
   edges but not 0-RTT: that needs a single-use store shared by the edges, or clients that come
-  back to the edge that served them. S3 measures how often they do.
+  back to the edge that served them. S3 measures how often they do. rustls's own cache would
+  not serve at an edge's scale anyway: each resumption searches it linearly (see Handshakes).
 - **F3. The post-quantum key share is cheap enough to keep:** 6% of a full handshake.
 - **F4. rustls's WebPKI client verifier accepts a client certificate that has no extended key
   usage at all.** It refuses one whose extended key usage lacks clientAuth
@@ -259,7 +272,9 @@ queued on one server thread, it measures the queue.
   core-seconds across the edges that take them.
 - **D5. Resumption uses stateless tickets** (the fastest, nothing stored per client, and
   shareable across edges). 0-RTT stays off until S3 has measured where resuming clients land:
-  on rustls it needs the session cache (F2), at 666 bytes per session per edge.
+  on rustls it needs a session store (F2), at 933 bytes per stored session plus 88 per slot in
+  rustls's cache, whose search per resumption grows with what it holds, so 0-RTT at an edge's
+  scale needs a store of OpenQTT's own with constant-time removal.
 - **D6. Keep rustls's default key share,** X25519MLKEM768 first (F3).
 - **D7. One endpoint per core stays the layout.** Memory and idle CPU are the same either way
   within this machine's spread, and it set 10^4 connections up at 3,913 a second against 3,289
