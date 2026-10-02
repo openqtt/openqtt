@@ -3,8 +3,8 @@
 
 CARGO ?= cargo
 
-.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance tools need-nextest \
-	need-deny
+.PHONY: check fmt fmt-check clippy test test-crate layers deny mdlint conformance differential \
+	differential-bless tools need-nextest need-deny
 
 check: fmt-check clippy test layers deny mdlint
 	@echo "check: ok"
@@ -119,6 +119,21 @@ mdlint:
 # check: today it lists every statement. R1 says how a test names the statements it proves.
 conformance:
 	@scripts/conformance-ids.sh
+
+# --- Differential -------------------------------------------------------------------------
+
+# The differential harness (crates/testkit/tests/differential/README.md): every scenario
+# against OpenQTT 1.x in Docker, twice, and the traces compared with each other and with those
+# kept in the repository. Not part of check: it needs Docker and takes a few minutes.
+differential: need-nextest
+	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
+		--no-capture -E 'test(the_oracle_traces_the_same_twice_and_as_kept)'
+
+# Rewrites the kept traces from two runs that agree, after an intended change to a scenario,
+# to the normalizing or to the oracle. Read the diff before committing it.
+differential-bless: need-nextest
+	$(CARGO) nextest run --locked -p openqtt-testkit --test differential --run-ignored only \
+		--no-capture -E 'test(bless_the_oracle_traces)'
 
 # --- Tools --------------------------------------------------------------------------------
 

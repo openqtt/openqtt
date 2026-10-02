@@ -35,7 +35,7 @@ not run as a broker yet.
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M1 | Rust workspace and CI; the complete MQTT 5 codec, fuzzed | in progress |
-| M2 | Conformance and design reports, specifications, test tooling, measured spikes | not started |
+| M2 | Conformance and design reports, specifications, test tooling, measured spikes | in progress |
 | M3 | Distributed walking skeleton: QoS 0 and 1, retained messages, takeover, chart 2.0.0; `v2.0.0-alpha.1` | not started |
 | M4 | Persistent sessions, QoS 2, wills, drain, replication | not started |
 | M5 | The rest of MQTT 5, security and operations; `v2.0.0-beta.1` | not started |
