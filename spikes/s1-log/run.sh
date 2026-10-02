@@ -109,17 +109,17 @@ window)
     done
     ;;
 repl)
-    b repl --schemes raft,raft-batched,raft10,pb --groups 1,16,128 --delays-us 1000,2000 --flush-us 0,1000 \
-        --loads o1000,o20000
+    b repl --schemes raft,raft-batched,raft10-seq,raft10,pb --groups 1,16,128 --delays-us 1000,2000 \
+        --flush-us 0,1000 --loads o1000,o20000
     ;;
 repl-storm)
     # The reconnect-storm target, 50,000 claims a second across the cluster.
-    b repl --schemes raft10,pb,raft-batched,raft --groups 16,128,256 --delays-us 1000 --flush-us 1000 \
+    b repl --schemes raft10,raft10-seq,pb,raft-batched,raft --groups 16,128,256 --delays-us 1000 --flush-us 1000 \
         --loads o50000
     ;;
 repl-max)
     # The most one partition leader commits: one group, writes always outstanding.
-    b repl --schemes raft,raft-batched,raft10,pb --groups 1 --delays-us 1000 --flush-us 0,1000 \
+    b repl --schemes raft,raft-batched,raft10-seq,raft10,pb --groups 1 --delays-us 1000 --flush-us 0,1000 \
         --loads c16,c256,c1024
     ;;
 idle)

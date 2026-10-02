@@ -154,6 +154,14 @@ impl Offered {
     }
 }
 
+fn line_cpu(c: &AnyCluster) -> f64 {
+    match c {
+        AnyCluster::Raft(c) => c.router.line_cpu_s(),
+        AnyCluster::Raft10(c) => c.router.line_cpu_s(),
+        AnyCluster::Pb(c) => c.line.cpu_s(),
+    }
+}
+
 /// Offers load to a running cluster and measures commit latency from when each write was due.
 async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration, measure: Duration) -> Value {
     let start = Instant::now();
@@ -240,6 +248,7 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
     };
     tokio::time::sleep_until(from.into()).await;
     let u0 = usage();
+    let l0 = line_cpu(&c);
     let m0 = c.messages();
     let d0: Vec<(u64, u64)> = c
         .disks()
@@ -248,6 +257,7 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         .collect();
     tokio::time::sleep_until(until.into()).await;
     let u1 = usage();
+    let l1 = line_cpu(&c);
     let m1 = c.messages();
     let (mut flushes, mut items) = (0, 0);
     for (d, (f0, i0)) in c.disks().iter().zip(d0) {
@@ -272,6 +282,8 @@ async fn offer(c: Arc<AnyCluster>, groups: u32, load: Offered, warmup: Duration,
         "errors": errors.load(Ordering::Relaxed),
         "first_error": *first_error.lock().expect("not poisoned"),
         "cpu_cores_total": round2((u1.cpu_s - u0.cpu_s) / secs),
+        // Without the delay line's own thread, which spins the last 150 us before each deadline.
+        "cpu_cores_protocol": round2(((u1.cpu_s - u0.cpu_s) - (l1 - l0)).max(0.0) / secs),
         "messages_per_s": round2((m1 - m0) as f64 / secs),
         "disk_flushes_per_s": round2(flushes as f64 / secs),
         "disk_items_per_flush": if flushes > 0 { round2(items as f64 / flushes as f64) } else { 0.0 },

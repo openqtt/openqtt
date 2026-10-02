@@ -243,6 +243,10 @@ pub struct Router {
 }
 
 impl Router {
+    pub fn line_cpu_s(&self) -> f64 {
+        self.line.cpu_s()
+    }
+
     fn get(&self, group: u32, node: u64) -> Option<R10> {
         self.rafts.read().expect("not poisoned").get(&(group, node)).cloned()
     }

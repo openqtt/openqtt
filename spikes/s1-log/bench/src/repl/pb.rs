@@ -158,6 +158,7 @@ impl Node {
 pub struct Cluster {
     pub nodes: Vec<Arc<Node>>,
     pub disks: Vec<Disk>,
+    pub line: DelayLine,
     tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
 }
 
@@ -243,6 +244,7 @@ impl Cluster {
         Cluster {
             nodes,
             disks,
+            line,
             tasks: Mutex::new(tasks),
         }
     }

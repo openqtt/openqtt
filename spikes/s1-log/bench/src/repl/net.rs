@@ -105,12 +105,32 @@ impl DelayLine {
     }
 }
 
+/// macOS stretches a thread's timed waits to coalesce wakeups, by about a quarter of the wait
+/// for an ordinary thread: a 1 ms delay fired 250 us late, and only when nothing else woke the
+/// thread first, which favoured protocols that send many messages. The user-interactive class
+/// gets the least slack.
+#[cfg(target_os = "macos")]
+fn raise_timer_precision() {
+    // SAFETY: sets the calling thread's own scheduling class; no pointers involved.
+    unsafe {
+        libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_USER_INTERACTIVE, 0);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn raise_timer_precision() {}
+
+/// The last stretch before a deadline is spun rather than slept, so a hop is late by
+/// microseconds whatever else the thread is doing.
+const SPIN: Duration = Duration::from_micros(150);
+
 fn run(
     rx: mpsc::Receiver<(Instant, oneshot::Sender<()>)>,
     lateness: Arc<Mutex<Lat>>,
     cpu_bits: Arc<AtomicU64>,
     fired: Arc<AtomicU64>,
 ) {
+    raise_timer_precision();
     let mut heap: BinaryHeap<Reverse<Timer>> = BinaryHeap::new();
     let mut seq = 0u64;
     let mut late = Lat::default();
@@ -122,7 +142,14 @@ fn run(
         let got = match wait {
             None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
             Some(d) if d.is_zero() => Err(mpsc::RecvTimeoutError::Timeout),
-            Some(d) => rx.recv_timeout(d),
+            Some(d) if d <= SPIN => {
+                std::hint::spin_loop();
+                rx.try_recv().map_err(|e| match e {
+                    mpsc::TryRecvError::Empty => mpsc::RecvTimeoutError::Timeout,
+                    mpsc::TryRecvError::Disconnected => mpsc::RecvTimeoutError::Disconnected,
+                })
+            }
+            Some(d) => rx.recv_timeout(d - SPIN),
         };
         match got {
             Ok((at, tx)) => {

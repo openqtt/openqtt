@@ -218,6 +218,14 @@ def recovery(rows):
                   f"replay {r['replay_s']} s ({k(r['replay_per_s'])}/s), read {r['read_s']} s")
 
 
+def scheme(r):
+    # The first repl step ran before openraft 0.10's appends were pipelined; its "raft10" rows
+    # carry no "append" field and used the sequential default.
+    if r["scheme"] == "raft10" and "append" not in r:
+        return "raft10-seq"
+    return r["scheme"]
+
+
 def repl(rows):
     print("\n### Replication\n")
     print("| Scheme | Groups | One-way ms | Flush ms | Load | Done/s | p50 ms | p99 ms | Errors | "
@@ -230,7 +238,7 @@ def repl(rows):
         ex = r.get("extra", {})
         if ex.get("misplaced_leaders"):
             note = f"{ex['misplaced_leaders']} leaders moved"
-        print(f"| {r['scheme']} | {r['groups']} | {r['delay_us'] / 1000:g} | {r['flush_us'] / 1000:g} | {r['load']} | "
+        print(f"| {scheme(r)} | {r['groups']} | {r['delay_us'] / 1000:g} | {r['flush_us'] / 1000:g} | {r['load']} | "
               f"{k(R['per_s'])} | {ms(L.get('p50'))} | {ms(L.get('p99'))} | {R['errors']} | "
               f"{k(R['messages_per_s'])} | {R['disk_items_per_flush']} | {R['cpu_cores_total']} | {note} |")
 
@@ -244,6 +252,15 @@ def idle(rows):
         print(f"| {r['scheme']} | {r['groups']} | {r['heartbeat_ms']} | {r['election_ms'][0]} to {r['election_ms'][1]} | "
               f"{r['cpu_cores_total']} | {r['cpu_cores_per_node']} | {r['cpu_us_per_group_replica_per_s']} | "
               f"{k(r['messages_per_s'])} |")
+
+
+def netcost(rows):
+    print("\n### Loopback TCP round trip\n")
+    print("| Size B | Round trips | CPU us per round trip | RTT p50 us | RTT p99 us |")
+    print("| --- | --- | --- | --- | --- |")
+    for r in rows:
+        print(f"| {r['size']} | {r['round_trips']:,} | {r['cpu_us_per_round_trip']} | "
+              f"{r['rtt_us']['p50']} | {r['rtt_us']['p99']} |")
 
 
 def build(rows):
@@ -262,7 +279,8 @@ def main():
     runs = load()
     for step, fn in [("fsync", fsync), ("write", write), ("shared", shared), ("claims", claims),
                      ("footprint", footprint), ("churn", churn), ("recovery", recovery),
-                     ("repl", repl), ("repl-storm", repl), ("repl-max", repl), ("idle", idle),
+                     ("repl", repl), ("repl-pipelined", repl), ("repl-storm", repl), ("repl-max", repl),
+                     ("idle", idle), ("window", write), ("netcost", netcost),
                      ("build", build)]:
         if step in runs:
             print(f"\n## {step}")
