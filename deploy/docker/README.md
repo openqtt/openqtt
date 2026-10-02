@@ -11,7 +11,7 @@ mutual TLS listeners, a REST API, and an Erlang runtime.
 ## Running it
 
 ```console
-docker run -d --name openqtt -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
+docker run -d --name openqtt -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.1
 ```
 
 The broker runs as Linux user `openqtt` (uid 1000) and is installed under
@@ -36,7 +36,7 @@ The lowercase `default` above is not a typo: case does not matter.
 ```console
 docker run -d --name openqtt \
   -e OPENQTT_DASHBOARD__DEFAULT_PASSWORD=mysecret \
-  -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
+  -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.1
 ```
 
 There is no `EMQX_` fallback. An environment written for EMQX is read by
@@ -59,7 +59,7 @@ Set a static seed list, and give each node a name that survives a restart.
 ```yaml
 services:
   node1:
-    image: ghcr.io/openqtt/openqtt:1.0.0
+    image: ghcr.io/openqtt/openqtt:1.0.1
     environment:
       - "OPENQTT_NODE__COOKIE=change-me"
       - "OPENQTT_NODE__NAME=openqtt@node1.openqtt.local"
@@ -70,7 +70,7 @@ services:
         aliases: [node1.openqtt.local]
 
   node2:
-    image: ghcr.io/openqtt/openqtt:1.0.0
+    image: ghcr.io/openqtt/openqtt:1.0.1
     environment:
       - "OPENQTT_NODE__COOKIE=change-me"
       - "OPENQTT_NODE__NAME=openqtt@node2.openqtt.local"
@@ -115,7 +115,7 @@ volumes:
 
 services:
   openqtt:
-    image: ghcr.io/openqtt/openqtt:1.0.0
+    image: ghcr.io/openqtt/openqtt:1.0.1
     restart: always
     environment:
       OPENQTT_NODE__NAME: openqtt@127.0.0.1
@@ -138,7 +138,7 @@ docker run -d --name openqtt -p 1883:1883 -p 18083:18083 \
     --sysctl net.core.netdev_max_backlog=16384 \
     --sysctl net.core.rmem_max=16777216 \
     --sysctl net.core.wmem_max=16777216 \
-    ghcr.io/openqtt/openqtt:1.0.0
+    ghcr.io/openqtt/openqtt:1.0.1
 ```
 
 Do not run the container privileged to tune the kernel.
