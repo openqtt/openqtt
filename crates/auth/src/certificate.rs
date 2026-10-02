@@ -13,9 +13,12 @@
 //!   (rule 15).
 //! - **The issuing CA**, when pinned (rule 2). A listener's CA file should hold only the device
 //!   issuing CA; a pin keeps a certificate from another intermediate under the same root out
-//!   even when the file holds the root. The CA that really issued the leaf is found by its
-//!   signature, not by its name, among the certificates the client sent and the listener's CA
-//!   certificates, and its Subject Key Identifier or the SHA-256 of its DER must be pinned.
+//!   even when the file holds the root. A pin names a certificate of the listener's CA file, and
+//!   is resolved to it once, when the listener is set up: a pin that names none is refused then.
+//!   A client certificate passes only when the public key of a pinned certificate verifies its
+//!   signature and its issuer is that certificate's subject. Nothing the client sends but its
+//!   own certificate is looked at, so a forged issuer carrying a pinned Subject Key Identifier,
+//!   or the pinned CA's real certificate sent beside a leaf another CA issued, gains nothing.
 //!
 //! A refusal is CONNACK 0x87 Not authorized.
 
@@ -37,46 +40,56 @@ use crate::{Error, ReservedPrefix};
 /// The longest CN, in bytes: RFC 5280's upper bound for a common name, and R2 rule 4's.
 pub const MAX_COMMON_NAME: usize = 64;
 
-/// The issuing CA a client certificate must come from (R2 rule 2).
+/// A certificate of the listener's CA file that must have issued a client certificate (R2
+/// rule 2). Each names a certificate the operator configured, never one a client sends.
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum IssuerPin {
-    /// The issuing CA's Subject Key Identifier, as its certificate carries it.
+    /// The SHA-256 of the CA's SubjectPublicKeyInfo, DER encoded: `spki-sha256:<hex>`. The pin
+    /// to prefer, since it names the CA's key, and so outlives a renewal of the CA's
+    /// certificate with the same key.
+    SpkiSha256([u8; 32]),
+    /// The SHA-256 of the CA's certificate, DER encoded, its fingerprint: `sha256:<hex>`.
+    CertificateSha256([u8; 32]),
+    /// The Subject Key Identifier the CA's certificate carries: `ski:<hex>`.
     SubjectKeyId(Box<[u8]>),
-    /// The SHA-256 of the issuing CA's certificate, DER encoded: its fingerprint.
-    Sha256([u8; 32]),
 }
 
+/// The forms of a pin, for a message about one that cannot be read.
+const PIN_FORMS: &str = "a pin is `spki-sha256:<hex>`, `sha256:<hex>` or `ski:<hex>`";
+
 impl IssuerPin {
-    /// Reads `ski:<hex>` or `sha256:<hex>`; the hex may separate its bytes with `:`, as
-    /// `openssl x509 -fingerprint` writes them.
+    /// Reads `spki-sha256:<hex>`, `sha256:<hex>` or `ski:<hex>`; the hex may separate its bytes
+    /// with `:`, as `openssl x509 -fingerprint` writes them.
     ///
     /// # Errors
     ///
-    /// [`Error::IssuerPin`] for anything else, or a fingerprint that is not 32 bytes.
+    /// [`Error::IssuerPin`] for anything else, or a hash that is not 32 bytes.
     pub fn parse(text: &str) -> Result<Self, Error> {
         let fail = |reason| Error::IssuerPin { reason };
-        let (kind, hex) = text
-            .split_once(':')
-            .ok_or_else(|| fail("a pin is `ski:<hex>` or `sha256:<hex>`"))?;
+        let (kind, hex) = text.split_once(':').ok_or_else(|| fail(PIN_FORMS))?;
         let bytes = decode_hex(hex).ok_or_else(|| fail("the value is not hexadecimal"))?;
+        let hash = |bytes: Vec<u8>| -> Result<[u8; 32], Error> {
+            bytes
+                .try_into()
+                .map_err(|_| fail("a SHA-256 hash is 32 bytes"))
+        };
         match kind.to_ascii_lowercase().as_str() {
+            "spki-sha256" => hash(bytes).map(Self::SpkiSha256),
+            "sha256" => hash(bytes).map(Self::CertificateSha256),
             "ski" if !bytes.is_empty() => Ok(Self::SubjectKeyId(bytes.into_boxed_slice())),
             "ski" => Err(fail("a Subject Key Identifier is at least one byte")),
-            "sha256" => bytes
-                .try_into()
-                .map(Self::Sha256)
-                .map_err(|_| fail("a SHA-256 fingerprint is 32 bytes")),
-            _ => Err(fail("a pin is `ski:<hex>` or `sha256:<hex>`")),
+            _ => Err(fail(PIN_FORMS)),
         }
     }
 
-    fn matches(&self, issuer: &X509Certificate<'_>) -> bool {
+    /// Whether this pin names `certificate`, one of the listener's CA certificates.
+    fn names(&self, certificate: &X509Certificate<'_>) -> bool {
+        let sha256 = |bytes: &[u8]| digest::digest(&digest::SHA256, bytes);
         match self {
-            Self::SubjectKeyId(pinned) => subject_key_id(issuer) == Some(&**pinned),
-            Self::Sha256(pinned) => {
-                digest::digest(&digest::SHA256, issuer.as_raw()).as_ref() == pinned.as_slice()
-            }
+            Self::SpkiSha256(pinned) => sha256(certificate.public_key().raw).as_ref() == pinned,
+            Self::CertificateSha256(pinned) => sha256(certificate.as_raw()).as_ref() == pinned,
+            Self::SubjectKeyId(pinned) => subject_key_id(certificate) == Some(&**pinned),
         }
     }
 }
@@ -90,8 +103,9 @@ impl fmt::Debug for IssuerPin {
 impl fmt::Display for IssuerPin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (kind, bytes): (_, &[u8]) = match self {
+            Self::SpkiSha256(bytes) => ("spki-sha256", bytes),
+            Self::CertificateSha256(bytes) => ("sha256", bytes),
             Self::SubjectKeyId(bytes) => ("ski", bytes),
-            Self::Sha256(bytes) => ("sha256", bytes),
         };
         f.write_str(kind)?;
         for byte in bytes {
@@ -161,8 +175,9 @@ pub fn certificates_from_pem(pem: &[u8]) -> Result<Vec<Certificate>, Error> {
 #[derive(Clone, Debug, Default)]
 pub struct CertificateIdentity {
     reserved: Option<ReservedPrefix>,
-    pins: Vec<IssuerPin>,
-    authorities: Vec<Certificate>,
+    /// The listener's CA certificates the pins named: a client certificate must have been
+    /// issued by one of them. Empty when nothing is pinned.
+    issuers: Vec<Certificate>,
 }
 
 impl CertificateIdentity {
@@ -170,19 +185,46 @@ impl CertificateIdentity {
     pub fn new(reserved: Option<ReservedPrefix>) -> Self {
         Self {
             reserved,
-            pins: Vec::new(),
-            authorities: Vec::new(),
+            issuers: Vec::new(),
         }
     }
 
-    /// And requires the CA that issued the leaf to match one of `pins`. It is looked for among
-    /// the certificates the client sends and `authorities`, the listener's client CA
-    /// certificates, since a client need not send the CA its certificate was issued by.
-    #[must_use]
-    pub fn with_issuer_pins(mut self, pins: Vec<IssuerPin>, authorities: Vec<Certificate>) -> Self {
-        self.pins = pins;
-        self.authorities = authorities;
-        self
+    /// And requires every client certificate to have been issued by a certificate one of `pins`
+    /// names among `authorities`, the listener's client CA certificates, the ones the operator
+    /// configured. Each pin is resolved here, once.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnresolvedPin`] for a pin that names none of `authorities`, and
+    /// [`Error::Certificate`] for one of them that cannot be read.
+    pub fn with_issuer_pins(
+        mut self,
+        pins: &[IssuerPin],
+        authorities: &[Certificate],
+    ) -> Result<Self, Error> {
+        let mut issuers: Vec<Certificate> = Vec::new();
+        for pin in pins {
+            let mut named = false;
+            for authority in authorities {
+                let (_, parsed) =
+                    parse_x509_certificate(authority.der()).map_err(|_| Error::Certificate {
+                        reason: "a CA certificate of the listener cannot be read",
+                    })?;
+                if pin.names(&parsed) {
+                    named = true;
+                    if !issuers.contains(authority) {
+                        issuers.push(authority.clone());
+                    }
+                }
+            }
+            if !named {
+                return Err(Error::UnresolvedPin {
+                    pin: pin.to_string(),
+                });
+            }
+        }
+        self.issuers = issuers;
+        Ok(self)
     }
 
     /// The CN of the leaf of `chain`, the chain a client presented, leaf first, once all the
@@ -233,22 +275,23 @@ impl CertificateIdentity {
                 "the CN begins with the prefix reserved for service credentials",
             ));
         }
-        if !self.pins.is_empty() && !self.issued_by_pinned(&leaf, &chain[1..]) {
+        if !self.issuers.is_empty() && !self.issued_by_pinned(&leaf) {
             return Err(fail("the certificate was not issued by a pinned CA"));
         }
         Ok(name)
     }
 
-    /// Whether a CA that matches a pin signed `leaf`: one whose subject is the leaf's issuer and
-    /// whose key verifies the leaf's signature, among `sent` and the listener's CAs.
-    fn issued_by_pinned(&self, leaf: &X509Certificate<'_>, sent: &[Certificate]) -> bool {
-        sent.iter().chain(&self.authorities).any(|candidate| {
-            let Ok((_, candidate)) = parse_x509_certificate(candidate.der()) else {
+    /// Whether a pinned CA issued `leaf`: one whose subject is the leaf's issuer and whose key,
+    /// as the listener's configuration holds it, verifies the leaf's signature. The rest of the
+    /// chain the client sent is never consulted: whatever it holds, a leaf only this key could
+    /// have signed is the pinned CA's.
+    fn issued_by_pinned(&self, leaf: &X509Certificate<'_>) -> bool {
+        self.issuers.iter().any(|issuer| {
+            let Ok((_, issuer)) = parse_x509_certificate(issuer.der()) else {
                 return false;
             };
-            candidate.subject().as_raw() == leaf.issuer().as_raw()
-                && leaf.verify_signature(Some(candidate.public_key())).is_ok()
-                && self.pins.iter().any(|pin| pin.matches(&candidate))
+            issuer.subject().as_raw() == leaf.issuer().as_raw()
+                && leaf.verify_signature(Some(issuer.public_key())).is_ok()
         })
     }
 }

@@ -10,14 +10,16 @@ use openqtt_auth::{CertificateIdentity, Error, IssuerPin, ReservedPrefix, certif
 use openqtt_ext::{Authenticator, Certificate, ConnectInfo, Refusal, Verdict};
 use rcgen::{
     BasicConstraints, CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose, IsCa,
-    Issuer, KeyPair, KeyUsagePurpose,
+    Issuer, KeyIdMethod, KeyPair, KeyUsagePurpose,
 };
 use x509_parser::extensions::ParsedExtension;
 
 /// A CA that lives as long as a test.
 struct Ca {
+    name: String,
     der: Vec<u8>,
     pem: String,
+    key_pem: String,
     issuer: Issuer<'static, KeyPair>,
 }
 
@@ -27,8 +29,10 @@ impl Ca {
         let params = ca_params(name);
         let certificate = params.self_signed(&key).expect("a root");
         Self {
+            name: name.to_owned(),
             der: certificate.der().to_vec(),
             pem: certificate.pem(),
+            key_pem: key.serialize_pem(),
             issuer: Issuer::new(params, key),
         }
     }
@@ -41,10 +45,23 @@ impl Ca {
             .signed_by(&key, &self.issuer)
             .expect("an intermediate");
         Self {
+            name: name.to_owned(),
             der: certificate.der().to_vec(),
             pem: certificate.pem(),
+            key_pem: key.serialize_pem(),
             issuer: Issuer::new(params, key),
         }
+    }
+
+    /// A forged copy of this CA's certificate: its name and its key, so that a leaf it issued
+    /// verifies against it, and `ski` written in as its Subject Key Identifier. Self-signed, so
+    /// no CA vouches for it: anyone holding a certificate from this CA can make it.
+    fn forged_with_ski(&self, ski: Vec<u8>) -> Certificate {
+        let key = KeyPair::from_pem(&self.key_pem).expect("the key reads back");
+        let mut params = ca_params(&self.name);
+        params.key_identifier_method = KeyIdMethod::PreSpecified(ski);
+        let certificate = params.self_signed(&key).expect("a forged copy");
+        Certificate::from_der(certificate.der().to_vec())
     }
 
     fn certificate(&self) -> Certificate {
@@ -89,6 +106,13 @@ impl Ca {
 
     fn fingerprint(&self) -> String {
         let digest = aws_lc_rs::digest::digest(&aws_lc_rs::digest::SHA256, &self.der);
+        hex(digest.as_ref())
+    }
+
+    /// The SHA-256 of the CA's SubjectPublicKeyInfo.
+    fn spki_fingerprint(&self) -> String {
+        let (_, parsed) = x509_parser::parse_x509_certificate(&self.der).expect("parses");
+        let digest = aws_lc_rs::digest::digest(&aws_lc_rs::digest::SHA256, parsed.public_key().raw);
         hex(digest.as_ref())
     }
 }
@@ -257,25 +281,36 @@ fn r2_rule_2_only_the_pinned_issuing_ca_is_trusted() {
     let devices = root.intermediate("Devices");
     let other = root.intermediate("Other");
     let pins = [
-        IssuerPin::SubjectKeyId(devices.subject_key_id().into_boxed_slice()),
+        format!("spki-sha256:{}", devices.spki_fingerprint())
+            .parse()
+            .unwrap(),
         format!("sha256:{}", devices.fingerprint()).parse().unwrap(),
+        IssuerPin::SubjectKeyId(devices.subject_key_id().into_boxed_slice()),
     ];
     for pin in pins {
         // The listener's CA file holds the root and the device CA.
-        let identity = CertificateIdentity::new(None).with_issuer_pins(
-            vec![pin.clone()],
-            vec![root.certificate(), devices.certificate()],
-        );
-        // Sent with its CA, or alone: the device CA is found either way.
+        let identity = CertificateIdentity::new(None)
+            .with_issuer_pins(
+                std::slice::from_ref(&pin),
+                &[root.certificate(), devices.certificate()],
+            )
+            .unwrap();
+        // Sent with its CA, or alone: the pinned key is the configured one either way.
         let device = devices.device("pump-3");
         identity
             .identify(&[device.clone(), devices.certificate()])
             .unwrap();
         identity.identify(&[device]).unwrap();
-        // Another intermediate under the same root is refused (Changed from 1.x).
+        // Another intermediate under the same root is refused (Changed from 1.x), even sent
+        // beside the device CA's own certificate.
         let stranger = other.device("pump-3");
         assert_eq!(
-            refusal(&identity, &[stranger, other.certificate()]),
+            refusal(&identity, &[stranger.clone(), other.certificate()]),
+            "the certificate was not issued by a pinned CA",
+            "{pin}"
+        );
+        assert_eq!(
+            refusal(&identity, &[stranger, devices.certificate()]),
             "the certificate was not issued by a pinned CA",
             "{pin}"
         );
@@ -295,6 +330,76 @@ fn r2_rule_2_only_the_pinned_issuing_ca_is_trusted() {
 }
 
 #[test]
+fn r2_rule_2_a_forged_issuer_carrying_the_pinned_ski_is_refused() {
+    let root = Ca::root("Root");
+    let devices = root.intermediate("Devices");
+    let other = root.intermediate("Other");
+    // The attack: a certificate from another intermediate under the same root, which the TLS
+    // handshake accepts, sent with a forged copy of its issuer that carries the device CA's
+    // Subject Key Identifier.
+    let stranger = other.device("pump-3");
+    let forged = other.forged_with_ski(devices.subject_key_id());
+    let (_, parsed) = x509_parser::parse_x509_certificate(forged.der()).expect("parses");
+    let forged_ski =
+        parsed
+            .extensions()
+            .iter()
+            .find_map(|extension| match extension.parsed_extension() {
+                ParsedExtension::SubjectKeyIdentifier(id) => Some(id.0.to_vec()),
+                _ => None,
+            });
+    assert_eq!(
+        forged_ski,
+        Some(devices.subject_key_id()),
+        "the forgery carries the pin"
+    );
+    let pin = IssuerPin::SubjectKeyId(devices.subject_key_id().into_boxed_slice());
+    let identity = CertificateIdentity::new(None)
+        .with_issuer_pins(&[pin], &[root.certificate(), devices.certificate()])
+        .unwrap();
+    for chain in [
+        vec![stranger.clone(), forged.clone()],
+        vec![stranger.clone(), forged.clone(), other.certificate()],
+        vec![stranger, other.certificate(), forged],
+    ] {
+        assert_eq!(
+            refusal(&identity, &chain),
+            "the certificate was not issued by a pinned CA"
+        );
+    }
+}
+
+#[test]
+fn r2_rule_2_a_pin_must_name_a_configured_certificate() {
+    let root = Ca::root("Root");
+    let devices = root.intermediate("Devices");
+    let other = root.intermediate("Other");
+    let configured = [root.certificate(), devices.certificate()];
+    for pin in [
+        IssuerPin::SubjectKeyId(other.subject_key_id().into_boxed_slice()),
+        format!("sha256:{}", other.fingerprint()).parse().unwrap(),
+        format!("spki-sha256:{}", other.spki_fingerprint())
+            .parse()
+            .unwrap(),
+    ] {
+        let error = CertificateIdentity::new(None)
+            .with_issuer_pins(std::slice::from_ref(&pin), &configured)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            Error::UnresolvedPin {
+                pin: pin.to_string()
+            }
+        );
+    }
+    // Nothing pinned, nothing required.
+    let open = CertificateIdentity::new(None)
+        .with_issuer_pins(&[], &configured)
+        .unwrap();
+    open.identify(&[other.device("pump-3")]).unwrap();
+}
+
+#[test]
 fn r2_rule_15_a_cn_cannot_claim_a_service_name() {
     let root = Ca::root("Root");
     let identity = CertificateIdentity::new(Some(ReservedPrefix::new("svc:").unwrap()));
@@ -309,8 +414,10 @@ fn r2_rule_15_a_cn_cannot_claim_a_service_name() {
 fn pins_read_as_openssl_writes_fingerprints() {
     let colons = "SHA256:".to_owned() + &["AB"; 32].join(":");
     let pin: IssuerPin = colons.parse().unwrap();
-    assert_eq!(pin, IssuerPin::Sha256([0xAB; 32]));
+    assert_eq!(pin, IssuerPin::CertificateSha256([0xAB; 32]));
     assert_eq!(pin.to_string(), format!("sha256:{}", ["ab"; 32].join(":")));
+    let spki: IssuerPin = format!("spki-sha256:{}", "cd".repeat(32)).parse().unwrap();
+    assert_eq!(spki, IssuerPin::SpkiSha256([0xCD; 32]));
     let ski: IssuerPin = "ski:0a1B".parse().unwrap();
     assert_eq!(
         ski,

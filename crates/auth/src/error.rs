@@ -73,6 +73,13 @@ pub enum Error {
         /// Each problem, naming its line.
         problems: Vec<String>,
     },
+    /// An issuer pin that names none of the listener's CA certificates: a pin is resolved to a
+    /// certificate the operator configured, never to one a client sends.
+    #[error("the issuer pin {pin} names no certificate of the listener's CA file")]
+    UnresolvedPin {
+        /// The pin, as written.
+        pin: String,
+    },
     /// Not one thread of a pool could start.
     #[error("no thread could start: {reason}")]
     Threads {
