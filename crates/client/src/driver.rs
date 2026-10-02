@@ -32,13 +32,22 @@ const LINGER: Duration = Duration::from_secs(1);
 /// reading holds the client to about this much, besides what callers have in hand.
 pub(crate) const WRITE_LIMIT: usize = 64 * 1024;
 
-/// A call from a [`Client`](crate::Client) handle.
+/// How many publications may wait in the connection task, for room to write or for a slot of
+/// the server's Receive Maximum. Past it, the task takes no more from the publication channel,
+/// so further callers wait with their payloads in hand, and the task goes on with everything
+/// else.
+pub(crate) const QUEUE_LIMIT: usize = 64;
+
+/// A publication from a [`Client`](crate::Client) handle. Publications have a channel of their
+/// own, which the connection task stops taking from when its queue is full; the other calls
+/// keep theirs.
+pub(crate) struct Publication {
+    pub(crate) publish: Publish,
+    pub(crate) reply: oneshot::Sender<Result<Published, Error>>,
+}
+
+/// A call from a [`Client`](crate::Client) handle, other than a publication.
 pub(crate) enum Command {
-    /// Publish a message.
-    Publish {
-        publish: Publish,
-        reply: oneshot::Sender<Result<Published, Error>>,
-    },
     /// Subscribe.
     Subscribe {
         subscriptions: Vec<Subscription>,
@@ -175,6 +184,8 @@ pub(crate) struct Driver {
     ping_sent: Option<Instant>,
     commands: mpsc::Receiver<Command>,
     commands_open: bool,
+    publications: mpsc::Receiver<Publication>,
+    publications_open: bool,
     events: mpsc::Sender<Event>,
     events_closed: bool,
     /// Events waiting for room in the channel; the client reads nothing more meanwhile.
@@ -198,6 +209,7 @@ impl Driver {
         session: Session,
         negotiated: Negotiated,
         commands: mpsc::Receiver<Command>,
+        publications: mpsc::Receiver<Publication>,
         events: mpsc::Sender<Event>,
         connack: Option<Packet>,
         shared: Arc<Shared>,
@@ -220,6 +232,8 @@ impl Driver {
             ping_sent: None,
             commands,
             commands_open: true,
+            publications,
+            publications_open: true,
             events,
             events_closed: false,
             outbox: VecDeque::new(),
@@ -326,6 +340,9 @@ impl Driver {
         // Packets that came in the same read as the CONNACK.
         self.decode_buffered()?;
         loop {
+            // A publication whose caller gave up, by a timeout or by dropping the call, is
+            // not sent and not held.
+            self.queued.retain(|(_, reply)| !reply.is_closed());
             let ping_at = self.ping_deadline();
             // A due PINGREQ, or an overdue PINGRESP, comes before anything else: the timer
             // branch below is reached only when nothing else is ready, and a server that
@@ -365,6 +382,14 @@ impl Driver {
                     self.outbox.clear();
                     if !self.commands_open {
                         return Err(self.abandon());
+                    }
+                }
+                publication = self.publications.recv(),
+                    if self.publications_open && self.queued.len() < QUEUE_LIMIT =>
+                {
+                    match publication {
+                        Some(Publication { publish, reply }) => self.publish(publish, reply),
+                        None => self.publications_open = false,
                     }
                 }
                 command = self.commands.recv(), if self.commands_open => match command {
@@ -545,6 +570,10 @@ impl Driver {
         mut publish: Publish,
         reply: oneshot::Sender<Result<Published, Error>>,
     ) {
+        if reply.is_closed() {
+            // Its caller gave up before it could go.
+            return;
+        }
         if publish.qos == QoS::AtMostOnce {
             let result = self.encode_publish(&publish).map(|_| Published::AtMostOnce);
             drop(reply.send(result));
@@ -661,10 +690,6 @@ impl Driver {
     /// Handles a call from a handle.
     fn command(&mut self, command: Command) -> Result<(), Stop> {
         match command {
-            Command::Publish { publish, reply } => {
-                self.publish(publish, reply);
-                Ok(())
-            }
             Command::Subscribe {
                 subscriptions,
                 properties,
@@ -733,9 +758,12 @@ impl Driver {
         }
     }
 
-    /// Takes a publication: refused at once when it breaks a limit the server announced,
-    /// otherwise queued for [`pump`](Self::pump).
+    /// Takes a publication: dropped when its caller already gave up, refused at once when it
+    /// breaks a limit the server announced, otherwise queued for [`pump`](Self::pump).
     fn publish(&mut self, mut publish: Publish, reply: oneshot::Sender<Result<Published, Error>>) {
+        if reply.is_closed() {
+            return;
+        }
         let negotiated = &self.negotiated;
         let refusal = if publish.qos > negotiated.server_maximum_qos {
             // [MQTT-3.2.2-11]

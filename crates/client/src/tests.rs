@@ -1466,3 +1466,97 @@ async fn mqtt_3_1_2_20_a_pingreq_falls_due_under_a_flood_of_messages() {
         written.packets()
     );
 }
+
+/// A payload that counts itself in `live` for as long as anything holds it.
+struct Tracked(std::sync::Arc<std::sync::atomic::AtomicUsize>, Vec<u8>);
+
+impl AsRef<[u8]> for Tracked {
+    fn as_ref(&self) -> &[u8] {
+        &self.1
+    }
+}
+
+impl Drop for Tracked {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+fn tracked(live: &std::sync::Arc<std::sync::atomic::AtomicUsize>) -> Bytes {
+    live.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    Bytes::from_owner(Tracked(std::sync::Arc::clone(live), vec![0; 1024]))
+}
+
+#[tokio::test(start_paused = true)]
+async fn publications_whose_callers_gave_up_are_dropped_unsent() {
+    let connack = ConnAck {
+        properties: ConnAckProperties {
+            receive_maximum: NonZeroU16::new(1),
+            ..ConnAckProperties::default()
+        },
+        ..ConnAck::default()
+    };
+    let (client, _events, mut server, _) =
+        connect_with(ConnectOptions::new("c").keep_alive(0), connack).await;
+    // The first QoS 1 publication takes the server's only slot and is never acknowledged.
+    let publisher = client.clone();
+    tokio::spawn(async move { drop(publisher.publish(qos1("t", "first")).await) });
+    let Packet::Publish(first) = server.recv().await else {
+        panic!("a PUBLISH");
+    };
+
+    // Two hundred more wait, and their callers give up.
+    let live = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let callers: Vec<_> = (0..200)
+        .map(|_| {
+            let publisher = client.clone();
+            let payload = tracked(&live);
+            tokio::spawn(async move {
+                publisher
+                    .publish(Publish {
+                        qos: QoS::AtLeastOnce,
+                        topic: "t".into(),
+                        payload,
+                        ..Publish::default()
+                    })
+                    .await
+            })
+        })
+        .collect();
+    tokio::time::sleep(Duration::from_millis(1)).await;
+    for caller in &callers {
+        caller.abort();
+    }
+    for caller in callers {
+        assert!(caller.await.is_err());
+    }
+
+    // A round trip on the connection, and the client holds none of their payloads.
+    let subscriber = client.clone();
+    let subscribed = tokio::spawn(async move {
+        subscriber
+            .subscribe("x", SubscriptionOptions::default())
+            .await
+    });
+    let Packet::Subscribe(subscribe) = server.recv().await else {
+        panic!("SUBSCRIBE");
+    };
+    server
+        .send(SubAck {
+            packet_id: subscribe.packet_id,
+            properties: AckProperties::default(),
+            reason_codes: vec![SubAckReasonCode::GrantedQos0],
+        })
+        .await;
+    subscribed.await.unwrap().unwrap();
+    tokio::time::sleep(Duration::from_millis(1)).await;
+    assert_eq!(
+        live.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the client still holds publications whose callers gave up"
+    );
+
+    // And none of them is sent once the slot frees.
+    server.send(PubAck::new(first.packet_id.unwrap())).await;
+    assert!(server.silent_for(Duration::from_secs(1)).await);
+}

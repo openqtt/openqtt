@@ -11,12 +11,17 @@ use openqtt_codec::{
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::driver::{Command, Driver, Negotiated};
+use crate::driver::{Command, Driver, Negotiated, Publication};
 use crate::transport::{CloseCode, Transport};
 use crate::{ConnectOptions, Error, Session};
 
-/// The capacity of the channel that carries calls to the connection task.
+/// The capacity of the channel that carries calls other than publications to the connection
+/// task.
 const COMMAND_CAPACITY: usize = 64;
+
+/// The capacity of the channel that carries publications to the connection task. With its
+/// queue, it bounds what the task holds; further callers wait with their payloads in hand.
+const PUBLICATION_CAPACITY: usize = 64;
 
 /// A connection to an MQTT 5 server.
 ///
@@ -55,6 +60,7 @@ const COMMAND_CAPACITY: usize = 64;
 #[derive(Debug, Clone)]
 pub struct Client {
     commands: mpsc::Sender<Command>,
+    publications: mpsc::Sender<Publication>,
     shared: Arc<Shared>,
 }
 
@@ -307,6 +313,7 @@ impl Client {
 
         let negotiated = Negotiated::new(&connect, &connack, ping_timeout);
         let (commands_tx, commands_rx) = mpsc::channel(COMMAND_CAPACITY);
+        let (publications_tx, publications_rx) = mpsc::channel(PUBLICATION_CAPACITY);
         let (events_tx, events_rx) = mpsc::channel(event_capacity);
         let shared = Arc::new(Shared {
             client_id: session.client_id.clone(),
@@ -324,6 +331,7 @@ impl Client {
             session,
             negotiated,
             commands_rx,
+            publications_rx,
             events_tx,
             packet_log.then(|| Packet::ConnAck(connack)),
             Arc::clone(&shared),
@@ -332,6 +340,7 @@ impl Client {
         Ok((
             Self {
                 commands: commands_tx,
+                publications: publications_tx,
                 shared,
             },
             Events { rx: events_rx },
@@ -359,8 +368,10 @@ impl Client {
     /// The client assigns the Packet Identifier and clears DUP. At QoS 1 and 2 the call waits
     /// for the acknowledgement, and for a free slot of the server's Receive Maximum before
     /// sending ([MQTT-3.3.4-7]). At any QoS it also waits while more than 64 KiB wait to be
-    /// written, so a server that stops reading holds the client to that much. A Topic Alias is
-    /// sent as given, after a check against the server's Topic Alias Maximum.
+    /// written, and, when 64 publications already wait, until one goes: a server that stops
+    /// reading holds the client to that much. A call dropped before its publication went out,
+    /// as by a timeout, takes the publication with it unsent. A Topic Alias is sent as given,
+    /// after a check against the server's Topic Alias Maximum.
     ///
     /// # Errors
     ///
@@ -370,8 +381,12 @@ impl Client {
     /// message in flight when it ended stays in the session, and is sent again if the session
     /// resumes.
     pub async fn publish(&self, publish: Publish) -> Result<Published, Error> {
-        self.request(|reply| Command::Publish { publish, reply })
+        let (reply, response) = oneshot::channel();
+        self.publications
+            .send(Publication { publish, reply })
             .await
+            .map_err(|_| Error::Closed)?;
+        response.await.map_err(|_| Error::Closed)?
     }
 
     /// Subscribes to one Topic Filter.
