@@ -92,6 +92,8 @@ pub fn shape_cover<'a>(
             last.coarse |= coarse;
             continue;
         }
+        // Every text is one of the edge's filters, or a shape that was checked when it was
+        // made, so none is left out here.
         if let Ok(filter) = TopicFilter::new(&text) {
             entries.push(CoverEntry { filter, coarse });
         }
