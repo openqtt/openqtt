@@ -16,8 +16,8 @@ EMQX or from a measured spike. They go in `reports/`.
 | Report | Question | Status |
 | --- | --- | --- |
 | R1 | Protocol conformance: every MQTT 5.0 normative statement, EMQX's behaviour and ours | to be written |
-| R2 | Compatibility contract with 1.x, as executable tests | to be written |
-| R3 | Roles, the message path, the wire protocol between roles and the extension traits | to be written |
+| [R2](reports/R02-compatibility.md) | Compatibility contract with 1.x, as executable tests | draft |
+| [R3](reports/R03-roles-and-wire.md) | Roles, the message path, the wire protocol between roles and the extension traits | draft |
 | R4 | The log: storage engine, partitioning, what durable means before a PUBACK, data model | to be written |
 | R5 | Sessions and handoff: takeover, drain, rolling upgrade, wills | to be written |
 | R6 | Routing at scale: interest aggregation, wildcard index, memory, fan-out | to be written |
@@ -32,5 +32,5 @@ Normative specifications go in `spec/`.
 
 | Specification | Status |
 | --- | --- |
-| `spec/mqtt-over-quic.md`: MQTT 5 over QUIC, compatible with EMQX and NanoMQ | to be written |
+| [`spec/mqtt-over-quic.md`](spec/mqtt-over-quic.md): MQTT 5 over QUIC, compatible with EMQX and NanoMQ | draft |
 | `spec/wire.md`: the protocol between roles | to be written |
