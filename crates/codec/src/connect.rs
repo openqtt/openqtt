@@ -436,12 +436,11 @@ impl Properties for WillProperties {
 /// How a server answers a CONNECT that is not MQTT 5.0, reported by decoding as
 /// [`Error::UnsupportedProtocol`], before it closes the connection.
 ///
-/// ADR 0001 refuses every such CONNECT with CONNACK reason code 0x84 and leaves the exact
-/// bytes an older client receives to report R1. **Until R1 settles them, the session sends
-/// [`ProtocolRefusal::ConnAckV5`] whatever the Protocol Name and Version, then closes.** The
-/// other two exist so that R1 can change the answer without changing the codec: a 3.1.1
-/// client cannot parse the MQTT 5.0 CONNACK, whose Remaining Length is 3 where it expects 2,
-/// and MQTT 3.1, which names the protocol `"MQIsdp"`, may be closed on without a CONNACK.
+/// Report R1 (decision D1) settles the bytes, and [`ProtocolRefusal::for_connect`] picks them
+/// from the Protocol Name and Version: a 3.1 or 3.1.1 client gets the CONNACK it can parse,
+/// return code 0x01, because the MQTT 5.0 CONNACK's Remaining Length of 3 and reason code
+/// 0x84 mean nothing to it; any other version of MQTT gets the MQTT 5.0 CONNACK with 0x84; and
+/// a CONNECT naming another protocol is closed on without a CONNACK, as [MQTT-3.1.2-1] allows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProtocolRefusal {
     /// The MQTT 5.0 CONNACK with reason code 0x84 (Unsupported Protocol Version) and no
@@ -457,6 +456,22 @@ pub enum ProtocolRefusal {
 }
 
 impl ProtocolRefusal {
+    /// The refusal for a CONNECT that decoded to [`Error::UnsupportedProtocol`], by report R1
+    /// decision D1.
+    ///
+    /// | Protocol Name | Protocol Version | Refusal |
+    /// | --- | --- | --- |
+    /// | `MQTT` or `MQIsdp` | 3 or 4, with or without the bridge bit (0x83, 0x84) | [`ConnAckV311`](Self::ConnAckV311) |
+    /// | `MQTT` or `MQIsdp` | any other | [`ConnAckV5`](Self::ConnAckV5) |
+    /// | anything else | any | [`Close`](Self::Close) |
+    pub fn for_connect(name: &str, level: u8) -> Self {
+        match (name, level) {
+            ("MQTT" | "MQIsdp", 3 | 4 | 0x83 | 0x84) => Self::ConnAckV311,
+            ("MQTT" | "MQIsdp", _) => Self::ConnAckV5,
+            _ => Self::Close,
+        }
+    }
+
     /// The bytes to send before closing the connection: none for [`ProtocolRefusal::Close`].
     pub const fn bytes(self) -> &'static [u8] {
         match self {
@@ -1114,5 +1129,29 @@ mod tests {
             error.disconnect_reason_code(),
             DisconnectReasonCode::ProtocolError
         );
+    }
+
+    #[test]
+    fn mqtt_3_1_2_2_the_refusal_is_one_an_older_client_can_read() {
+        use ProtocolRefusal::{Close, ConnAckV5, ConnAckV311};
+        for name in ["MQTT", "MQIsdp"] {
+            for level in [3, 4, 0x83, 0x84] {
+                assert_eq!(
+                    ProtocolRefusal::for_connect(name, level),
+                    ConnAckV311,
+                    "{name} {level}"
+                );
+            }
+            for level in [0, 1, 2, 6, 0x85, 0xff] {
+                assert_eq!(
+                    ProtocolRefusal::for_connect(name, level),
+                    ConnAckV5,
+                    "{name} {level}"
+                );
+            }
+        }
+        for name in ["", "mqtt", "MQTTS", "HTTP/1.1", "\u{fffd}"] {
+            assert_eq!(ProtocolRefusal::for_connect(name, 4), Close, "{name}");
+        }
     }
 }

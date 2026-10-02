@@ -218,8 +218,8 @@ pub enum Error {
     /// Version is not 5 ([MQTT-3.1.2-1], [MQTT-3.1.2-2]). The name tells protocols apart
     /// (section 3.1.2.1), so one that is not even UTF-8 still names another protocol rather
     /// than making a malformed MQTT packet. The rest of the packet is not read, since another
-    /// protocol lays it out differently. CONNACK 0x84, Unsupported Protocol Version; see
-    /// [`ProtocolRefusal`](crate::ProtocolRefusal) for the bytes to answer with.
+    /// protocol lays it out differently. [`ProtocolRefusal::for_connect`](crate::ProtocolRefusal::for_connect)
+    /// gives the bytes to answer with.
     #[error("protocol {name:?} version {level} is not MQTT 5.0")]
     UnsupportedProtocol {
         /// The Protocol Name, such as `"MQIsdp"` for MQTT 3.1, with any bytes that are not

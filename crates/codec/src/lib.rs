@@ -1,7 +1,7 @@
 //! MQTT 5.0 packets, properties and reason codes, encoded and decoded over `bytes`.
 //!
 //! The codec speaks MQTT 5.0 and nothing older (docs/adr/0001-mqtt5-only.md): a CONNECT at any
-//! other protocol level is refused with CONNACK reason code 0x84, unsupported protocol version.
+//! other protocol level is refused, in bytes the client can read (report R1, decision D1).
 //!
 //! It is pure data in and data out. It performs no IO and knows no runtime, transport, TLS
 //! stack or serialization framework, so it must not depend on tokio, quinn, rustls or serde.
@@ -70,10 +70,10 @@
 //!
 //! A CONNECT naming another protocol or version decodes to
 //! [`Error::UnsupportedProtocol`], carrying the Protocol Name and Version.
-//! [`ProtocolRefusal`] holds the answers: the MQTT 5.0 CONNACK with 0x84, the MQTT 3.1.1
-//! CONNACK with return code 0x01, or closing without a CONNACK. Until report R1 settles the
-//! bytes an older client receives, the session sends the MQTT 5.0 CONNACK, as ADR 0001
-//! decides.
+//! [`ProtocolRefusal::for_connect`] picks the answer from the name and version: the MQTT 3.1.1
+//! CONNACK with return code 0x01 for MQTT 3.1 and 3.1.1, the MQTT 5.0 CONNACK with 0x84 for
+//! any other version of MQTT, and closing without a CONNACK for another protocol (report R1,
+//! decision D1).
 //!
 //! # Where the specification is ambiguous
 //!

@@ -21,15 +21,18 @@ other refusal: subscriptions, quotas, takeover, server shutdown.
 
 2.0 implements MQTT 5.0 (OASIS Standard, 7 March 2019) and nothing older.
 
-A CONNECT whose protocol level is not 5 is refused with CONNACK reason code
-0x84, unsupported protocol version, and the connection is closed, as
-`[MQTT-3.1.2-2]` allows.
+A CONNECT that is not MQTT 5.0 is refused and the connection is closed, in
+bytes the client can read (report R1, decision D1):
 
-Report R1 settles the exact bytes. A 3.1.1 client cannot parse an MQTT 5
-CONNACK, so the refusal may go out in the 3.1.1 shape instead (return code
-0x01), and a 3.1 CONNECT names the protocol `MQIsdp`, which `[MQTT-3.1.2-1]`
-lets the server close without any CONNACK. Either way the connection is
-refused.
+| Protocol Name | Protocol Version | Reply, then close |
+| --- | --- | --- |
+| `MQTT` or `MQIsdp` | 3 or 4 (also 0x83, 0x84) | CONNACK return code 0x01, `20 02 00 01` |
+| `MQTT` or `MQIsdp` | any other but 5 | CONNACK reason code 0x84, `20 03 00 84 00` |
+| anything else | any | none |
+
+A 3.1 or 3.1.1 client cannot parse the MQTT 5 CONNACK, so it gets the refusal
+its own version defines. `[MQTT-3.1.2-1]` and `[MQTT-3.1.2-2]` allow all
+three.
 
 ## Consequences
 
