@@ -8,5 +8,12 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+bytes.workspace = true
+openqtt-codec.workspace = true
+openqtt-ext.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["time"] }
+
 [lints]
 workspace = true
