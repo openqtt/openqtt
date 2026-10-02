@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! s2 memory  --n 100000,1000000 --workload a|b|c --out FILE
-//! s2 match   --n 1000000 --samples 1000000 --out FILE
+//! s2 match   --n 1000000 --samples 1000000 [--workloads a,b,c] --out FILE
 //! s2 fanout  --out FILE
 //! s2 coarsen --n 1000000 --edges 100 --samples 200000 --out FILE
 //! s2 churn   --n 1000000 --edges 100 --minutes 5 --out FILE
@@ -389,10 +389,14 @@ fn matching(a: &Args) -> Value {
     let n = a.num("n", 1_000_000);
     let samples = a.num("samples", 1_000_000);
     let groups = a.num("groups", 1000);
+    let only = a.text("workloads", "a,b,c");
     let shape = Shape::new(n);
     let mut f = String::new();
     let mut rows = Vec::new();
     for w in ["a", "b", "c"] {
+        if !only.split(',').any(|x| x == w) {
+            continue;
+        }
         let mut trie = Trie::new();
         for i in 0..n {
             let d = filter(&shape, w, i, &mut f);
@@ -977,8 +981,10 @@ fn churn_events(
         transitions: 0,
     };
     let mut home = vec![NOWHERE; nu];
-    let mut held = vec![NOWHERE; nu];
-    let mut token = vec![0u32; nu];
+    // Withdrawals waiting out their grace period, per device: (edge, token). A device that
+    // moves on and leaves again before the first one ends owes one on each edge.
+    let mut pending: HashMap<u32, Vec<(u32, u32)>> = HashMap::new();
+    let mut next_token = 0u32;
     let mut epoch = vec![0u64; nu];
     let mut snapshot = Vec::new();
     for i in 0..n {
@@ -1043,9 +1049,9 @@ fn churn_events(
                 if grace_ms == 0 {
                     covers.remove(i, e, &mut out);
                 } else {
-                    held[iu] = e;
-                    token[iu] += 1;
-                    queue.push(Reverse((at + grace_ms, Event::Expire(e, token[iu]), i)));
+                    next_token += 1;
+                    pending.entry(i).or_default().push((e, next_token));
+                    queue.push(Reverse((at + grace_ms, Event::Expire(e, next_token), i)));
                 }
             }
             Event::Reconnect => {
@@ -1055,17 +1061,32 @@ fn churn_events(
                 epoch[iu] += 1;
                 let e = placer.home(shape.device(u64::from(i)), epoch[iu]);
                 home[iu] = e;
-                if held[iu] == e {
-                    // Back on the edge that still holds its entry: nothing changes.
-                    held[iu] = NOWHERE;
-                    token[iu] += 1;
+                let owed = pending
+                    .get(&i)
+                    .and_then(|v| v.iter().position(|&(pe, _)| pe == e));
+                if let Some(p) = owed {
+                    // Back on an edge that still holds its entry: nothing changes there.
+                    if let Some(v) = pending.get_mut(&i) {
+                        v.swap_remove(p);
+                        if v.is_empty() {
+                            pending.remove(&i);
+                        }
+                    }
                 } else {
                     covers.add(i, e, &mut out);
                 }
             }
             Event::Expire(e, t) => {
-                if token[iu] == t && held[iu] == e {
-                    held[iu] = NOWHERE;
+                let due = pending
+                    .get(&i)
+                    .and_then(|v| v.iter().position(|&x| x == (e, t)));
+                if let Some(p) = due {
+                    if let Some(v) = pending.get_mut(&i) {
+                        v.swap_remove(p);
+                        if v.is_empty() {
+                            pending.remove(&i);
+                        }
+                    }
                     covers.remove(i, e, &mut out);
                 }
             }
@@ -1076,6 +1097,17 @@ fn churn_events(
             per_minute[minute].append(&mut out);
         }
     }
+    // Every event has run, so each device is connected and owes no withdrawal: the cells must
+    // hold exactly one membership per device, or the model lost or leaked one.
+    let memberships: usize = covers
+        .cells
+        .iter()
+        .map(|c| c.values().map(|x| x.members.len()).sum::<usize>())
+        .sum();
+    let connected = home.iter().filter(|&&e| e != NOWHERE).count();
+    let owed: usize = pending.values().map(Vec::len).sum();
+    let end_state = json!({ "memberships": memberships, "connected": connected,
+        "withdrawals_owed": owed, "consistent": memberships == connected && owed == 0 });
     let mut rows = Vec::new();
     for (m, records) in per_minute.iter().enumerate() {
         let mut bytes = 0usize;
@@ -1125,6 +1157,7 @@ fn churn_events(
         "mean_apply_seconds_per_minute": mean("apply_seconds"),
         "mean_apply_ns_per_record": mean("apply_ns_per_record"),
         "coarse_transitions": covers.transitions,
+        "end_state": end_state,
         "minutes": rows,
     })
 }
@@ -1153,15 +1186,18 @@ fn churn_recompute(
         pos[iu] = u32::try_from(members[e as usize].len()).unwrap_or(0);
         members[e as usize].push(u32::try_from(i).unwrap_or(0));
     }
-    let h0 = alloc::now();
-    let mut view = Trie::new();
     let mut states: Vec<HashSet<String>> = Vec::new();
     for (e, m) in members.iter().enumerate() {
         let c = cover(&edge_tree(shape, m, e, placer.edges, &mut f), rule, None);
-        for flt in &c.filters {
+        states.push(c.filters.into_iter().collect());
+    }
+    // The view alone: the per-edge sets above are the model's bookkeeping, not route view.
+    let h0 = alloc::now();
+    let mut view = Trie::new();
+    for (e, st) in states.iter().enumerate() {
+        for flt in st {
             view.insert(flt, u32::try_from(e).unwrap_or(0));
         }
-        states.push(c.filters.into_iter().collect());
     }
     let view_bytes = alloc::now().bytes - h0.bytes;
     let view_entries = view.entries();

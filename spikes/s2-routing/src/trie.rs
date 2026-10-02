@@ -585,18 +585,25 @@ impl Trie {
     pub fn collect(&self, topic: &str, pick: u64, s: &mut Scratch, out: &mut Vec<u32>) -> usize {
         out.clear();
         let mut hits = 0;
+        // Each destination set and each group's pick is sorted and unique on its own; several
+        // of them together are neither, whether they come from one filter or from many.
+        let mut sets = 0;
         self.matches(topic, s, |t| {
             hits += 1;
-            t.dests.extend_into(out);
+            if !t.dests.is_empty() {
+                sets += 1;
+                t.dests.extend_into(out);
+            }
             if let Some(groups) = &t.groups {
                 for g in groups.iter() {
                     if let Some(m) = g.members.pick(pick) {
+                        sets += 1;
                         out.push(m);
                     }
                 }
             }
         });
-        if hits > 1 {
+        if sets > 1 {
             out.sort_unstable();
             out.dedup();
         }
@@ -805,6 +812,17 @@ mod tests {
         assert_eq!(got.len(), 2);
         assert_eq!(got[0], 1);
         assert!((100..110).contains(&got[1]));
+    }
+
+    #[test]
+    fn destinations_from_one_filter_are_sorted_and_unique() {
+        let mut t = Trie::new();
+        t.insert("$share/g/a", 7);
+        t.insert("$share/h/a", 7);
+        assert_eq!(hits(&t, "a"), vec![7]);
+        t.insert("a", 9);
+        t.insert("$share/k/a", 3);
+        assert_eq!(hits(&t, "a"), vec![3, 7, 9]);
     }
 
     #[test]
