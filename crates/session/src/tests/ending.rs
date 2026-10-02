@@ -325,6 +325,14 @@ fn mqtt_3_1_2_22_a_silent_client_is_disconnected_at_one_and_a_half_times_its_kee
 }
 
 #[test]
+fn mqtt_3_12_4_1_every_pingreq_gets_a_pingresp() {
+    let mut harness = Harness::connected();
+    for _ in 0..3 {
+        assert_eq!(harness.send(Packet::PingReq), [Packet::PingResp]);
+    }
+}
+
+#[test]
 fn every_packet_resets_keep_alive() {
     let mut harness = Harness::connected();
     harness.advance(seconds(40));

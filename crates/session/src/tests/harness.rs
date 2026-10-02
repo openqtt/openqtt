@@ -165,6 +165,34 @@ impl Harness {
         self.input(Input::packet(packet))
     }
 
+    /// The client sends `packet` on `stream`, and the test reads what it received with the
+    /// streams it came on.
+    pub(crate) fn send_on(
+        &mut self,
+        stream: StreamId,
+        packet: impl Into<Packet>,
+    ) -> Vec<(StreamId, Packet)> {
+        self.feed(Input::Packet {
+            stream,
+            packet: packet.into(),
+            early: false,
+        });
+        while let Some(answer) = self.answers.pop_front() {
+            self.feed(answer);
+        }
+        self.received.drain(..).collect()
+    }
+
+    /// Feeds one input, then the answers it led to, and returns the packets the client
+    /// received meanwhile with the streams they came on.
+    pub(crate) fn input_on(&mut self, input: Input) -> Vec<(StreamId, Packet)> {
+        self.feed(input);
+        while let Some(answer) = self.answers.pop_front() {
+            self.feed(answer);
+        }
+        self.received.drain(..).collect()
+    }
+
     /// The packets the client received and the test has not read.
     pub(crate) fn take(&mut self) -> Vec<Packet> {
         self.received.drain(..).map(|(_, packet)| packet).collect()

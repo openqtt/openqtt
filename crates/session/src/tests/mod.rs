@@ -3,8 +3,10 @@
 
 mod harness;
 
+mod auth;
 mod connect;
 mod deliver;
 mod ending;
 mod publish;
+mod streams;
 mod subscribe;

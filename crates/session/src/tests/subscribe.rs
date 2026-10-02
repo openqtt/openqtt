@@ -48,11 +48,16 @@ fn with_retained() -> Harness {
 
 #[test]
 fn mqtt_3_8_4_1_every_subscribe_gets_a_suback_with_its_identifier() {
-    // covers: MQTT-3.8.4-2
+    // covers: MQTT-3.8.4-2, MQTT-2.2.1-6
     let mut harness = Harness::connected();
     for packet_id in [1, 300, u16::MAX] {
         let packets = harness.send(subscribe1(packet_id, "t", QoS::AtMostOnce));
         assert_eq!(suback(&packets).packet_id.get(), packet_id);
+        // UNSUBACK too, whether or not anything was deleted.
+        for _ in 0..2 {
+            let packets = harness.send(unsubscribe(packet_id, &["t"]));
+            assert_eq!(unsuback(&packets).packet_id.get(), packet_id);
+        }
     }
 }
 
