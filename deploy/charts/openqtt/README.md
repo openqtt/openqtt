@@ -1,5 +1,10 @@
 # OpenQTT Helm chart
 
+> **This chart deploys OpenQTT 1.x**, the EMQX 5.8.9 line maintained on branch
+> `release/1.x`. It stays here only until chart 2.0.0 replaces it for the Rust
+> broker on `main`. It does not deploy a 2.0 image, and nothing below applies to
+> 2.0.
+
 Deploys OpenQTT, the Apache 2.0 continuation of EMQX 5.8, as a StatefulSet
 that clusters itself through DNS discovery on its headless Service.
 
