@@ -52,6 +52,7 @@ mod error;
 mod input;
 mod machine;
 mod phrase;
+mod redact;
 mod state;
 
 #[cfg(test)]

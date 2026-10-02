@@ -15,6 +15,7 @@ use super::{
     Reauth, Received, Session, Stage, Subscription, WillDraft, draw,
 };
 use crate::convert::{core_format, core_qos};
+use crate::redact::Credential;
 use crate::state::StoredOutbound;
 use crate::{
     Action, AuthResult, AuthStep, Authentication, Authorization, Claim, ClaimResult, CloseCode,
@@ -142,7 +143,7 @@ impl Session {
             receive_maximum: properties.receive_maximum.map_or(u16::MAX, NonZeroU16::get),
             topic_alias_maximum: properties.topic_alias_maximum.unwrap_or(0),
             method: properties.authentication_method.clone(),
-            auth_data: None,
+            auth_data: Credential::default(),
             will,
             will_message: None,
         };
@@ -191,7 +192,7 @@ impl Session {
 
     /// The identifier for a client that sent an empty one (report R1, O9).
     fn draw_client_id(&mut self) -> ClientId {
-        let id = ClientId::assigned(draw(self.random, self.draws));
+        let id = ClientId::assigned(draw(self.random.0, self.draws));
         self.draws += 1;
         id
     }
@@ -236,7 +237,7 @@ impl Session {
             }
             AuthResult::Success { data } => {
                 if let Some(client) = self.client.as_mut() {
-                    client.auth_data = data;
+                    client.auth_data = Credential(data);
                 }
                 self.admit(now, fx);
             }
@@ -568,7 +569,7 @@ impl Session {
             authentication_data: client
                 .method
                 .as_ref()
-                .and_then(|_| client.auth_data.clone()),
+                .and_then(|_| client.auth_data.0.clone()),
             // Report R1, O18: never Response Information ([MQTT-3.1.2-28]).
             ..ConnAckProperties::default()
         };

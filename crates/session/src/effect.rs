@@ -7,6 +7,7 @@ use bytes::Bytes;
 use openqtt_codec::{Packet, ProtocolRefusal};
 use openqtt_core::{ClientId, Message, QoS, SubOpts, Timestamp, TopicFilter, TopicName};
 
+use crate::redact::Redacted;
 use crate::{SessionState, StreamId};
 
 /// One thing for the caller to do. [`Session::handle`](crate::Session::handle) returns them in
@@ -168,10 +169,10 @@ impl fmt::Debug for Authentication {
             .field("step", &self.step)
             .field("client_id", &self.client_id)
             .field("username", &self.username)
-            .field("password", &self.password.as_ref().map(|_| "<redacted>"))
+            .field("password", &Redacted(&self.password))
             .field("certificate_cn", &self.certificate_cn)
             .field("method", &self.method)
-            .field("data", &self.data.as_ref().map(|_| "<redacted>"))
+            .field("data", &Redacted(&self.data))
             .finish()
     }
 }

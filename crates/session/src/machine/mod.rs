@@ -20,6 +20,7 @@ use openqtt_core::{ClientId, Message, SubOpts, SubscriptionId, Timestamp, TopicF
 use openqtt_topic::Mount;
 
 use crate::phrase::phrase;
+use crate::redact::{Credential, Secret};
 use crate::state::{StoredDelivery, StoredOutbound, StoredSubscription};
 use crate::{
     CloseCode, Config, Counter, Delivery, Effect, Effects, Input, Peer, Release, SessionEnd,
@@ -61,8 +62,8 @@ pub struct Session {
     certificate_cn: Option<String>,
     /// Whether the TLS handshake has completed.
     handshake_complete: bool,
-    /// The bits identifiers are drawn from.
-    random: u128,
+    /// The bits identifiers are drawn from, which never show in `{:?}`.
+    random: Secret<u128>,
     /// How many identifiers have been drawn.
     draws: u32,
     phase: Phase,
@@ -274,8 +275,8 @@ struct Client {
     topic_alias_maximum: u16,
     /// The Authentication Method of enhanced authentication.
     method: Option<String>,
-    /// Authentication Data for the CONNACK.
-    auth_data: Option<bytes::Bytes>,
+    /// Authentication Data for the CONNACK, which never shows in `{:?}`.
+    auth_data: Credential,
     /// The Will Message as checked, before mounting.
     will: Option<WillDraft>,
     /// The Will Message as stored with the claim.
@@ -494,7 +495,7 @@ impl Session {
             config,
             certificate_cn: peer.certificate_cn,
             handshake_complete: peer.handshake_complete,
-            random: peer.random,
+            random: Secret(peer.random),
             draws: 0,
             phase: Phase::Start,
             connect_read: false,

@@ -5,6 +5,7 @@ use bytes::Bytes;
 use openqtt_codec::{ConnectReasonCode, Packet, PacketType};
 use openqtt_core::{Message, TopicFilter};
 
+use crate::redact::Redacted;
 use crate::{PublishToken, RequestId, SessionState, Timer};
 
 /// A stream of the QUIC connection (docs/spec/mqtt-over-quic.md, section 2).
@@ -141,11 +142,11 @@ impl std::fmt::Debug for AuthResult {
         match self {
             Self::Success { data } => f
                 .debug_struct("Success")
-                .field("data", &data.as_ref().map(|_| "<redacted>"))
+                .field("data", &Redacted(data))
                 .finish(),
             Self::Continue { data } => f
                 .debug_struct("Continue")
-                .field("data", &data.as_ref().map(|_| "<redacted>"))
+                .field("data", &Redacted(data))
                 .finish(),
             Self::Failure(code) => f.debug_tuple("Failure").field(code).finish(),
         }

@@ -64,7 +64,44 @@ fn the_authenticator_sees_the_connects_credentials() {
     // A credential never reaches a log through `{:?}`.
     let shown = format!("{:?}", Effect::Authenticate(request.clone()));
     assert!(!shown.contains("hunter2"), "{shown}");
-    assert!(shown.contains("<redacted>"), "{shown}");
+    assert!(shown.contains("<redacted, 7 bytes>"), "{shown}");
+}
+
+#[test]
+fn credentials_never_appear_in_debug_output() {
+    // The bits identifiers are drawn from predict them, and are as secret.
+    let random: u128 = 0x1234_5678_9abc_def0;
+    let mut harness = Harness::with_peer(crate::Config::default(), crate::Peer::new(random));
+    harness.auto.authenticate = false;
+    harness.send(connect_with("client-1", |connect| {
+        connect.password = Some(Bytes::from_static(b"hunter2-password"));
+        connect.properties.authentication_method = Some(METHOD.into());
+        connect.properties.authentication_data = data("hunter2-client");
+    }));
+    let request = harness.authentications.remove(0);
+    harness.auto.claim = false;
+    harness.input(Input::Authenticated(AuthResult::Success {
+        data: data("hunter2-server"),
+    }));
+    let texts = [
+        format!("{:?}", harness.session),
+        format!("{request:?}"),
+        format!(
+            "{:?}",
+            AuthResult::Continue {
+                data: data("hunter2-server")
+            }
+        ),
+    ];
+    for text in &texts {
+        assert!(!text.contains("hunter2"), "{text}");
+        assert!(!text.contains(&random.to_string()), "{text}");
+        assert!(!text.contains(&format!("{random:x}")), "{text}");
+    }
+    // Present, with their length, as the codec shows them.
+    assert!(texts[0].contains("<redacted, 14 bytes>"), "{}", texts[0]);
+    assert!(texts[1].contains("<redacted, 16 bytes>"), "{}", texts[1]);
+    assert!(texts[2].contains("<redacted, 14 bytes>"), "{}", texts[2]);
 }
 
 #[test]
