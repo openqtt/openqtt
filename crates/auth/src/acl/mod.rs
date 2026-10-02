@@ -6,6 +6,7 @@
 //! evaluating a name, a pattern or an address again, and [`AclAuthorizer`] is the
 //! `openqtt-ext` authorizer over a replaceable [`Acl`].
 
+pub mod contract;
 mod engine;
 mod parse;
 pub mod render;
@@ -17,6 +18,7 @@ mod naive;
 #[cfg(test)]
 mod properties;
 
+pub(crate) use engine::check_topic;
 pub use engine::{Acl, AclAuthorizer, ClientRules};
 pub use parse::VERSION;
 pub use spec::{

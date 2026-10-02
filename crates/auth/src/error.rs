@@ -59,6 +59,20 @@ pub enum Error {
         /// Each problem, naming its rule.
         problems: Vec<String>,
     },
+    /// A 1.x file that cannot be read as the format it should be in.
+    #[error("line {line}: {reason}")]
+    Convert {
+        /// The line, counted from 1.
+        line: usize,
+        /// What is wrong there.
+        reason: String,
+    },
+    /// The rules or users of a 1.x file that cannot be converted: every problem, one per line.
+    #[error("{}", problems.join("\n"))]
+    Conversion {
+        /// Each problem, naming its line.
+        problems: Vec<String>,
+    },
     /// Not one thread of a pool could start.
     #[error("no thread could start: {reason}")]
     Threads {

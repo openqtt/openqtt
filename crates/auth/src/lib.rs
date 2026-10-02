@@ -8,6 +8,8 @@
 //! - The ACL engine ([`acl`]): ordered rules in a TOML file, the first match deciding and no
 //!   match denying, compiled once and bound to each client so that a decision per message
 //!   costs bit tests and topic comparisons (R2 rules 9 to 16, `docs/spec/acl.md`).
+//! - The converters of OpenQTT 1.x files ([`convert`]): an `acl.conf` into that format, and a
+//!   user file into a `hashed` bootstrap file (R2 rule 30).
 //! - A [`ReservedPrefix`] that only service credentials carry, which every authenticator here
 //!   keeps from anyone else (R2 rule 15).
 //!
@@ -20,6 +22,7 @@
 pub mod acl;
 mod anonymous;
 mod certificate;
+pub mod convert;
 mod error;
 pub mod password;
 mod pool;

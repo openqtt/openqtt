@@ -463,6 +463,12 @@ fn first_line(text: &str) -> &str {
         .trim()
 }
 
+/// Whether `topic` is one a rule can hold, and why not: for the converter, which leaves out a
+/// topic that matches nothing.
+pub(crate) fn check_topic(topic: &TopicSpec) -> Result<(), String> {
+    compile_topic(topic, &mut 0).map(|_| ())
+}
+
 fn compile_topic(topic: &TopicSpec, templates: &mut usize) -> Result<Topic, String> {
     match topic {
         TopicSpec::All => Ok(Topic::All),

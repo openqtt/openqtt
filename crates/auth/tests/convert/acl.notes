@@ -1,0 +1,10 @@
+line 26: warning: the pattern "legacy-\\d+" uses a character class that is ASCII in 1.x and Unicode in 2.0, so a name with other scripts may match differently
+line 26: warning: a topic that matches nothing, in 1.x either, is left out: the topic "a/#/b" is not a topic filter
+line 28: warning: the address "192.0.2.77/24" has bits set past its prefix; 1.x read it as 192.0.2.0/24, and so does the converted rule
+line 7: conflict: R2 rule 13: a device may publish to the command topics commands/#
+line 7: conflict: R2 rule 16: a device may publish with RETAIN set
+line 7: conflict: R2 rule 15: the pattern "(?s:.*?)(?:^svc:)(?s:.*)" matches reserved service names; a rule for services names them exactly or by the reserved prefix
+line 12: conflict: R2 rule 14: not converted: an allow rule on the client's address alone, which grants nothing by itself in 2.0: name the clients as well
+line 21: conflict: R2 rule 15: the rule grants by client identifier, which a client chooses for itself
+line 23: conflict: R2 rule 16: a device may publish with RETAIN set
+line 26: conflict: R2 rule 15: the rule grants by client identifier, which a client chooses for itself
