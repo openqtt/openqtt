@@ -49,6 +49,10 @@ thiserror = "2.0"
 # Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
 # payload is a slice of the buffer it arrived in rather than a copy.
 bytes = "1.12"
+# Property tests, a dev-dependency only: random valid packets must round-trip and random bytes
+# must never panic the decoder. Without the fork and timeout features, which run each case in
+# a child process and bring tempfile and rusty-fork for it.
+proptest = { version = "1.11", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
