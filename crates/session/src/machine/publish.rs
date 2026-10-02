@@ -278,17 +278,18 @@ impl Session {
             return fx.push(Effect::Count(counter));
         };
         let kind = if publish.qos == QoS::ExactlyOnce {
-            // A refused repeat of a reserved identifier frees it for the client, so whatever
-            // the log still holds under it must go, or it would swallow the next message sent
-            // with it.
+            // The refusal ends the exchange and frees the identifier for the client
+            // ([MQTT-4.3.3-9]), so whatever the log holds under it goes too: nothing from this
+            // PUBLISH, but a receipt a cut-off commit of a reserved identifier may have left,
+            // which would swallow the next message sent with it.
             let reserved = self
                 .inbound
                 .get(&packet_id.get())
                 .is_some_and(|inbound| inbound.state == InboundState::Reserved);
             if reserved {
                 self.inbound.remove(&packet_id.get());
-                fx.push(Effect::ReleaseReceipt(packet_id));
             }
+            fx.push(Effect::ReleaseReceipt(packet_id));
             ReplyKind::PubRec
         } else {
             ReplyKind::PubAck
@@ -324,8 +325,12 @@ impl Session {
                 && inbound.state == InboundState::Committing(token)
             {
                 if code.is_error() {
-                    // [MQTT-4.3.3-9]: the identifier is free again.
+                    // [MQTT-4.3.3-9]: the identifier is free again. The failed commit wrote
+                    // nothing, but a repeat of a reserved identifier may find the log still
+                    // holding the receipt of the first, cut-off commit: it goes with the
+                    // exchange.
                     self.inbound.remove(&id);
+                    fx.push(Effect::ReleaseReceipt(commit.packet_id));
                 } else {
                     inbound.state = InboundState::AwaitingRelease;
                 }

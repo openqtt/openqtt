@@ -43,12 +43,24 @@
 //!   runs out; the router and the edge match topics. A [`Delivery`] names the subscriptions
 //!   the edge matched, and the machine checks each again (report R2, rule 6).
 //! - The log decides whether a QoS 2 PUBLISH is new. Every QoS 2 [`Publication`] carries its
-//!   receipt, the client's Packet Identifier, which the partition commits with the message as
-//!   `rel/{cid}/{pid}` (report R3) until [`Effect::ReleaseReceipt`]; a publication whose
-//!   receipt it already holds is answered as accepted and not routed again. That is what keeps
-//!   a message delivered once when a connection ends with its commit still out: the
-//!   identifier is handed over reserved ([`SessionState::awaiting_commit`]), and the client's
-//!   repeat on the next connection is published again under the same receipt.
+//!   receipt, the client's Packet Identifier, and the partition keeps it as `rel/{cid}/{pid}`
+//!   (report R3):
+//!   - from the commit that writes it with the message until [`Effect::ReleaseReceipt`], or
+//!     the end of the session;
+//!   - a publication whose receipt it already holds is answered as accepted and not routed
+//!     again, and the receipt stays;
+//!   - a publication answered with a failure, [`PublishOutcome::QuotaExceeded`] or
+//!     [`PublishOutcome::Failed`], wrote nothing, its receipt included. A failure is definite:
+//!     an outcome the edge cannot know is not one; it waits, or ends the connection.
+//!
+//!   The machine releases the receipt whenever the exchange for the identifier ends: on
+//!   PUBREL, and with every PUBREC that refuses the message, before it is published or after
+//!   its commit failed. For a fresh publication nothing is then held and the release changes
+//!   nothing. For a repeat of a reserved identifier it clears the receipt the first, cut-off
+//!   commit may have left: a connection that ends with a commit still out hands its
+//!   identifier over reserved ([`SessionState::awaiting_commit`]), the client's repeat on the
+//!   next connection is published again under the same receipt, and the message is delivered
+//!   once whichever way the first commit went.
 
 #![forbid(unsafe_code)]
 

@@ -60,8 +60,10 @@ pub enum Effect {
     /// or PUBREC waits for it (report R3, The hot path; report R1, D26).
     Publish(Publication),
     /// Delete the receipt of a QoS 2 message from the client, `rel/{cid}/{pid}` at the log
-    /// (report R3): its PUBREL came, or the identifier was refused, so the identifier is free for
-    /// a new message ([MQTT-4.3.3-12]).
+    /// (report R3), if one is held: the exchange for the identifier ended, by its PUBREL or by
+    /// a PUBREC refusing the message, and the identifier is free for a new message
+    /// ([MQTT-4.3.3-9], [MQTT-4.3.3-12]). It reaches the log before any later publication under
+    /// the same identifier, as the effects come.
     ReleaseReceipt(PacketId),
     /// Add or replace a subscription's interest.
     Subscribe(Interest),
@@ -290,7 +292,8 @@ pub struct Publication {
     /// commits the receipt with the message, as `rel/{cid}/{pid}` (report R3), and holds it
     /// until [`Effect::ReleaseReceipt`]. A publication whose receipt the log already holds is
     /// answered as accepted and not routed again, so a message the client publishes again
-    /// after its connection ended mid-commit is delivered once ([MQTT-4.3.3-10]).
+    /// after its connection ended mid-commit is delivered once ([MQTT-4.3.3-10]). One the log
+    /// answers with a failure wrote nothing, its receipt included.
     pub receipt: Option<PacketId>,
 }
 

@@ -34,7 +34,8 @@ pub struct SessionState {
     /// commit had not answered when the connection ended. Each stays reserved: a PUBLISH that
     /// repeats one is published again with its receipt, and the log, which commits the receipt
     /// `rel/{cid}/{pid}` with the message (report R3), routes it only if the first never
-    /// committed. The message is delivered once whichever way the first commit went.
+    /// committed. The message is delivered once whichever way the first commit went. If the
+    /// repeat is refused, or its own commit fails, the receipt is released with the exchange.
     pub awaiting_commit: Vec<PacketId>,
     /// Messages for the client not yet sent, oldest first.
     pub queue: Vec<StoredDelivery>,

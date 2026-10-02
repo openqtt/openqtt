@@ -194,9 +194,12 @@ pub enum PublishOutcome {
         matched: bool,
     },
     /// The message was refused for a limit, as the retained store refuses one (report R1,
-    /// D15): 0x97.
+    /// D15): 0x97. Nothing was committed, a receipt included.
     QuotaExceeded,
-    /// The message could not be made durable: 0x80.
+    /// The message could not be made durable: 0x80. Nothing was committed, a receipt included.
+    /// This is definite: an outcome the edge cannot know, after a timeout say, is not
+    /// `Failed`. The edge waits for it, or ends the connection, which leaves a QoS 2
+    /// identifier reserved for the next ([`SessionState::awaiting_commit`]).
     Failed,
 }
 

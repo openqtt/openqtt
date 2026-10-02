@@ -292,6 +292,51 @@ fn a_refused_repeat_of_a_reserved_identifier_releases_its_receipt() {
 }
 
 #[test]
+fn a_failed_commit_of_a_reserved_identifier_releases_its_receipt() {
+    for outcome in [PublishOutcome::Failed, PublishOutcome::QuotaExceeded] {
+        let mut harness = resumed(cut_off_mid_commit());
+        let mut repeat = publish2("t", 5, "once");
+        repeat.dup = true;
+        harness.send(repeat);
+        let token = harness.commits[0].token.unwrap();
+        // The log could not take the repeat, and may still hold the first commit's receipt.
+        let packets = harness.input(Input::Committed { token, outcome });
+        let (packet_id, code) = pubrec_code(one(packets));
+        assert_eq!(packet_id, 5);
+        assert!(code.is_error(), "{outcome:?}");
+        // The client takes 5 as free again, so the receipt goes with the exchange.
+        assert_eq!(harness.released_receipts(), [5], "{outcome:?}");
+    }
+}
+
+#[test]
+fn every_qos_2_exchange_that_ends_releases_its_receipt() {
+    let mut harness = Harness::connected();
+    harness.auto.loopback = false;
+    // Refused before it is published: a Topic Name with a wildcard.
+    pubrec_code(one(harness.send(publish2("a/+", 1, "x"))));
+    // Refused by its commit.
+    harness.send(publish2("t", 2, "x"));
+    let token = harness.commits[0].token.unwrap();
+    harness.input(Input::Committed {
+        token,
+        outcome: PublishOutcome::Failed,
+    });
+    // Released by PUBREL.
+    harness.send(publish2("t", 3, "x"));
+    let token = harness.commits[1].token.unwrap();
+    harness.input(Input::Committed {
+        token,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    harness.send(pubrel(3));
+    assert_eq!(harness.released_receipts(), [1, 2, 3]);
+    // A QoS 1 exchange has no receipt to release.
+    harness.send(publish1("a/+", 4, "x"));
+    assert_eq!(harness.released_receipts(), [1, 2, 3]);
+}
+
+#[test]
 fn a_pubrel_releases_the_receipt_and_only_qos_2_has_one() {
     let mut harness = Harness::connected();
     harness.auto.loopback = false;
