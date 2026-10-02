@@ -3,9 +3,10 @@
 //!
 //! Messages for offline sessions arrive on schedule; each is stored once (`msg/{seq}`) and
 //! queued for its session (`q/{cid}/{seq}`), durably. Each session reconnects after a random
-//! 5 to 60 seconds and drains: its queue is scanned and range-deleted. Once a second, message
-//! bodies below the oldest still-queued sequence number are range-deleted in every partition,
-//! as R3's "collected below the lowest session cursor" says.
+//! 5 to 60 seconds and drains: once every entry in its queue is durable, the queue is scanned
+//! and the scanned range deleted. Once a second, message bodies below the oldest still-queued
+//! sequence number are range-deleted in every partition, as R3's "collected below the lowest
+//! session cursor" says.
 
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap};
@@ -109,6 +110,9 @@ pub fn run(
     // reconnect thread.
     let shared = Arc::new(Mutex::new((ss, BTreeSet::<u64>::new())));
     let published = Arc::new(AtomicU64::new(0));
+    // The highest sequence number whose message is durable. The committer completes requests in
+    // the order they were submitted, and messages are submitted in sequence order.
+    let durable = Arc::new(AtomicU64::new(0));
     let u0 = usage();
 
     // Publisher: open loop, each message stamped with its own due time.
@@ -118,6 +122,7 @@ pub fn run(
         let writes = writes.clone();
         let outstanding = outstanding.clone();
         let published = published.clone();
+        let durable = durable.clone();
         std::thread::spawn(move || {
             let mut rng = Rng::new(42);
             let interval = Duration::from_secs_f64(1.0 / rate as f64);
@@ -127,32 +132,38 @@ pub fn run(
                 let now = Instant::now();
                 while next_msg <= now && next_msg < end {
                     let si = rng.below(sessions) as usize;
-                    let (p, qk) = {
-                        let mut g = shared.lock().expect("not poisoned");
-                        let (ss, live) = &mut *g;
-                        let s = &mut ss[si];
-                        s.queued.push(seq);
-                        live.insert(seq);
-                        (s.p, q_key(s.p, &s.cid, seq))
-                    };
-                    let ops = vec![
-                        Op::Put(Space::State, msg_key(p, seq), rng.bytes(body)),
-                        Op::Put(Space::State, qk, seq.to_le_bytes().repeat(2)),
-                    ];
-                    seq += 1;
-                    published.fetch_add(1, Ordering::Relaxed);
+                    let body = rng.bytes(body);
                     let sec = (next_msg - start).as_secs() as usize;
                     let due_at = next_msg;
-                    let w = writes.clone();
-                    let o = outstanding.clone();
+                    let (w, o, d) = (writes.clone(), outstanding.clone(), durable.clone());
+                    // A message becomes visible to a drain and goes to the committer under one
+                    // lock, so no drain can delete a queue entry before its insert is submitted.
+                    let mut g = shared.lock().expect("not poisoned");
+                    let (ss, live) = &mut *g;
+                    let s = &mut ss[si];
+                    s.queued.push(seq);
+                    live.insert(seq);
+                    let ops = vec![
+                        Op::Put(Space::State, msg_key(s.p, seq), body),
+                        Op::Put(
+                            Space::State,
+                            q_key(s.p, &s.cid, seq),
+                            seq.to_le_bytes().repeat(2),
+                        ),
+                    ];
                     o.fetch_add(1, Ordering::Relaxed);
+                    let this = seq;
                     sender.submit(Req {
                         ops,
                         done: Some(Box::new(move |at| {
                             w.record(sec, at - due_at);
+                            d.fetch_max(this, Ordering::Release);
                             o.fetch_sub(1, Ordering::Relaxed);
                         })),
                     });
+                    drop(g);
+                    seq += 1;
+                    published.fetch_add(1, Ordering::Relaxed);
                     next_msg += interval;
                 }
                 std::thread::sleep(Duration::from_micros(100));
@@ -175,7 +186,8 @@ pub fn run(
     let mut disk_series: Vec<Value> = Vec::new();
     let mut drained_entries: u64 = 0;
     let mut drains_n: u64 = 0;
-    let mut scan_short: u64 = 0;
+    let mut scan_mismatch: u64 = 0;
+    let waits = Seconds::new(n_secs);
     while Instant::now() < end {
         let now = Instant::now();
         while let Some(Reverse((at, si))) = due.peek().copied() {
@@ -196,6 +208,14 @@ pub fn run(
             let (p, cid, q) = taken;
             if let Some(&last) = q.last() {
                 let t0 = Instant::now();
+                let sec = (t0 - start).as_secs() as usize;
+                // Every entry taken was submitted before the take; wait until the last of them
+                // is durable, so the scan sees the whole queue.
+                while durable.load(Ordering::Acquire) < last {
+                    std::thread::sleep(Duration::from_micros(50));
+                }
+                waits.record(sec, t0.elapsed());
+                let t_scan = Instant::now();
                 let mut found = 0u64;
                 eng.scan(
                     Space::State,
@@ -204,17 +224,19 @@ pub fn run(
                     usize::MAX,
                     &mut |_, _| found += 1,
                 )?;
-                let sec = (t0 - start).as_secs() as usize;
-                scans.record(sec, t0.elapsed());
-                // Entries still in the committer are not visible yet; count, do not fail.
-                if found < q.len() as u64 {
-                    scan_short += 1;
+                scans.record(sec, t_scan.elapsed());
+                // Anything but the whole queue is an error in the engine or here, not noise.
+                if found != q.len() as u64 {
+                    scan_mismatch += 1;
                 }
-                drained_entries += q.len() as u64;
+                drained_entries += found;
                 drains_n += 1;
                 let d = drains.clone();
                 let o = outstanding.clone();
                 o.fetch_add(1, Ordering::Relaxed);
+                // The range is exactly what was scanned. Every insert in it was submitted before
+                // the take, so the delete follows them in the committer's order; anything
+                // published since has a higher sequence number and stays queued.
                 sender.submit(Req {
                     ops: vec![Op::DelRange(
                         Space::State,
@@ -268,7 +290,6 @@ pub fn run(
     }
     let _ = publisher.join();
     let published = published.load(Ordering::Relaxed);
-    let scan_mismatch = scan_short;
     let u1 = usage();
     while outstanding.load(Ordering::Relaxed) > 0 {
         std::thread::sleep(Duration::from_millis(5));
@@ -293,6 +314,7 @@ pub fn run(
             "scan_mismatch": scan_mismatch,
             "write_us": total.summary(), "drain_us": drains.total().summary(),
             "scan_us": scans.total().summary(), "gc_us": gcs.total().summary(),
+            "wait_us": waits.total().summary(),
             "stall_seconds": stalls,
             "series": { "write_p50": w_p50, "write_p99": w_p99, "write_max": w_max,
                         "drain_p99": drains.series(0.99), "scan_p99": scans.series(0.99) },

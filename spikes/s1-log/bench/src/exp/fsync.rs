@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use serde_json::json;
 
-use crate::util::{Lat, Rng, emit, fresh_dir};
+use crate::util::{Lat, Rng, emit, fresh_dir, round2};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub enum Primitive {
@@ -88,7 +88,7 @@ pub fn run(
                     let hs: Vec<_> = (0..t)
                         .map(|i| {
                             let path = dir.join(format!("f{i}"));
-                            std::thread::spawn(move || -> std::io::Result<(Lat, u64)> {
+                            std::thread::spawn(move || -> std::io::Result<(Lat, u64, f64)> {
                                 let f = OpenOptions::new()
                                     .create(true)
                                     .truncate(true)
@@ -107,6 +107,7 @@ pub fn run(
                                 let mut lat = Lat::default();
                                 let mut off = 0u64;
                                 let mut n = 0;
+                                let began = Instant::now();
                                 while Instant::now() < deadline {
                                     let t0 = Instant::now();
                                     f.write_all_at(&buf, off)?;
@@ -114,21 +115,28 @@ pub fn run(
                                     lat.record(t0.elapsed());
                                     off += size as u64;
                                     n += 1;
-                                    // Keep files small: rewind every 64 MiB.
-                                    if off > 64 << 20 {
+                                    if mode == Mode::Prealloc && off + size as u64 > 64 << 20 {
+                                        // Stay inside the region written and synced beforehand.
                                         off = 0;
+                                    } else if mode == Mode::Append && off >= 4 << 30 {
+                                        // Every write extends the file; stop at 4 GiB rather
+                                        // than wrap into overwrites.
+                                        break;
                                     }
                                 }
-                                Ok((lat, n))
+                                Ok((lat, n, began.elapsed().as_secs_f64()))
                             })
                         })
                         .collect();
                     let mut lat = Lat::default();
                     let mut n = 0;
+                    // The longest thread's time: an append run may stop early at its size cap.
+                    let mut ran = 0f64;
                     for h in hs {
-                        let (l, k) = h.join().expect("thread")?;
+                        let (l, k, e) = h.join().expect("thread")?;
                         lat.add(&l);
                         n += k;
+                        ran = ran.max(e);
                     }
                     emit(
                         out,
@@ -138,9 +146,9 @@ pub fn run(
                             "mode": format!("{mode:?}"),
                             "size": size,
                             "threads": t,
-                            "secs": secs,
+                            "secs": round2(ran),
                             "syncs": n,
-                            "per_s": (n as f64 / secs).round(),
+                            "per_s": (n as f64 / ran.max(1e-9)).round(),
                             "lat_us": lat.summary(),
                         }),
                     );

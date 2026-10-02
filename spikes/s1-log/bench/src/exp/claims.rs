@@ -16,6 +16,7 @@ use serde_json::json;
 
 use crate::commit::{Committer, Req, Shape};
 use crate::engine::{self, Engine, Kind, Op, Opts, Space};
+use crate::exp::Window;
 use crate::exp::write::merge;
 use crate::util::{
     Lat, Rng, TAG_OWN, TAG_SESS, client_id, dir_size, emit, fresh_dir, key, log_key, own_conn_gen,
@@ -61,14 +62,6 @@ fn claim_entry(cid: &[u8], node: u32, epoch: u64) -> Vec<u8> {
     v
 }
 
-struct Shared {
-    lat: Mutex<Lat>,
-    completed: AtomicU64,
-    outstanding: AtomicU64,
-    from: Instant,
-    until: Instant,
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     data: &Path,
@@ -105,7 +98,7 @@ pub fn run(
             let c = Committer::start(eng.clone(), Duration::ZERO, Shape::Combined, 16_384);
             let mut rec = storm(&eng, &c, n, rate, workers, warmup, measure);
             c.stop();
-            let backlog = rec["backlog_at_end"].as_u64().unwrap_or(0);
+            let backlog = rec["outstanding_at_end"].as_u64().unwrap_or(0);
             merge(
                 &mut rec,
                 json!({
@@ -138,13 +131,7 @@ fn storm(
     let start = Instant::now();
     let from = start + warmup;
     let until = from + measure;
-    let shared = Arc::new(Shared {
-        lat: Mutex::new(Lat::default()),
-        completed: AtomicU64::new(0),
-        outstanding: AtomicU64::new(0),
-        from,
-        until,
-    });
+    let window = Arc::new(Window::new(from, measure));
     let log_index = Arc::new(AtomicU64::new(0));
     let reads = Arc::new(Mutex::new(Lat::default()));
     let mut txs = Vec::new();
@@ -154,7 +141,7 @@ fn storm(
         txs.push(tx);
         let eng = eng.clone();
         let sender = c.sender();
-        let shared = shared.clone();
+        let window = window.clone();
         let log_index = log_index.clone();
         let reads = reads.clone();
         hs.push(std::thread::spawn(move || {
@@ -165,7 +152,7 @@ fn storm(
                 let own_key = key(p, TAG_OWN, &[&cid]);
                 let r0 = Instant::now();
                 let cur = eng.get(Space::State, &own_key).expect("read own");
-                if due >= shared.from {
+                if due >= window.from && due < window.until {
                     read_lat.record(r0.elapsed());
                 }
                 let generation = cur.as_deref().map(own_conn_gen).unwrap_or(0) + 1;
@@ -179,16 +166,10 @@ fn storm(
                     ),
                     Op::Put(Space::State, own_key, own_value(node, 2, generation)),
                 ];
-                let sh = shared.clone();
+                let w = window.clone();
                 sender.submit(Req {
                     ops,
-                    done: Some(Box::new(move |at| {
-                        if due >= sh.from && at <= sh.until {
-                            sh.lat.lock().expect("not poisoned").record(at - due);
-                            sh.completed.fetch_add(1, Ordering::Relaxed);
-                        }
-                        sh.outstanding.fetch_sub(1, Ordering::Relaxed);
-                    })),
+                    done: Some(Box::new(move |at| w.done(due, at, true))),
                 });
             }
             reads.lock().expect("not poisoned").add(&read_lat);
@@ -209,7 +190,7 @@ fn storm(
         while next <= now && next < until {
             let i = rng.below(n);
             let w = usize::from(partition(&client_id(i))) % workers;
-            shared.outstanding.fetch_add(1, Ordering::Relaxed);
+            window.offered(next);
             let _ = txs[w].send((next, i));
             next += interval;
         }
@@ -219,32 +200,24 @@ fn storm(
     let u1 = usage();
     let u0 = u0.unwrap_or(u1);
     let commit = c.stats.lock().expect("not poisoned").summary();
-    // Claims handed out but not yet durable when the window closed.
-    let backlog = shared.outstanding.load(Ordering::Relaxed);
+    window.close();
     drop(txs);
     for h in hs {
         let _ = h.join();
     }
-    let t_drain = Instant::now();
-    while shared.outstanding.load(Ordering::Relaxed) > 0
-        && t_drain.elapsed() < Duration::from_secs(120)
-    {
-        std::thread::sleep(Duration::from_millis(1));
-    }
+    // Every claim offered in the window counts, so wait for the slowest of them.
+    window.drain(Duration::from_secs(300));
     let secs = measure.as_secs_f64();
-    let completed = shared.completed.load(Ordering::Relaxed);
-    let lat = shared.lat.lock().expect("not poisoned").summary();
-    let reads = reads.lock().expect("not poisoned").summary();
-    json!({
-        "lat_us": lat,
-        "read_us": reads,
-        "completed": completed,
-        "per_s": round2(completed as f64 / secs),
-        "cpu_cores": round2((u1.cpu_s - u0.cpu_s) / secs),
-        "disk_written": u1.disk_written.saturating_sub(u0.disk_written),
-        "commit": commit,
-        "backlog_at_end": backlog,
-        "drain_s": round2(t_drain.elapsed().as_secs_f64()),
-        "engine_stats": eng.stats(),
-    })
+    let mut rec = window.json();
+    merge(
+        &mut rec,
+        json!({
+            "read_us": reads.lock().expect("not poisoned").summary(),
+            "cpu_cores": round2((u1.cpu_s - u0.cpu_s) / secs),
+            "disk_written": u1.disk_written.saturating_sub(u0.disk_written),
+            "commit": commit,
+            "engine_stats": eng.stats(),
+        }),
+    );
+    rec
 }

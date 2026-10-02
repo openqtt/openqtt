@@ -296,8 +296,16 @@ pub fn fresh_dir(base: &Path, name: &str) -> PathBuf {
 }
 
 /// Appends one run's record to the JSON lines file and echoes it.
+/// The revision of the measurement code, written into every record. Records without one are
+/// revision 1. Revision 2 counts window throughput by completion and keeps every window
+/// request's latency through the drain, gives primary-backup's backups the same storage and
+/// apply as Raft's followers, stops the fsync append mode wrapping, and makes a churn drain wait
+/// for its queue to be durable before scanning it.
+pub const REV: u64 = 2;
+
 pub fn emit(out: &Path, mut record: Value) {
     if let Value::Object(m) = &mut record {
+        m.insert("rev".into(), json!(REV));
         m.insert("load_avg".into(), json!(load_avg()));
         m.insert(
             "at".into(),

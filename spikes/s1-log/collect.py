@@ -75,6 +75,13 @@ def main():
             "modelled per-node flush; message CPU excludes serialisation, sockets and TLS.",
             "Latencies are microseconds. Open-loop latencies are measured from when each "
             "request was due, so queueing behind a stall is counted.",
+            "Each record carries rev, the revision of the measurement code (no field means 1). "
+            "Revision 2 counts a window's throughput by completion inside it and its latency "
+            "over every request offered inside it, through the drain; gives primary-backup's "
+            "backups the storage and apply a Raft follower does; stops the fsync step's append "
+            "mode wrapping into overwrites; and makes a churn drain wait for its queue to be "
+            "durable before it scans. Steps run again under revision 2 keep their revision 1 "
+            "records here; the report quotes revision 2 wherever both exist.",
         ],
         "runs": runs,
     }

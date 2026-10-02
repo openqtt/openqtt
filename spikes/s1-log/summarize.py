@@ -6,6 +6,10 @@
 
 Where a configuration ran more than once (the write and shared steps run three passes), the
 table shows the median of the passes and the spread of the p99 as min to max.
+
+Every record carries the revision of the measurement code that wrote it (no field means
+revision 1). A step that was run again under a later revision keeps its earlier records in the
+results file; the tables use only the latest revision of each step.
 """
 
 import json
@@ -126,36 +130,54 @@ def shared(rows):
               f"{ms(med([x['p50'] for x in L]))} | {ms(med([x['p99'] for x in L]))} | {ms(ew)} | {amp:.1f} |")
 
 
+def passes(rows, keys):
+    """Numbers each row by how many rows with the same keys came before it, from 1."""
+    seen = defaultdict(int)
+    out = []
+    for r in rows:
+        key = tuple(r[k_] for k_ in keys)
+        seen[key] += 1
+        out.append((seen[key], r))
+    return out
+
+
+def backlog(r):
+    # Revision 1 named it backlog_at_end.
+    return r.get("outstanding_at_end", r.get("backlog_at_end", 0))
+
+
 def claims(rows):
     print("\n### Claim storm on one node's engine\n")
-    print("| Engine | Workers | Offered/s | Done/s | p50 ms | p99 ms | p99.9 ms | Read p50 us | Batch | CPU cores |")
-    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-    for r in rows:
-        if r["exp"] == "claims-preload":
-            continue
+    print("| Engine | Workers | Pass | Offered/s | Done/s | p50 ms | p99 ms | p99.9 ms | Read p50 us | Batch | "
+          "CPU cores | Drain s |")
+    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    storms = passes([r for r in rows if r["exp"] == "claims"], ["engine", "workers", "rate"])
+    for n, r in sorted(storms, key=lambda x: (x[1]["engine"], -x[1]["workers"], x[1]["rate"], x[0])):
         L = r["lat_us"] or {}
         R = r["read_us"] or {}
-        print(f"| {r['engine']} | {r['workers']} | {k(r['rate'])} | {k(r['per_s'])} | {ms(L.get('p50'))} | "
+        print(f"| {r['engine']} | {r['workers']} | {n} | {k(r['rate'])} | {k(r['per_s'])} | {ms(L.get('p50'))} | "
               f"{ms(L.get('p99'))} | {ms(L.get('p999'))} | {R.get('p50', '-')} | "
-              f"{r['commit']['mean_batch']:.0f} | {r['cpu_cores']} |")
+              f"{r['commit']['mean_batch']:.0f} | {r['cpu_cores']} | {r.get('drain_s', '-')} |")
+    print()
     for r in rows:
         if r["exp"] == "claims-preload":
-            print(f"\npreload {r['engine']}: {r['sessions']} sessions in {r['secs']} s, "
-                  f"{mib(r['disk_allocated'])} MiB")
+            print(f"preload {r['engine']}: {r['sessions']} sessions in {r['secs']} s, "
+                  f"{mib(r['disk_allocated'])} MiB  ")
     # The highest offered rate an engine kept up with (99% done, nothing left queued beyond a
-    # second of work) and its p99 there.
-    print("\n| Engine | Workers | Highest rate kept up with | p99 ms there |")
-    print("| --- | --- | --- | --- |")
+    # second of work) and its p99 there, per pass.
+    print("\n| Engine | Workers | Pass | Highest rate kept up with | p99 ms there |")
+    print("| --- | --- | --- | --- | --- |")
     best = {}
-    for r in rows:
-        if r["exp"] != "claims" or not r["lat_us"]:
+    for n, r in storms:
+        if not r["lat_us"]:
             continue
-        ok = r["per_s"] >= 0.99 * r["rate"] and r["backlog_at_end"] <= r["rate"]
-        key = (r["engine"], r["workers"])
+        ok = (r["per_s"] >= 0.99 * r["rate"] and backlog(r) <= r["rate"]
+              and not r.get("unfinished"))
+        key = (r["engine"], r["workers"], n)
         if ok and r["rate"] > best.get(key, (0, None))[0]:
             best[key] = (r["rate"], r["lat_us"]["p99"])
-    for (eng, w), (rate, p99) in sorted(best.items()):
-        print(f"| {eng} | {w} | {k(rate)} | {ms(p99)} |")
+    for (eng, w, n), (rate, p99) in sorted(best.items(), key=lambda x: (x[0][0], -x[0][1], x[0][2])):
+        print(f"| {eng} | {w} | {n} | {k(rate)} | {ms(p99)} |")
 
 
 def footprint(rows):
@@ -196,18 +218,19 @@ def footprint(rows):
 
 def churn(rows):
     print("\n### Queue churn\n")
-    print("| Engine | Secs | Published | Write p50 ms | p99 ms | p99.9 ms | max ms | Worst second p99 ms | "
-          "Seconds with a write over 100 ms | Drain p99 ms | Scan p99 ms | GC p99 ms | Disk end MiB | "
-          "Disk max MiB | CPU |")
-    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-    for r in rows:
+    print("| Engine | Pass | Secs | Published | Write p50 ms | p99 ms | p99.9 ms | max ms | Worst second p99 ms | "
+          "Seconds with a write over 100 ms | Drain p99 ms | Scan p99 ms | Scans short | GC p99 ms | "
+          "Disk end MiB | Disk max MiB | CPU |")
+    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    for n, r in sorted(passes(rows, ["engine"]), key=lambda x: (x[1]["engine"], x[0])):
         w = r["write_us"]
         worst = max(r["series"]["write_p99"]) if r["series"]["write_p99"] else None
         dmax = max(d["allocated"] for d in r["disk"]) if r["disk"] else 0
         slow = sum(1 for x in r["series"]["write_max"] if x > 100_000)
-        print(f"| {r['engine']} | {r['secs']} | {r['published']:,} | {ms(w['p50'])} | {ms(w['p99'])} | "
+        print(f"| {r['engine']} | {n} | {r['secs']} | {r['published']:,} | {ms(w['p50'])} | {ms(w['p99'])} | "
               f"{ms(w['p999'])} | {ms(w['max'])} | {ms(worst)} | {slow} | "
               f"{ms((r['drain_us'] or {}).get('p99'))} | {ms((r['scan_us'] or {}).get('p99'))} | "
+              f"{r.get('scan_mismatch', '-')} | "
               f"{ms((r['gc_us'] or {}).get('p99'))} | {mib(r['final_disk']['allocated'])} | {mib(dmax)} | {r['cpu_cores']} |")
 
 
@@ -236,9 +259,9 @@ def scheme(r):
 
 def repl(rows):
     print("\n### Replication\n")
-    print("| Scheme | Groups | One-way ms | Flush ms | Load | Done/s | p50 ms | p99 ms | Errors | "
-          "Msgs/s | Items/flush | CPU cores (3 nodes) | Notes |")
-    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    print("| Scheme | Groups | One-way ms | Flush ms | Load | Done/s | p50 ms | p99 ms | p99.9 ms | Errors | "
+          "Unfinished | Msgs/s | Items/flush | CPU cores (3 nodes) | Hop late p99 us | Notes |")
+    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         R = r["result"]
         L = R["lat_us"] or {}
@@ -246,9 +269,30 @@ def repl(rows):
         ex = r.get("extra", {})
         if ex.get("misplaced_leaders"):
             note = f"{ex['misplaced_leaders']} leaders moved"
+        left = R.get("unfinished", R.get("left_outstanding", "-"))
         print(f"| {scheme(r)} | {r['groups']} | {r['delay_us'] / 1000:g} | {r['flush_us'] / 1000:g} | {r['load']} | "
-              f"{k(R['per_s'])} | {ms(L.get('p50'))} | {ms(L.get('p99'))} | {R['errors']} | "
-              f"{k(R['messages_per_s'])} | {R['disk_items_per_flush']} | {R.get('cpu_cores_protocol', R['cpu_cores_total'])} | {note} |")
+              f"{k(R['per_s'])} | {ms(L.get('p50'))} | {ms(L.get('p99'))} | {ms(L.get('p999'))} | {R['errors']} | "
+              f"{left} | {k(R['messages_per_s'])} | {R['disk_items_per_flush']} | "
+              f"{R.get('cpu_cores_protocol', R['cpu_cores_total'])} | "
+              f"{(r.get('delay_lateness_us') or {}).get('p99', '-')} | {note} |")
+
+
+def applied(rows):
+    print("\n### Entries applied on each node (primary-backup)\n")
+    print("| Scheme | Groups | Load | Committed | Applied, node 0 | node 1 | node 2 |")
+    print("| --- | --- | --- | --- | --- | --- | --- |")
+    for r in rows:
+        ex = r.get("extra", {})
+        if "applied_by_node" not in ex:
+            continue
+        a = ex["applied_by_node"]
+        print(f"| {scheme(r)} | {r['groups']} | {r['load']} | {ex['committed']:,} | "
+              + " | ".join(f"{x:,}" for x in a) + " |")
+
+
+def repl_check(rows):
+    repl(rows)
+    applied(rows)
 
 
 def idle(rows):
@@ -310,6 +354,7 @@ APPENDIX_STEPS = {
     "repl": "Replication grid",
     "repl-storm": "Replication, the storm",
     "repl-max": "Replication, one partition leader at its limit",
+    "repl-check": "Replication, primary-backup's apply checked",
     "idle": "Replication, idle",
     "window": "Group commit windows side by side (median of two passes)",
     "netcost": "Loopback TCP",
@@ -319,6 +364,9 @@ APPENDIX_STEPS = {
 APPENDIX_LEGEND = """## Appendix: every run
 
 Generated by `spikes/s1-log/summarize.py --appendix` from the results file.
+Steps run again after review (revision 2 of the measurement code: the fsync,
+group commit, window, shared, claim, churn and replication steps) show only
+their revision 2 records; the results file keeps the revision 1 records too.
 Latencies are in milliseconds unless a column says otherwise. `closed:N` keeps N
 requests outstanding; `open:R/s` sends R a second on schedule and measures from
 when each was due. Replication schemes: `raft` is openraft 0.9.25, `raft-batched`
@@ -364,12 +412,19 @@ def main():
     tables()
 
 
+def latest(rows):
+    """The records of the latest revision of the measurement code present in a step."""
+    rev = max((r.get("rev", 1) for r in rows), default=1)
+    return [r for r in rows if r.get("rev", 1) == rev]
+
+
 def tables():
-    runs = load()
+    runs = {step: latest(rows) for step, rows in load().items()}
     for step, fn in [("fsync", fsync), ("write", write), ("shared", shared), ("claims", claims),
                      ("footprint", footprint), ("footprint-reopen", footprint), ("churn", churn),
                      ("recovery", recovery), ("recovery-50", recovery),
                      ("repl", repl), ("repl-pipelined", repl), ("repl-storm", repl), ("repl-max", repl),
+                     ("repl-check", repl_check),
                      ("idle", idle), ("window", write), ("netcost", netcost),
                      ("build", build)]:
         if step in runs:

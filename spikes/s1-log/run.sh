@@ -62,9 +62,14 @@ shared)
     done
     ;;
 claims)
-    b claims --sessions 1000000 --workers 4
+    # Each engine runs its rates as one block of a few minutes, so the engines are not
+    # interleaved within a rate. Two passes with the engine order reversed, so drift in the
+    # machine's flush cost over the step does not pass for a difference between engines.
+    b claims --sessions 1000000 --workers 4 --engines fjall,redb,rocksdb
+    b claims --sessions 1000000 --workers 4 --engines rocksdb,redb,fjall
     # One apply thread: the most a single partition's state machine sustains.
-    b claims --sessions 1000000 --workers 1 --rates 5000,10000,25000,50000,100000
+    b claims --sessions 1000000 --workers 1 --rates 5000,10000,25000,50000,100000 --engines fjall,redb,rocksdb
+    b claims --sessions 1000000 --workers 1 --rates 5000,10000,25000,50000,100000 --engines rocksdb,redb,fjall
     ;;
 footprint)
     for n in 1000000 10000000; do
@@ -89,7 +94,9 @@ footprint-reopen)
     done
     ;;
 churn)
-    for e in fjall rocksdb redb; do
+    # Ten minutes an engine, one engine at a time. Two passes, the second in reverse order, so
+    # drift over the step does not pass for a difference between engines.
+    for e in fjall rocksdb redb redb rocksdb fjall; do
         b churn --engine "$e" --secs 600
     done
     ;;
@@ -144,6 +151,11 @@ repl-max)
     # The most one partition leader commits: one group, writes always outstanding.
     b repl --schemes raft,raft-batched,raft10-seq,raft10,pb --groups 1 --delays-us 1000 --flush-us 0,1000 \
         --loads c16,c256,c1024
+    ;;
+repl-check)
+    # One storm run that counts the entries every node applied, to check that primary-backup's
+    # backups apply what is committed, as Raft followers do.
+    b repl --schemes pb --groups 256 --delays-us 1000 --flush-us 1000 --loads o50000
     ;;
 idle)
     b idle --schemes raft,raft10,pb --groups 128,256 --timings 50:150:300,250:1000:2000 --secs 20

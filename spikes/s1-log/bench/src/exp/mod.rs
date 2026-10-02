@@ -49,29 +49,136 @@ impl Load {
 pub type MakeOps = Arc<dyn Fn(u64) -> Vec<Op> + Send + Sync>;
 
 pub struct Drive {
-    pub lat: Lat,
-    pub completed: u64,
+    /// The window's counts and latency, as `Window::json` writes them.
+    pub window: Value,
     pub measure_s: f64,
     pub cpu_s: f64,
     pub disk_written: u64,
     pub commit: Value,
-    /// Requests still queued when the measurement window closed.
-    pub backlog: u64,
-    /// Seconds after the window closed until every request had finished.
-    pub drain_s: f64,
 }
 
 impl Drive {
     pub fn json(&self) -> Value {
+        let mut v = self.window.clone();
+        if let Value::Object(m) = &mut v {
+            m.insert(
+                "cpu_cores".into(),
+                json!(round2(self.cpu_s / self.measure_s)),
+            );
+            m.insert("disk_written".into(), json!(self.disk_written));
+            m.insert("commit".into(), self.commit.clone());
+        }
+        v
+    }
+}
+
+/// What a measurement window saw, counted the same way by every experiment that offers load.
+///
+/// Throughput counts requests that completed inside the window, whenever they were offered, so
+/// work left over from the warmup counts against the capacity it used. Latency covers every
+/// request offered inside the window, through the drain after it, so the slowest requests of a
+/// saturated run are kept rather than cut off at the window's end.
+pub struct Window {
+    pub from: Instant,
+    pub until: Instant,
+    pub measure_s: f64,
+    lat: Mutex<Lat>,
+    completed: AtomicU64,
+    offered: AtomicU64,
+    failed: AtomicU64,
+    outstanding: AtomicU64,
+    outstanding_at_end: AtomicU64,
+    drain_s: Mutex<f64>,
+}
+
+impl Window {
+    pub fn new(from: Instant, measure: Duration) -> Self {
+        Window {
+            from,
+            until: from + measure,
+            measure_s: measure.as_secs_f64(),
+            lat: Mutex::new(Lat::default()),
+            completed: AtomicU64::new(0),
+            offered: AtomicU64::new(0),
+            failed: AtomicU64::new(0),
+            outstanding: AtomicU64::new(0),
+            outstanding_at_end: AtomicU64::new(0),
+            drain_s: Mutex::new(0.0),
+        }
+    }
+
+    /// A request due at `due` was handed to the system under test.
+    pub fn offered(&self, due: Instant) {
+        self.outstanding.fetch_add(1, Ordering::Relaxed);
+        if due >= self.from && due < self.until {
+            self.offered.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// A request due at `due` finished at `at`. `ok` is false for a request that failed, which
+    /// counts as neither throughput nor latency.
+    pub fn done(&self, due: Instant, at: Instant, ok: bool) {
+        let in_window = due >= self.from && due < self.until;
+        if ok {
+            if at >= self.from && at <= self.until {
+                self.completed.fetch_add(1, Ordering::Relaxed);
+            }
+            if in_window {
+                self.lat.lock().expect("not poisoned").record(at - due);
+            }
+        } else if in_window {
+            self.failed.fetch_add(1, Ordering::Relaxed);
+        }
+        self.outstanding.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    pub fn outstanding(&self) -> u64 {
+        self.outstanding.load(Ordering::Relaxed)
+    }
+
+    /// Call when the window closes: notes what is still in flight.
+    pub fn close(&self) {
+        self.outstanding_at_end
+            .store(self.outstanding(), Ordering::Relaxed);
+    }
+
+    /// Waits for every request to finish, at most `cap`, and records how long that took.
+    pub fn drain(&self, cap: Duration) {
+        let t = Instant::now();
+        while self.outstanding() > 0 && t.elapsed() < cap {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        *self.drain_s.lock().expect("not poisoned") = t.elapsed().as_secs_f64();
+    }
+
+    /// The same as `drain`, for async callers.
+    pub async fn drain_async(&self, cap: Duration) {
+        let t = Instant::now();
+        while self.outstanding() > 0 && t.elapsed() < cap {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        *self.drain_s.lock().expect("not poisoned") = t.elapsed().as_secs_f64();
+    }
+
+    pub fn completed(&self) -> u64 {
+        self.completed.load(Ordering::Relaxed)
+    }
+
+    pub fn json(&self) -> Value {
+        let lat = self.lat.lock().expect("not poisoned");
+        let offered = self.offered.load(Ordering::Relaxed);
+        let failed = self.failed.load(Ordering::Relaxed);
         json!({
-            "lat_us": self.lat.summary(),
-            "completed": self.completed,
-            "per_s": round2(self.completed as f64 / self.measure_s),
-            "cpu_cores": round2(self.cpu_s / self.measure_s),
-            "disk_written": self.disk_written,
-            "commit": self.commit,
-            "backlog_at_end": self.backlog,
-            "drain_s": round2(self.drain_s),
+            "lat_us": lat.summary(),
+            "completed": self.completed(),
+            "per_s": round2(self.completed() as f64 / self.measure_s),
+            "offered_in_window": offered,
+            "failed_in_window": failed,
+            // Offered in the window but never finished, not even during the drain; their
+            // latency is missing from lat_us.
+            "unfinished": offered.saturating_sub(lat.len()).saturating_sub(failed),
+            "outstanding_at_end": self.outstanding_at_end.load(Ordering::Relaxed),
+            "drain_s": round2(*self.drain_s.lock().expect("not poisoned")),
         })
     }
 }
@@ -80,11 +187,7 @@ struct Shared {
     sender: CommitSender,
     make: MakeOps,
     seq: AtomicU64,
-    from: Instant,
-    until: Instant,
-    lat: Mutex<Lat>,
-    completed: AtomicU64,
-    outstanding: AtomicU64,
+    window: Window,
 }
 
 impl Shared {
@@ -92,7 +195,7 @@ impl Shared {
         let i = self.seq.fetch_add(1, Ordering::Relaxed);
         let ops = (self.make)(i);
         let me = self.clone();
-        self.outstanding.fetch_add(1, Ordering::Relaxed);
+        self.window.offered(due);
         self.sender.submit(Req {
             ops,
             done: Some(Box::new(move |at| me.done(due, at, resubmit))),
@@ -100,14 +203,10 @@ impl Shared {
     }
 
     fn done(self: &Arc<Self>, due: Instant, at: Instant, resubmit: bool) {
-        if due >= self.from && at <= self.until {
-            self.lat.lock().expect("not poisoned").record(at - due);
-            self.completed.fetch_add(1, Ordering::Relaxed);
-        }
-        self.outstanding.fetch_sub(1, Ordering::Relaxed);
+        self.window.done(due, at, true);
         if resubmit {
             let now = Instant::now();
-            if now < self.until {
+            if now < self.window.until {
                 self.submit(now, true);
             }
         }
@@ -130,11 +229,7 @@ pub fn drive(
         sender: committer.sender(),
         make,
         seq: AtomicU64::new(0),
-        from,
-        until,
-        lat: Mutex::new(Lat::default()),
-        completed: AtomicU64::new(0),
-        outstanding: AtomicU64::new(0),
+        window: Window::new(from, measure),
     });
 
     match load {
@@ -169,43 +264,27 @@ pub fn drive(
                 std::thread::sleep(Duration::from_micros(100));
             }
             sleep_until(until);
-            return finish(committer, &shared, u0, until, measure);
+            return finish(committer, &shared, u0);
         }
     }
     let u0 = usage();
     committer.reset_stats();
     sleep_until(until);
-    finish(committer, &shared, u0, until, measure)
+    finish(committer, &shared, u0)
 }
 
-fn finish(
-    committer: &Committer,
-    shared: &Arc<Shared>,
-    u0: crate::util::Usage,
-    until: Instant,
-    measure: Duration,
-) -> Drive {
+fn finish(committer: &Committer, shared: &Arc<Shared>, u0: crate::util::Usage) -> Drive {
     let u1 = usage();
     let commit = committer.stats.lock().expect("not poisoned").summary();
-    let backlog = committer.queued.load(Ordering::Relaxed);
-    // Let whatever is in flight finish so the next run starts clean.
-    let wait_from = Instant::now();
-    while shared.outstanding.load(Ordering::Relaxed) > 0 {
-        if wait_from.elapsed() > Duration::from_secs(120) {
-            eprintln!("drive: requests still outstanding after 120 s");
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(1));
-    }
-    let lat = std::mem::take(&mut *shared.lat.lock().expect("not poisoned"));
+    shared.window.close();
+    // Everything offered in the window counts, so wait for it; the cap only guards a run that
+    // would never finish.
+    shared.window.drain(Duration::from_secs(300));
     Drive {
-        lat,
-        completed: shared.completed.load(Ordering::Relaxed),
-        measure_s: measure.as_secs_f64(),
+        window: shared.window.json(),
+        measure_s: shared.window.measure_s,
         cpu_s: u1.cpu_s - u0.cpu_s,
         disk_written: u1.disk_written.saturating_sub(u0.disk_written),
         commit,
-        backlog,
-        drain_s: (Instant::now().max(until) - until).as_secs_f64(),
     }
 }

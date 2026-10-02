@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use serde_json::{Value, json};
 
+use crate::exp::Window;
 use crate::util::{Lat, Rng, client_id, emit, own_value, round2, usage};
 use net::DelayLine;
 use raft::{Cmd, Timing};
@@ -116,7 +117,10 @@ impl AnyCluster {
         match self {
             AnyCluster::Raft(c) => json!({ "misplaced_leaders": c.misplaced_leaders() }),
             AnyCluster::Raft10(c) => json!({ "misplaced_leaders": c.misplaced_leaders().await }),
-            AnyCluster::Pb(c) => json!({ "refused": c.refused() }),
+            AnyCluster::Pb(c) => {
+                let (applied, committed) = c.applied();
+                json!({ "refused": c.refused(), "applied_by_node": applied, "committed": committed })
+            }
         }
     }
 
@@ -182,22 +186,30 @@ async fn offer(
     let start = Instant::now();
     let from = start + warmup;
     let until = from + measure;
-    let lat = Arc::new(Mutex::new(Lat::default()));
-    let completed = Arc::new(AtomicU64::new(0));
+    let window = Arc::new(Window::new(from, measure));
     let errors = Arc::new(AtomicU64::new(0));
-    let outstanding = Arc::new(AtomicU64::new(0));
     let first_error: Arc<Mutex<Option<String>>> = Arc::default();
+    // Records one finished write: errors count apart, and neither as throughput nor latency.
+    let finish = {
+        let (window, errors, first_error) = (window.clone(), errors.clone(), first_error.clone());
+        move |due: Instant, r: anyhow::Result<()>| {
+            let at = Instant::now();
+            if let Err(e) = &r {
+                errors.fetch_add(1, Ordering::Relaxed);
+                first_error
+                    .lock()
+                    .expect("not poisoned")
+                    .get_or_insert_with(|| {
+                        format!("{:.3}s after start: {e:#}", (at - start).as_secs_f64())
+                    });
+            }
+            window.done(due, at, r.is_ok());
+        }
+    };
     let handle = tokio::runtime::Handle::current();
     let generator = match load {
         Offered::Open(rate) => {
-            let (c, lat, completed, errors, outstanding) = (
-                c.clone(),
-                lat.clone(),
-                completed.clone(),
-                errors.clone(),
-                outstanding.clone(),
-            );
-            let first_error = first_error.clone();
+            let (c, window, finish) = (c.clone(), window.clone(), finish.clone());
             Some(std::thread::spawn(move || {
                 let mut rng = Rng::new(rate);
                 let interval = Duration::from_secs_f64(1.0 / rate as f64);
@@ -208,34 +220,11 @@ async fn offer(
                         let g = rng.below(u64::from(groups)) as u32;
                         let cmd = claim(&mut rng);
                         let due = next;
-                        let (c, lat, completed, errors, outstanding) = (
-                            c.clone(),
-                            lat.clone(),
-                            completed.clone(),
-                            errors.clone(),
-                            outstanding.clone(),
-                        );
-                        let first_error = first_error.clone();
-                        outstanding.fetch_add(1, Ordering::Relaxed);
+                        let (c, finish) = (c.clone(), finish.clone());
+                        window.offered(due);
                         handle.spawn(async move {
                             let r = c.write(g, cmd).await;
-                            let at = Instant::now();
-                            if let Err(e) = r {
-                                errors.fetch_add(1, Ordering::Relaxed);
-                                first_error
-                                    .lock()
-                                    .expect("not poisoned")
-                                    .get_or_insert_with(|| {
-                                        format!(
-                                            "{:.3}s after start: {e:#}",
-                                            (at - start).as_secs_f64()
-                                        )
-                                    });
-                            } else if due >= from && at <= until {
-                                lat.lock().expect("not poisoned").record(at - due);
-                                completed.fetch_add(1, Ordering::Relaxed);
-                            }
-                            outstanding.fetch_sub(1, Ordering::Relaxed);
+                            finish(due, r);
                         });
                         next += interval;
                     }
@@ -245,36 +234,16 @@ async fn offer(
         }
         Offered::Closed(n) => {
             for k in 0..n {
-                let (c, lat, completed, errors, outstanding) = (
-                    c.clone(),
-                    lat.clone(),
-                    completed.clone(),
-                    errors.clone(),
-                    outstanding.clone(),
-                );
-                let first_error = first_error.clone();
-                outstanding.fetch_add(1, Ordering::Relaxed);
+                let (c, window, finish) = (c.clone(), window.clone(), finish.clone());
                 tokio::spawn(async move {
                     let mut rng = Rng::new(k);
                     while Instant::now() < until {
                         let g = rng.below(u64::from(groups)) as u32;
                         let due = Instant::now();
+                        window.offered(due);
                         let r = c.write(g, claim(&mut rng)).await;
-                        let at = Instant::now();
-                        if let Err(e) = r {
-                            errors.fetch_add(1, Ordering::Relaxed);
-                            first_error
-                                .lock()
-                                .expect("not poisoned")
-                                .get_or_insert_with(|| {
-                                    format!("{:.3}s after start: {e:#}", (at - start).as_secs_f64())
-                                });
-                        } else if due >= from && at <= until {
-                            lat.lock().expect("not poisoned").record(at - due);
-                            completed.fetch_add(1, Ordering::Relaxed);
-                        }
+                        finish(due, r);
                     }
-                    outstanding.fetch_sub(1, Ordering::Relaxed);
                 });
             }
             None
@@ -303,21 +272,18 @@ async fn offer(
         flushes += d.flushes.load(Ordering::Relaxed) - f0;
         items += d.items.load(Ordering::Relaxed) - i0;
     }
+    window.close();
     if let Some(g) = generator {
         let _ = tokio::task::spawn_blocking(move || g.join()).await;
     }
-    let wait = Instant::now();
-    // An overloaded scheme can hold minutes of backlog; give it 20 s, then report what is left.
-    while outstanding.load(Ordering::Relaxed) > 0 && wait.elapsed() < Duration::from_secs(20) {
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    }
+    // Every write offered in the window counts, so wait for the slowest; an overloaded scheme
+    // that cannot finish in two minutes reports what is left as unfinished.
+    window.drain_async(Duration::from_secs(120)).await;
     let secs = measure.as_secs_f64();
-    let n = completed.load(Ordering::Relaxed);
-    let summary = lat.lock().expect("not poisoned").summary();
-    json!({
-        "lat_us": summary,
-        "completed": n,
-        "per_s": round2(n as f64 / secs),
+    let mut rec = window.json();
+    crate::exp::write::merge(
+        &mut rec,
+        json!({
         "errors": errors.load(Ordering::Relaxed),
         "first_error": *first_error.lock().expect("not poisoned"),
         "cpu_cores_total": round2((u1.cpu_s - u0.cpu_s) / secs),
@@ -326,10 +292,10 @@ async fn offer(
         "messages_per_s": round2((m1 - m0) as f64 / secs),
         "disk_flushes_per_s": round2(flushes as f64 / secs),
         "disk_items_per_flush": if flushes > 0 { round2(items as f64 / flushes as f64) } else { 0.0 },
-        "drain_s": round2(wait.elapsed().as_secs_f64()),
-        "left_outstanding": outstanding.load(Ordering::Relaxed),
         "rss_bytes": u1.rss,
-    })
+        }),
+    );
+    rec
 }
 
 pub struct LatencyArgs {
