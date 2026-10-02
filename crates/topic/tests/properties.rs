@@ -6,7 +6,8 @@
 //! - the index finds exactly the destinations the naive matcher does, each once;
 //! - random inserts and removes never lose or duplicate a destination, compaction changes
 //!   nothing, and removing everything leaves an empty index;
-//! - mounting keeps matching, and stripping undoes it;
+//! - mounting keeps matching, stripping undoes it, and a mounted filter's text parses back to
+//!   the same filter;
 //! - a shape cover matches every name its filters match, and is the filters themselves when
 //!   nothing is over the threshold.
 //!
@@ -285,6 +286,32 @@ proptest! {
             prop_assert!(name.starts_with_dollar());
             prop_assert!(filter.pattern().starts_with(['+', '#']));
         }
+    }
+
+    #[test]
+    fn a_mounted_filter_means_what_its_text_says(
+        parts in vec(
+            select(&["ingest/", "$share/", "$share", "$", "g/", "share/", "${username}",
+                "${clientid}"][..]),
+            1..5,
+        ),
+        username in select(&["acme", "share/g", "/g", "x/y"][..]),
+        client_id in select(&["c", "e/g", "share"][..]),
+        filter in filter(),
+    ) {
+        // Whatever mounts resolve, a mounted filter's text parses back to the same filter, so
+        // the text can stand for it in a route view or a cover.
+        let template = format!("{}/", parts.concat());
+        let Ok(mountpoint) = Mountpoint::parse(&template) else {
+            return Ok(());
+        };
+        let Ok(mount) = mountpoint.resolve(Some(username), client_id) else {
+            return Ok(());
+        };
+        let mounted = mount.mount_filter(&filter).expect("short enough");
+        let reparsed = TopicFilter::new(mounted.as_str()).expect("a mounted filter is valid");
+        prop_assert_eq!(reparsed.share_name(), filter.share_name());
+        prop_assert_eq!(reparsed.pattern(), mounted.pattern());
     }
 }
 

@@ -53,6 +53,12 @@ pub enum Error {
     /// behind it whole.
     #[error("a mountpoint must end with `/`")]
     UnterminatedMountpoint,
+    /// A mountpoint, as configured or once its placeholders have values, begins with
+    /// `$share/`. An ordinary filter behind it would read as a shared subscription: behind
+    /// `$share/g/`, the filter `t` becomes the text `$share/g/t`, which names the shared
+    /// subscription to `t` in the group `g`.
+    #[error("a mountpoint must not begin with `$share/`, which marks a shared subscription")]
+    SharedMountpoint,
     /// A mountpoint names a placeholder other than `${username}` and `${clientid}`.
     #[error("a mountpoint may use ${{username}} and ${{clientid}}, not ${{{name}}}")]
     UnknownPlaceholder {

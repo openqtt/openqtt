@@ -61,7 +61,9 @@ impl fmt::Display for Placeholder {
 /// It ends with `/`, so that a client's topics keep their levels whole behind it: without it,
 /// `#` behind `ingest/u` would be `ingest/u#`, not a filter at all, and a client `dev1` could
 /// publish `0/x` into the namespace of `dev10`. Its own text holds no wildcard character and no
-/// U+0000, and its placeholders are `${username}` and `${clientid}`.
+/// U+0000, and its placeholders are `${username}` and `${clientid}`. It does not begin with
+/// `$share/`, configured or resolved: behind `$share/g/`, the ordinary filter `t` would be the
+/// text `$share/g/t`, which is the shared subscription to `t` in the group `g`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mountpoint {
     template: Box<str>,
@@ -80,6 +82,7 @@ impl Mountpoint {
     /// # Errors
     ///
     /// [`Error::UnterminatedMountpoint`] unless it ends with `/`, an empty one included;
+    /// [`Error::SharedMountpoint`] when it begins with `$share/`;
     /// [`Error::UnknownPlaceholder`] and [`Error::UnclosedPlaceholder`] for a placeholder it
     /// cannot read; [`Error::WildcardInName`], [`Error::NullCharacter`] or [`Error::TooLong`]
     /// for text that cannot begin a topic.
@@ -117,6 +120,9 @@ impl Mountpoint {
         if !template.ends_with('/') {
             return Err(Error::UnterminatedMountpoint);
         }
+        if template.starts_with(SHARE_PREFIX) {
+            return Err(Error::SharedMountpoint);
+        }
         Ok(Self {
             template: template.into(),
             parts,
@@ -143,6 +149,7 @@ impl Mountpoint {
     ///
     /// # Errors
     ///
+    /// [`Error::SharedMountpoint`] when the values make the mount begin with `$share/`,
     /// [`Error::MissingPlaceholderValue`] when the mountpoint uses `${username}` and the client
     /// sent no User Name, [`Error::InvalidPlaceholderValue`] for a value it cannot use, and
     /// [`Error::TooLong`] when no topic would fit behind the result.
@@ -168,6 +175,10 @@ impl Mountpoint {
                 }
             }
         }
+        // Text and values that are each fine can still spell `$share/` together.
+        if prefix.starts_with(SHARE_PREFIX) {
+            return Err(Error::SharedMountpoint);
+        }
         // A mounted topic is at least one byte longer than the mount.
         if prefix.len() >= MAX_TOPIC_LEN {
             return Err(Error::TooLong {
@@ -185,8 +196,9 @@ impl fmt::Display for Mountpoint {
 }
 
 /// A mountpoint resolved for one connection: the literal prefix of its namespace, such as
-/// `ingest/acme/production/pump-3/`. It ends with `/` and holds no wildcard character and no
-/// U+0000, which is what keeps every mounted name and filter valid. A clone shares the text.
+/// `ingest/acme/production/pump-3/`. It ends with `/`, holds no wildcard character and no
+/// U+0000, and does not begin with `$share/`, which is what keeps every mounted name and filter
+/// valid and a mounted filter's text meaning what the filter does. A clone shares the text.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Mount(Arc<str>);
 
@@ -460,6 +472,54 @@ mod tests {
             Err(Error::WildcardInName { wildcard: '#' })
         );
         assert_eq!(Mountpoint::parse("t\0/"), Err(Error::NullCharacter));
+    }
+
+    #[test]
+    fn a_mountpoint_cannot_begin_like_a_shared_subscription() {
+        // Behind `$share/g/`, the ordinary filter `t` would be the text `$share/g/t`, which is
+        // the shared subscription to `t` in group `g`: the same text with another meaning.
+        for template in [
+            "$share/g/",
+            "$share/",
+            "$share/${username}/",
+            "$share/a/${clientid}/",
+        ] {
+            assert_eq!(
+                Mountpoint::parse(template),
+                Err(Error::SharedMountpoint),
+                "{template}"
+            );
+        }
+        // Text that only starts the same way is fine.
+        for template in ["$shared/", "$share-x/", "a/$share/", "$SHARE/g/"] {
+            Mountpoint::parse(template).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_placeholder_cannot_make_the_mount_begin_like_a_shared_subscription() {
+        let cases = [
+            ("$${username}/", Some("share/g"), "c"),
+            ("$share${username}/", Some("/g"), "c"),
+            ("$shar${clientid}/", None, "e/g"),
+        ];
+        for (template, username, client_id) in cases {
+            let mountpoint = Mountpoint::parse(template).unwrap();
+            assert_eq!(
+                mountpoint.resolve(username, client_id),
+                Err(Error::SharedMountpoint),
+                "{template}"
+            );
+        }
+        // The same templates with other values resolve.
+        let mount = Mountpoint::parse("$${username}/")
+            .unwrap()
+            .resolve(Some("x"), "c")
+            .unwrap();
+        assert_eq!(mount.as_str(), "$x/");
+        let filter = mount.mount_filter(&filter("t")).unwrap();
+        assert!(!filter.is_shared());
+        assert_eq!(TopicFilter::new(filter.as_str()).unwrap(), filter);
     }
 
     #[test]
