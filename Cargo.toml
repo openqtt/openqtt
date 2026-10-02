@@ -3,6 +3,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# Measured spikes are workspaces of their own with their own pinned dependencies, so nothing
+# they pull in reaches Cargo.lock, cargo-deny or `make check`.
+exclude = ["spikes"]
 
 [workspace.package]
 version = "2.0.0-alpha.0"

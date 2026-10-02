@@ -1,0 +1,24 @@
+[package]
+name = "s1-bench"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Spike S1: storage engines and replication schemes for the OpenQTT log role"
+
+# Every version is pinned exactly: a spike's numbers are only comparable if the code under
+# test does not move between runs.
+[dependencies]
+fjall = "=3.1.10" # candidate: LSM tree, pure Rust
+redb = "=4.3.0" # candidate: copy-on-write B-tree, pure Rust
+# candidate: RocksDB through rust-rocksdb (C++). lz4 only, the same block compression fjall
+# uses by default; bindgen-runtime loads libclang at build time.
+rocksdb = { version = "=0.25.0", default-features = false, features = ["lz4", "bindgen-runtime"] }
+openraft = { version = "=0.9.25", default-features = false, features = ["storage-v2"] } # replication candidate: one Raft group per partition
+tokio = { version = "=1.53.1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+hdrhistogram = { version = "=7.6.0", default-features = false } # latency percentiles
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+clap = { version = "=4.6.7", features = ["derive"] }
+anyhow = "=1.0.104"
+libc = "=0.2.189" # raw fsync variants and process resource usage

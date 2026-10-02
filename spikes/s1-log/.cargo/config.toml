@@ -1,0 +1,6 @@
+# rust-rocksdb's build script never defines HAVE_FULLFSYNC, so on macOS RocksDB's "sync" is a
+# plain fsync(), which leaves data in the drive's volatile cache. fjall and redb sync through
+# Rust's std, which issues F_FULLFSYNC on Apple platforms. Defining it here makes all three pay
+# for the same durability; on Linux all three use fdatasync and nothing changes.
+[env]
+CXXFLAGS_aarch64_apple_darwin = "-DHAVE_FULLFSYNC"

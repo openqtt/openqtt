@@ -1,0 +1,21 @@
+# Spike S1 (report R4): which storage engine and which replication scheme the log role is
+# built on. A workspace of its own, excluded from the OpenQTT workspace, so its dependencies
+# are pinned here and never reach the broker's Cargo.lock or `make check`. Spike code is
+# measured, reported and then discarded or harvested; it is not part of the broker.
+[workspace]
+resolver = "3"
+members = ["bench", "probe"]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[profile.release]
+debug = "line-tables-only"
+
+# The build-friction probe is measured stripped, as the image would ship it.
+[profile.probe]
+inherits = "release"
+debug = false
+strip = true
