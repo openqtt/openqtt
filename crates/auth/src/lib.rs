@@ -2,6 +2,8 @@
 //!
 //! - [`PasswordAuthenticator`] over a [`PasswordList`] of PBKDF2 hashes, loaded from a bootstrap
 //!   file in the `plain` or `hashed` format (report R2, rule 5).
+//! - [`CertificateIdentity`]: the client named by its certificate's CN, which must carry the
+//!   clientAuth extended key usage and may have to come from a pinned CA (R2 rules 2 to 4).
 //! - [`Anonymous`], for a listener that does not authenticate.
 //! - A [`ReservedPrefix`] that only service credentials carry, which every authenticator here
 //!   keeps from anyone else (R2 rule 15).
@@ -13,12 +15,14 @@
 //! 7 March 2019.
 
 mod anonymous;
+mod certificate;
 mod error;
 pub mod password;
 mod pool;
 mod prefix;
 
 pub use anonymous::Anonymous;
+pub use certificate::{CertificateIdentity, IssuerPin, MAX_COMMON_NAME, certificates_from_pem};
 pub use error::Error;
 pub use password::{BootstrapFormat, PasswordAuthenticator, PasswordHash, PasswordList};
 pub use prefix::ReservedPrefix;

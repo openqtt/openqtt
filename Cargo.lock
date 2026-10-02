@@ -584,7 +584,9 @@ dependencies = [
  "base64",
  "openqtt-core",
  "openqtt-ext",
+ "rcgen",
  "thiserror",
+ "x509-parser",
 ]
 
 [[package]]

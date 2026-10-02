@@ -30,6 +30,18 @@ pub enum Error {
         /// What is wrong with it.
         reason: &'static str,
     },
+    /// A client certificate refused, or a CA file that cannot be read.
+    #[error("{reason}")]
+    Certificate {
+        /// Which check failed.
+        reason: &'static str,
+    },
+    /// An issuer pin that cannot be read.
+    #[error("not an issuer pin: {reason}")]
+    IssuerPin {
+        /// What is wrong with it.
+        reason: &'static str,
+    },
     /// Not one thread of a pool could start.
     #[error("no thread could start: {reason}")]
     Threads {

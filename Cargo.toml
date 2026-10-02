@@ -96,6 +96,10 @@ aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sy
 # The salt and hash of a PHC string, in base64 without padding. The version and features rcgen's
 # pem already brings, so not the default simd-unsafe.
 base64 = { version = "0.23.1", default-features = false, features = ["alloc"] }
+# Client certificates for identity: the subject CN, the extended key usage and the key
+# identifiers (R2 rules 2 to 4). verify-aws checks a signature with aws-lc-rs, to find the CA
+# that really issued a leaf; its other feature, verify, would bring ring.
+x509-parser = { version = "0.18.1", default-features = false, features = ["verify-aws"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
