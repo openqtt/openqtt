@@ -7,6 +7,7 @@
 //! one packet.
 
 use std::future::Future;
+use std::ops::Range;
 use std::pin::{Pin, pin};
 use std::slice;
 use std::sync::Arc;
@@ -114,7 +115,7 @@ struct Stream {
     stopped: Option<BoxFuture<Result<Option<VarInt>, StoppedError>>>,
     stop: Stop,
     /// Bytes read and not yet a whole packet.
-    read: BytesMut,
+    read: Reassembly,
     /// Encoded packets not yet handed to quinn.
     queued: BytesMut,
     /// The bytes being handed to quinn.
@@ -145,7 +146,7 @@ impl Stream {
             recv: Some(recv),
             send: Some(send),
             stop: Stop::None,
-            read: BytesMut::new(),
+            read: Reassembly::default(),
             queued: BytesMut::new(),
             writing: None,
             finish: false,
@@ -276,7 +277,7 @@ impl Stream {
     fn poll_read(&mut self, decoder: Decoder, cx: &mut Context<'_>) -> Read {
         loop {
             if !self.read.is_empty() {
-                match take_packet(&mut self.read, decoder) {
+                match self.read.take_packet(decoder) {
                     Ok(Some(packet)) => return Read::Event(self.check(packet)),
                     Ok(None) => {}
                     Err(error) => {
@@ -296,7 +297,7 @@ impl Stream {
             };
             match polled {
                 Poll::Pending => return Read::Pending,
-                Poll::Ready(Ok(Some(chunk))) => self.read.extend_from_slice(&chunk.bytes),
+                Poll::Ready(Ok(Some(chunk))) => self.read.extend(&chunk.bytes),
                 Poll::Ready(Ok(None)) => {
                     self.recv = None;
                     return Read::Event(if self.read.is_empty() {
@@ -313,7 +314,7 @@ impl Stream {
                 }
                 Poll::Ready(Err(ReadError::Reset(code))) => {
                     self.recv = None;
-                    self.read = BytesMut::new();
+                    self.read.clear();
                     return Read::Event(Ok(Event::StreamEnded {
                         stream: self.tag,
                         end: StreamEnd::Reset(code.into_inner()),
@@ -365,40 +366,79 @@ impl Stream {
     }
 }
 
-/// Takes the next whole packet off the front of `read`, the bytes a stream delivered.
+/// What a stream delivered that is not yet a whole packet, and the extent of the allocation it
+/// lives in.
 ///
-/// The codec decodes without copying, so a packet's payload shares the buffer it arrived in, and
-/// keeps all of it alive. A packet small beside that buffer is copied out first, and what is left
-/// after it moves to a buffer of its own size, so that no packet keeps alive a buffer much larger
-/// than itself: a retained message of ten bytes read behind a packet of a megabyte would
-/// otherwise hold the megabyte.
-fn take_packet(
-    read: &mut BytesMut,
-    decoder: Decoder,
-) -> Result<Option<Packet>, openqtt_codec::Error> {
-    let packet = match frame_len(read) {
-        Some(len) if len <= read.len() && wasteful(read.capacity(), len) => {
-            let mut frame = BytesMut::from(&read[..len]);
-            let packet = decoder.decode(&mut frame)?;
-            read.advance(len);
-            packet
-        }
-        _ => decoder.decode(read)?,
-    };
-    if packet.is_some() {
-        if read.is_empty() {
-            // Let the buffer go: the packet keeps what it needs of it.
-            *read = BytesMut::new();
-        } else if wasteful(read.capacity(), read.len()) {
-            *read = BytesMut::from(&read[..]);
-        }
-    }
-    Ok(packet)
+/// The codec decodes without copying, so a packet's payload shares the allocation it arrived in,
+/// and keeps all of it alive. A packet small beside that allocation is copied out first, and what
+/// is left after it moves to an allocation of its own size, so that no packet keeps alive one far
+/// larger than itself: a retained message of ten bytes read behind a packet of a megabyte would
+/// otherwise hold the megabyte. `BytesMut` reports only the capacity left after the packets split
+/// off before, which says nothing of the allocation behind them, so the allocation is tracked
+/// here.
+#[derive(Default)]
+struct Reassembly {
+    bytes: BytesMut,
+    /// The addresses of the allocation `bytes` lives in.
+    allocation: Range<usize>,
 }
 
-/// Whether `len` bytes would pin a buffer of `capacity` far larger than themselves.
-fn wasteful(capacity: usize, len: usize) -> bool {
-    capacity > SHARE_FLOOR && capacity / SHARE_RATIO > len
+impl Reassembly {
+    fn is_empty(&self) -> bool {
+        self.bytes.is_empty()
+    }
+
+    /// Lets the allocation go: the packets taken from it keep what they need of it.
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Appends bytes a stream delivered.
+    fn extend(&mut self, chunk: &[u8]) {
+        self.bytes.extend_from_slice(chunk);
+        self.track();
+    }
+
+    /// Notes the allocation the bytes live in once growing them has moved them to another, or
+    /// grown this one in place.
+    fn track(&mut self) {
+        let start = self.bytes.as_ptr() as usize;
+        let end = start.saturating_add(self.bytes.capacity());
+        if self.allocation.contains(&start) {
+            self.allocation.end = self.allocation.end.max(end);
+        } else {
+            self.allocation = start..end;
+        }
+    }
+
+    /// Takes the next whole packet off the front.
+    fn take_packet(&mut self, decoder: Decoder) -> Result<Option<Packet>, openqtt_codec::Error> {
+        let allocation = self.allocation.len();
+        let packet = match frame_len(&self.bytes) {
+            Some(len) if len <= self.bytes.len() && wasteful(allocation, len) => {
+                let mut frame = BytesMut::from(&self.bytes[..len]);
+                let packet = decoder.decode(&mut frame)?;
+                self.bytes.advance(len);
+                packet
+            }
+            _ => decoder.decode(&mut self.bytes)?,
+        };
+        if packet.is_some() {
+            if self.bytes.is_empty() {
+                self.clear();
+            } else if wasteful(allocation, self.bytes.len()) {
+                self.bytes = BytesMut::from(&self.bytes[..]);
+                self.allocation = 0..0;
+                self.track();
+            }
+        }
+        Ok(packet)
+    }
+}
+
+/// Whether `len` bytes would pin an allocation of `allocation` bytes far larger than themselves.
+fn wasteful(allocation: usize, len: usize) -> bool {
+    allocation > SHARE_FLOOR && allocation / SHARE_RATIO > len
 }
 
 /// The size of the packet at the front of `buffer`, from its fixed header: `None` until the
@@ -1038,6 +1078,16 @@ mod tests {
         bytes
     }
 
+    /// A reassembly buffer holding `bytes`, as reads into it would leave it.
+    fn reassembly(bytes: BytesMut) -> Reassembly {
+        let mut read = Reassembly {
+            bytes,
+            allocation: 0..0,
+        };
+        read.track();
+        read
+    }
+
     /// Whether `payload` lies inside `buffer`'s memory.
     fn inside(payload: &Bytes, buffer: std::ops::Range<usize>) -> bool {
         buffer.contains(&(payload.as_ptr() as usize))
@@ -1071,41 +1121,79 @@ mod tests {
         let decoder = Decoder::new().with_sender(Sender::Client);
         // A large packet, then a small one and the start of another, in one buffer, as a burst
         // read into it leaves them.
-        let mut read = publish(200_000);
-        read.extend_from_slice(&publish(10));
-        read.extend_from_slice(&publish(10)[..5]);
-        let start = read.as_ptr() as usize;
-        let memory = start..start + read.capacity();
+        let mut bytes = publish(200_000);
+        bytes.extend_from_slice(&publish(10));
+        bytes.extend_from_slice(&publish(10)[..5]);
+        let start = bytes.as_ptr() as usize;
+        let memory = start..start + bytes.capacity();
+        let mut read = reassembly(bytes);
 
         // The large packet shares the buffer, which is not much larger than it.
-        let large = payload(take_packet(&mut read, decoder).unwrap());
+        let large = payload(read.take_packet(decoder).unwrap());
         assert_eq!(large.len(), 200_000);
         assert!(inside(&large, memory.clone()));
         // The small one is copied out, and what follows it moves to a buffer of its own.
-        let small = payload(take_packet(&mut read, decoder).unwrap());
+        let small = payload(read.take_packet(decoder).unwrap());
         assert_eq!(small.len(), 10);
         assert!(!inside(&small, memory.clone()));
-        assert_eq!(read.len(), 5);
-        assert!(!inside(&Bytes::copy_from_slice(&read), memory.clone()));
-        assert!(read.capacity() < SHARE_FLOOR);
-        assert_eq!(take_packet(&mut read, decoder), Ok(None));
+        assert_eq!(read.bytes.len(), 5);
+        assert!(!memory.contains(&(read.bytes.as_ptr() as usize)));
+        assert!(read.allocation.len() < SHARE_FLOOR);
+        assert_eq!(read.take_packet(decoder), Ok(None));
+    }
+
+    #[test]
+    fn a_small_packet_behind_a_large_one_in_a_full_buffer_is_copied_out() {
+        let decoder = Decoder::new().with_sender(Sender::Client);
+        let large = publish(200_000);
+        let small = publish(10);
+        // A buffer exactly as large as the two packets, as a read that filled it leaves it:
+        // once the large one is split off, what is left of the buffer looks small, though the
+        // allocation behind it is not.
+        let mut bytes = BytesMut::with_capacity(large.len() + small.len());
+        bytes.extend_from_slice(&large);
+        bytes.extend_from_slice(&small);
+        let start = bytes.as_ptr() as usize;
+        let memory = start..start + bytes.capacity();
+        let mut read = reassembly(bytes);
+        let large = payload(read.take_packet(decoder).unwrap());
+        assert!(inside(&large, memory.clone()));
+        let small = payload(read.take_packet(decoder).unwrap());
+        assert_eq!(small.len(), 10);
+        assert!(!inside(&small, memory));
     }
 
     #[test]
     fn packets_in_a_small_buffer_share_it() {
         let decoder = Decoder::new().with_sender(Sender::Client);
-        let mut read = publish(100);
-        read.extend_from_slice(&publish(100));
-        let start = read.as_ptr() as usize;
-        let memory = start..start + read.capacity();
+        let mut bytes = publish(100);
+        bytes.extend_from_slice(&publish(100));
+        let start = bytes.as_ptr() as usize;
+        let memory = start..start + bytes.capacity();
+        let mut read = reassembly(bytes);
         for _ in 0..2 {
             assert!(inside(
-                &payload(take_packet(&mut read, decoder).unwrap()),
+                &payload(read.take_packet(decoder).unwrap()),
                 memory.clone()
             ));
         }
         // Emptied, the buffer is let go.
-        assert_eq!(read.capacity(), 0);
+        assert_eq!(read.bytes.capacity(), 0);
+        assert!(read.allocation.is_empty());
+    }
+
+    #[test]
+    fn the_allocation_is_followed_as_the_buffer_grows() {
+        let mut read = Reassembly::default();
+        assert!(read.is_empty());
+        for _ in 0..100 {
+            read.extend(&[0x30; 1_000]);
+            let start = read.bytes.as_ptr() as usize;
+            assert!(read.allocation.contains(&start));
+            assert!(read.allocation.end >= start + read.bytes.capacity());
+        }
+        read.clear();
+        assert!(read.allocation.is_empty());
     }
 
     #[test]
