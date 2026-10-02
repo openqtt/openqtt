@@ -68,7 +68,7 @@ the edge from rules cached there.
 | `msg/{seq}` | A message body, stored once per partition, collected below the lowest session cursor |
 | `q/{cid}/{seq}` | Offline and pending queue entries |
 | `infl/{cid}/{seq}` | Outbound in-flight state (sent, or received PUBREC) |
-| `rel/{cid}/{pid}` | Inbound QoS 2 awaiting PUBREL |
+| `rel/{cid}/{pid}` | Inbound QoS 2 awaiting PUBREL: the receipt, committed with the message. A publication whose receipt the partition already holds is answered as accepted and not routed again. Deleted on PUBREL, on a refusal of that identifier, and with the session |
 | `ret/{topic}` | Retained message and expiry, in the partition of the topic's first K literal levels (K fixed when the cluster is created) |
 | `exp/…`, `will/…`, `byedge/…` | Timers and cleanup after an edge's epoch dies |
 
@@ -108,6 +108,15 @@ every partition in parallel with bounded concurrency.
   permanent moves.
 - **Resume elsewhere.** The same `Claim`; the log then streams queued messages to
   the new edge within the client's Receive Maximum.
+- **QoS 2 from a client.** Every QoS 2 publication carries the client's Packet
+  Identifier, and the partition commits `rel/{cid}/{pid}` with the message, so
+  `rel` decides whether a PUBLISH is new, not the edge's memory. A connection that
+  ends while such a commit is out hands its identifier over as reserved: the
+  client publishes it again on its next connection, the edge publishes it again
+  under the same receipt, and the partition routes it only if the first commit
+  never happened. Either way the message is delivered once. The session machine
+  releases the receipt when PUBREL arrives, or when it refuses a reserved
+  identifier, since the client may then reuse it for a new message.
 
 ## The wire between roles
 

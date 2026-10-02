@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use bytes::Bytes;
-use openqtt_codec::{Packet, ProtocolRefusal};
+use openqtt_codec::{Packet, PacketId, ProtocolRefusal};
 use openqtt_core::{ClientId, Message, QoS, SubOpts, Timestamp, TopicFilter, TopicName};
 
 use crate::redact::Redacted;
@@ -59,6 +59,10 @@ pub enum Effect {
     /// [`Input::Committed`](crate::Input::Committed) once the message is durable; the PUBACK
     /// or PUBREC waits for it (report R3, The hot path; report R1, D26).
     Publish(Publication),
+    /// Delete the receipt of a QoS 2 message from the client, `rel/{cid}/{pid}` at the log
+    /// (report R3): its PUBREL came, or the identifier was refused, so the identifier is free for
+    /// a new message ([MQTT-4.3.3-12]).
+    ReleaseReceipt(PacketId),
     /// Add or replace a subscription's interest.
     Subscribe(Interest),
     /// Remove the interest of a subscription, by its mounted filter.
@@ -282,6 +286,12 @@ pub struct Publication {
     /// Present for QoS 1 and 2: the [`Input::Committed`](crate::Input::Committed) that answers
     /// it carries it back.
     pub token: Option<PublishToken>,
+    /// For a QoS 2 message, the Packet Identifier the client sent it with: its receipt. The log
+    /// commits the receipt with the message, as `rel/{cid}/{pid}` (report R3), and holds it
+    /// until [`Effect::ReleaseReceipt`]. A publication whose receipt the log already holds is
+    /// answered as accepted and not routed again, so a message the client publishes again
+    /// after its connection ended mid-commit is delivered once ([MQTT-4.3.3-10]).
+    pub receipt: Option<PacketId>,
 }
 
 /// Names a [`Publication`] whose outcome the machine waits for.

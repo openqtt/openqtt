@@ -199,6 +199,116 @@ fn a_qos_2_publish_repeated_while_it_commits_gets_its_pubrec_after_the_commit() 
     assert_eq!(harness.session.in_flight_in(), 1);
 }
 
+/// The state a connection left when it ended with the commit of QoS 2 message 5 outstanding.
+fn cut_off_mid_commit() -> crate::SessionState {
+    let mut harness = Harness::new();
+    harness.connect(connect_with("client-1", |connect| {
+        connect.properties = super::harness::expiry(600);
+    }));
+    harness.auto.loopback = false;
+    harness.send(publish2("t", 5, "once"));
+    // Every QoS 2 publication carries its receipt, for the log to keep with the message.
+    assert_eq!(harness.commits[0].receipt, Some(id(5)));
+    harness.input(Input::TransportClosed);
+    // The commit answers after the end: too late for this connection.
+    let token = harness.commits[0].token.unwrap();
+    harness.input(Input::Committed {
+        token,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    match &harness.releases()[0].session {
+        crate::SessionEnd::Keep(state) => state.clone(),
+        crate::SessionEnd::Discard => panic!("kept"),
+    }
+}
+
+/// A connection resuming `state`, its commits left to the test.
+fn resumed(state: crate::SessionState) -> Harness {
+    let mut harness = Harness::new();
+    harness.stored = Some(state);
+    harness.auto.loopback = false;
+    let connack = harness.connect(connect_with("client-1", |connect| {
+        connect.clean_start = false;
+        connect.properties = super::harness::expiry(600);
+    }));
+    assert!(connack.session_present);
+    harness
+}
+
+// covers: MQTT-4.3.3-10
+#[test]
+fn a_qos_2_message_whose_commit_was_cut_off_is_published_again_under_its_receipt() {
+    let state = cut_off_mid_commit();
+    // The identifier stays reserved: its commit had not answered.
+    assert_eq!(state.awaiting_commit, [id(5)]);
+    assert!(state.awaiting_release.is_empty());
+    let mut harness = resumed(state);
+    let mut repeat = publish2("t", 5, "once");
+    repeat.dup = true;
+    // Published again with its receipt: the log routes it only if the first never committed.
+    assert!(harness.send(repeat.clone()).is_empty());
+    assert_eq!(harness.commits.len(), 1);
+    assert_eq!(harness.commits[0].receipt, Some(id(5)));
+    // Another repeat while that commit is out is not published a third time.
+    assert!(harness.send(repeat).is_empty());
+    assert_eq!(harness.commits.len(), 1);
+    let token = harness.commits[0].token.unwrap();
+    let packets = harness.input(Input::Committed {
+        token,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    assert_eq!(packets.len(), 2);
+    for packet in packets {
+        assert_eq!(pubrec_code(packet), (5, PubRecReasonCode::Success));
+    }
+    // PUBREL ends it, and the receipt goes.
+    let Packet::PubComp(comp) = one(harness.send(pubrel(5))) else {
+        panic!("PUBCOMP");
+    };
+    assert_eq!(comp.reason_code, PubCompReasonCode::Success);
+    assert_eq!(harness.released_receipts(), [5]);
+}
+
+#[test]
+fn a_refused_repeat_of_a_reserved_identifier_releases_its_receipt() {
+    let mut harness = resumed(cut_off_mid_commit());
+    harness.auto.authorize = Some(|_| Decision::Deny);
+    let mut repeat = publish2("t", 5, "once");
+    repeat.dup = true;
+    assert_eq!(
+        pubrec_code(one(harness.send(repeat))),
+        (5, PubRecReasonCode::NotAuthorized)
+    );
+    // The client takes 5 as free again, so whatever the log holds under it goes.
+    assert_eq!(harness.released_receipts(), [5]);
+    assert!(
+        harness
+            .session
+            .snapshot()
+            .unwrap()
+            .awaiting_commit
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_pubrel_releases_the_receipt_and_only_qos_2_has_one() {
+    let mut harness = Harness::connected();
+    harness.auto.loopback = false;
+    harness.send(publish1("t", 1, "x"));
+    assert_eq!(harness.commits[0].receipt, None);
+    harness.send(publish2("t", 2, "x"));
+    assert_eq!(harness.commits[1].receipt, Some(id(2)));
+    let token = harness.commits[1].token.unwrap();
+    harness.input(Input::Committed {
+        token,
+        outcome: PublishOutcome::Accepted { matched: true },
+    });
+    assert!(harness.released_receipts().is_empty());
+    harness.send(pubrel(2));
+    assert_eq!(harness.released_receipts(), [2]);
+}
+
 #[test]
 fn mqtt_4_3_3_9_after_a_failure_pubrec_an_identifier_is_a_new_message() {
     let mut harness = Harness::connected();

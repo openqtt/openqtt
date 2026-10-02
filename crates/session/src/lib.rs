@@ -42,6 +42,13 @@
 //! - The log keeps sessions, retained messages and wills, and publishes a will whose delay
 //!   runs out; the router and the edge match topics. A [`Delivery`] names the subscriptions
 //!   the edge matched, and the machine checks each again (report R2, rule 6).
+//! - The log decides whether a QoS 2 PUBLISH is new. Every QoS 2 [`Publication`] carries its
+//!   receipt, the client's Packet Identifier, which the partition commits with the message as
+//!   `rel/{cid}/{pid}` (report R3) until [`Effect::ReleaseReceipt`]; a publication whose
+//!   receipt it already holds is answered as accepted and not routed again. That is what keeps
+//!   a message delivered once when a connection ends with its commit still out: the
+//!   identifier is handed over reserved ([`SessionState::awaiting_commit`]), and the client's
+//!   repeat on the next connection is published again under the same receipt.
 
 #![forbid(unsafe_code)]
 

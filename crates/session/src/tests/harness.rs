@@ -272,6 +272,17 @@ impl Harness {
             .collect()
     }
 
+    /// The receipts released, in order.
+    pub(crate) fn released_receipts(&self) -> Vec<u16> {
+        self.log
+            .iter()
+            .filter_map(|effect| match effect {
+                Effect::ReleaseReceipt(packet_id) => Some(packet_id.get()),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// How often `counter` was counted.
     pub(crate) fn count(&self, counter: Counter) -> usize {
         self.log
@@ -350,6 +361,7 @@ impl Harness {
                 Effect::PauseReading => self.paused = true,
                 Effect::ResumeReading => self.paused = false,
                 Effect::SendRefusal(_)
+                | Effect::ReleaseReceipt(_)
                 | Effect::FinishStream(_)
                 | Effect::Close(_)
                 | Effect::Release(_)

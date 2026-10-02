@@ -847,6 +847,12 @@ impl Driver {
                     );
                 }
                 Effect::Publish(publication) => {
+                    // A receipt exactly for a QoS 2 message, for the log to keep with it.
+                    assert_eq!(
+                        publication.receipt.is_some(),
+                        publication.message.qos == openqtt_core::QoS::ExactlyOnce,
+                        "{publication:?}"
+                    );
                     if let Some(token) = publication.token {
                         self.commits.push(token);
                     }
@@ -878,7 +884,7 @@ impl Driver {
                     assert!(self.paused, "resumed without a pause");
                     self.paused = false;
                 }
-                Effect::Will(_) | Effect::Count(_) => {}
+                Effect::Will(_) | Effect::Count(_) | Effect::ReleaseReceipt(_) => {}
             }
         }
     }

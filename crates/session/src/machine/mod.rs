@@ -433,6 +433,10 @@ enum InboundState {
     Committing(u64),
     /// Durable and acknowledged with PUBREC; waiting for PUBREL.
     AwaitingRelease,
+    /// Published on an earlier connection, which ended before the commit answered. The
+    /// identifier stays reserved: a repeat is published again under its receipt, and the log
+    /// decides by the receipt whether it is new.
+    Reserved,
 }
 
 /// A QoS 1 or 2 message to the client.
@@ -668,7 +672,10 @@ impl Session {
         let slot = match &packet {
             Packet::Publish(publish) => match (publish.qos, publish.packet_id) {
                 (codec::QoS::AtMostOnce, _) | (_, None) => false,
-                (codec::QoS::ExactlyOnce, Some(id)) => !self.inbound.contains_key(&id.get()),
+                (codec::QoS::ExactlyOnce, Some(id)) => self
+                    .inbound
+                    .get(&id.get())
+                    .is_none_or(|inbound| inbound.state == InboundState::Reserved),
                 (codec::QoS::AtLeastOnce, Some(_)) => true,
             },
             _ => false,
@@ -1155,6 +1162,19 @@ impl Session {
                 .inbound
                 .iter()
                 .filter(|(_, inbound)| inbound.state == InboundState::AwaitingRelease)
+                .filter_map(|(&id, _)| PacketId::new(id))
+                .collect(),
+            // A commit still out may have gone through: the identifier stays reserved, and the
+            // log tells a repeat from a new message by the receipt it committed.
+            awaiting_commit: self
+                .inbound
+                .iter()
+                .filter(|(_, inbound)| {
+                    matches!(
+                        inbound.state,
+                        InboundState::Committing(_) | InboundState::Reserved
+                    )
+                })
                 .filter_map(|(&id, _)| PacketId::new(id))
                 .collect(),
             queue: self

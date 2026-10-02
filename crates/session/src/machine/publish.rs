@@ -59,15 +59,18 @@ impl Session {
             return self.close_with(DisconnectReasonCode::RetainNotSupported, None, now, fx);
         }
         if let Some(packet_id) = publish.packet_id {
-            if publish.qos == QoS::ExactlyOnce
-                && let Some(inbound) = self.inbound.get(&packet_id.get())
-            {
-                // A repeat before PUBREL: PUBREC again, and no second delivery
-                // ([MQTT-4.3.3-10], report R1 D8).
-                let state = match inbound.state {
-                    InboundState::Committing(token) => ReplyState::Waiting(token),
-                    InboundState::AwaitingRelease => ReplyState::Ready(AckCode::Success),
-                };
+            // A repeat before PUBREL: PUBREC again, and no second delivery ([MQTT-4.3.3-10],
+            // report R1 D8). A reserved identifier is published again instead, under its
+            // receipt, which the log keeps from the first commit if there was one.
+            let repeat = match self.inbound.get(&packet_id.get()) {
+                Some(inbound) if publish.qos == QoS::ExactlyOnce => match inbound.state {
+                    InboundState::Committing(token) => Some(ReplyState::Waiting(token)),
+                    InboundState::AwaitingRelease => Some(ReplyState::Ready(AckCode::Success)),
+                    InboundState::Reserved => None,
+                },
+                _ => None,
+            };
+            if let Some(state) = repeat {
                 self.push_reply(stream, packet_id, ReplyKind::PubRec, state, false);
                 return self.flush(stream, now, fx);
             }
@@ -197,6 +200,10 @@ impl Session {
             },
             None => topic.clone(),
         };
+        // The receipt the log commits with a QoS 2 message, `rel/{cid}/{pid}` (report R3).
+        let receipt = publish
+            .packet_id
+            .filter(|_| publish.qos == QoS::ExactlyOnce);
         let properties = publish.properties;
         let mut message = Message::new(mounted, publish.payload);
         message.qos = core_qos(publish.qos);
@@ -245,7 +252,11 @@ impl Session {
                 Some(PublishToken(token))
             }
         };
-        fx.push(Effect::Publish(Publication { message, token }));
+        fx.push(Effect::Publish(Publication {
+            message,
+            token,
+            receipt,
+        }));
     }
 
     /// Refuses one PUBLISH with `code` and keeps the connection: in its PUBACK or PUBREC, or
@@ -267,6 +278,17 @@ impl Session {
             return fx.push(Effect::Count(counter));
         };
         let kind = if publish.qos == QoS::ExactlyOnce {
+            // A refused repeat of a reserved identifier frees it for the client, so whatever
+            // the log still holds under it must go, or it would swallow the next message sent
+            // with it.
+            let reserved = self
+                .inbound
+                .get(&packet_id.get())
+                .is_some_and(|inbound| inbound.state == InboundState::Reserved);
+            if reserved {
+                self.inbound.remove(&packet_id.get());
+                fx.push(Effect::ReleaseReceipt(packet_id));
+            }
             ReplyKind::PubRec
         } else {
             ReplyKind::PubAck
@@ -415,17 +437,23 @@ impl Session {
         fx: &mut Effects,
     ) {
         let id = pubrel.packet_id;
-        let released = self
-            .inbound
-            .get(&id.get())
-            .is_some_and(|inbound| inbound.state == InboundState::AwaitingRelease);
+        // A reserved identifier cannot have had its PUBREC, but a client that releases it says
+        // it is done with it, and the receipt goes so as not to swallow its next message.
+        let released = self.inbound.get(&id.get()).is_some_and(|inbound| {
+            matches!(
+                inbound.state,
+                InboundState::AwaitingRelease | InboundState::Reserved
+            )
+        });
         let reason_code = if released {
             if let Some(inbound) = self.inbound.remove(&id.get())
                 && inbound.counted
             {
                 self.inbound_in_flight = self.inbound_in_flight.saturating_sub(1);
             }
-            // [MQTT-4.3.3-12]: the identifier is free for a new message.
+            // [MQTT-4.3.3-12]: the identifier is free for a new message, and the log lets go
+            // of the receipt it kept under it.
+            fx.push(Effect::ReleaseReceipt(id));
             PubCompReasonCode::Success
         } else {
             PubCompReasonCode::PacketIdentifierNotFound

@@ -522,6 +522,13 @@ impl Session {
                 },
             );
         }
+        for packet_id in state.awaiting_commit {
+            self.inbound.entry(packet_id.get()).or_insert(Inbound {
+                state: InboundState::Reserved,
+                stream: StreamId::Control,
+                counted: false,
+            });
+        }
         for stored in state.queue {
             self.queue.push_back(Queued {
                 message: stored.message,

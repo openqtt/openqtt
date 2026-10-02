@@ -30,6 +30,12 @@ pub struct SessionState {
     /// Packet Identifiers of QoS 2 messages from the client whose PUBREL has not arrived. A
     /// PUBLISH that repeats one is acknowledged again and not delivered twice (report R1, D8).
     pub awaiting_release: Vec<PacketId>,
+    /// Packet Identifiers of QoS 2 messages from the client published into the broker whose
+    /// commit had not answered when the connection ended. Each stays reserved: a PUBLISH that
+    /// repeats one is published again with its receipt, and the log, which commits the receipt
+    /// `rel/{cid}/{pid}` with the message (report R3), routes it only if the first never
+    /// committed. The message is delivered once whichever way the first commit went.
+    pub awaiting_commit: Vec<PacketId>,
     /// Messages for the client not yet sent, oldest first.
     pub queue: Vec<StoredDelivery>,
     /// Where the search for a free Packet Identifier starts.
@@ -46,6 +52,7 @@ impl SessionState {
             subscriptions: Vec::new(),
             outbound: Vec::new(),
             awaiting_release: Vec::new(),
+            awaiting_commit: Vec::new(),
             queue: Vec::new(),
             next_packet_id: 1,
         }
