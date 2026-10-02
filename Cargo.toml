@@ -133,6 +133,9 @@ x509-parser = { version = "0.18.1", default-features = false, features = ["verif
 # The user name and client identifier patterns of the ACL. Linear time in the input, whatever the
 # pattern, so a rule cannot be written that a client's name makes slow.
 regex = "1.12"
+# The literals every match of a pattern begins with, so the 1.x converter can tell whether an ACL
+# pattern may match the names reserved for services. The version regex already brings.
+regex-syntax = "0.8.11"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

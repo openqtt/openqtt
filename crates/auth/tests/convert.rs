@@ -181,6 +181,23 @@ fn r2_rule_30_strict_refuses_what_conflicts_with_rules_13_to_16() {
 }
 
 #[test]
+fn r2_rule_15_a_pattern_that_can_name_a_service_conflicts() {
+    let source = "{allow, {username, {re, \"^(svc:admin|device)$\"}}, subscribe, [\"#\"]}.\n";
+    let converted = convert_acl(source, &contract()).expect("converts");
+    let r15: Vec<&str> = converted
+        .conflicts
+        .iter()
+        .filter(|note| note.message.starts_with("R2 rule 15:"))
+        .map(|note| note.message.as_str())
+        .collect();
+    assert_eq!(r15.len(), 1, "{:?}", converted.conflicts);
+    // A pattern held to a literal start that is not the reserved prefix is no conflict.
+    let devices = "{allow, {username, {re, \"^dev-[0-9]+$\"}}, subscribe, [\"#\"]}.\n";
+    let converted = convert_acl(devices, &contract()).expect("converts");
+    assert_eq!(converted.conflicts, []);
+}
+
+#[test]
 fn r2_rule_30_what_1x_would_not_load_is_refused() {
     for (source, reason) in [
         (

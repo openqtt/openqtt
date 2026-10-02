@@ -7,7 +7,7 @@
 //! prefix. An allow rule is excused only by an earlier deny that applies to every client, at
 //! every QoS, and covers what the allow rule would grant.
 
-use regex::Regex;
+use regex_syntax::hir::literal::Extractor;
 
 use super::spec::{Decision, NameMatch, QosSet, RuleSpec, TopicSpec, Who};
 use super::topic::covers;
@@ -113,11 +113,12 @@ pub fn check(rules: &[RuleSpec], contract: &Contract) -> Vec<Conflict> {
                             ),
                         );
                     }
-                    NameMatch::Regex(pattern) if matches_reserved(pattern, prefix) => conflict(
+                    NameMatch::Regex(pattern) if may_match_reserved(pattern, prefix) => conflict(
                         15,
                         format!(
-                            "the pattern {pattern:?} matches reserved service names; a rule for \
-                             services names them exactly or by the reserved prefix"
+                            "the pattern {pattern:?} may match names with the reserved prefix \
+                             {prefix:?}; a rule for services names them exactly or by the \
+                             reserved prefix"
                         ),
                     ),
                     _ => {}
@@ -227,12 +228,28 @@ fn intersects(a: &str, b: &str) -> bool {
     }
 }
 
-/// Whether `pattern`, matched whole, takes in a name with the reserved prefix.
-fn matches_reserved(pattern: &str, prefix: &str) -> bool {
-    Regex::new(&format!("^(?:{pattern})$")).is_ok_and(|regex| {
-        ["", "x", "platform", "service-1"]
-            .iter()
-            .any(|rest| regex.is_match(&format!("{prefix}{rest}")))
+/// Whether some name `pattern`, matched whole, takes in may begin with `prefix`: yes, unless the
+/// pattern provably keeps away from it.
+///
+/// The proof is the set of literals every match must begin with, as regex-syntax extracts them
+/// for prefilters. When that set is every name the pattern matches (all its literals exact),
+/// the pattern keeps away from the prefix if none of them begins with it. Otherwise a literal is
+/// only how a match begins, and each must part from the prefix before either ends. A set too
+/// wide to list, as for `.*` or `[a-z]`, proves nothing, and neither does a pattern that does
+/// not parse.
+fn may_match_reserved(pattern: &str, prefix: &str) -> bool {
+    let Ok(hir) = regex_syntax::Parser::new().parse(&format!("^(?:{pattern})$")) else {
+        return true;
+    };
+    let starts = Extractor::new().extract(&hir);
+    let Some(literals) = starts.literals() else {
+        return true;
+    };
+    let whole = starts.is_exact();
+    let prefix = prefix.as_bytes();
+    literals.iter().any(|literal| {
+        let start = literal.as_bytes();
+        start.starts_with(prefix) || (!whole && prefix.starts_with(start))
     })
 }
 
@@ -359,6 +376,21 @@ action = "subscribe"
 topics = ["#"]
 "##;
         assert_eq!(conflicts(pattern, &services()), [(0, 15)]);
+        // Whatever names a pattern takes, unless each provably starts away from the prefix.
+        for overlapping in [
+            "(svc:admin|device)",
+            "(?i)SVC:root",
+            ".*admin",
+            "[a-z:]+",
+            "s.*",
+        ] {
+            let text = pattern.replace("svc.*", overlapping);
+            assert_eq!(conflicts(&text, &services()), [(0, 15)], "{overlapping}");
+        }
+        for apart in ["dev-[0-9]+", "(device|sensor)-[0-9]+", "svc", "sv", ""] {
+            let text = pattern.replace("svc.*", apart);
+            assert_eq!(conflicts(&text, &services()), [], "{apart:?}");
+        }
         let exact = r##"
 [[rule]]
 permission = "allow"

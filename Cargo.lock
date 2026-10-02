@@ -993,6 +993,7 @@ dependencies = [
  "proptest",
  "rcgen",
  "regex",
+ "regex-syntax",
  "thiserror",
  "toml",
  "tracing",
