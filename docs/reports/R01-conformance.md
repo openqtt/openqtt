@@ -80,7 +80,7 @@ Scenario files for the test kit use the same line.
 Code that implements a statement cites it as `[MQTT-x.y.z-n]`, as ADR 0003 asks; a citation is
 not a test and is not counted. `scripts/conformance-ids.sh` reads the ids from the tables of
 this report and searches the test tree, then prints every id no test names, one per line, and
-a count; `make conformance` runs it. Today it prints all 247.
+a count; `make conformance` runs it.
 
 ## Table 1. Chapter 1, data representation
 
