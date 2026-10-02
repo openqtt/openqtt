@@ -67,8 +67,9 @@ def main():
         "versions": versions(),
         "caveats": [
             "Laptop numbers: one APFS SSD shared by every simulated node, macOS, and other "
-            "work running on the machine (load average 4 to 20 during the runs, recorded per "
-            "record as load_avg). Compare candidates and shapes, not absolute values.",
+            "work running on the machine (load average 1.4 to 11 in the runs the report "
+            "quotes and up to 39 in revision 1's write step, recorded per record as "
+            "load_avg). Compare candidates and shapes, not absolute values.",
             "Durable means F_FULLFSYNC on macOS for all three engines (RocksDB built with "
             "-DHAVE_FULLFSYNC). Production Linux uses fdatasync.",
             "Replication runs three replicas in one process over a simulated network and a "
