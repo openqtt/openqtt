@@ -2,6 +2,7 @@
 //! client and `openqtt-client`: the handshake and its refusals, the stream mapping of
 //! docs/spec/mqtt-over-quic.md, stream ends, backpressure, 0-RTT and closing.
 
+mod backpressure;
 mod control;
 mod handshake;
 mod streams;
