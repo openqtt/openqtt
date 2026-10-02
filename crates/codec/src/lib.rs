@@ -11,8 +11,10 @@
 //! 7 March 2019, which the codec implements and its tests cite.
 
 mod ack;
+mod auth;
 mod connack;
 mod connect;
+mod disconnect;
 mod encode;
 mod error;
 mod primitives;
@@ -25,11 +27,13 @@ mod test_util;
 mod types;
 
 pub use ack::{AckProperties, PubAck, PubComp, PubRec, PubRel};
+pub use auth::{Auth, AuthProperties};
 pub use connack::{ConnAck, ConnAckProperties};
 pub use connect::{
     Connect, ConnectProperties, PROTOCOL_NAME, PROTOCOL_VERSION, ProtocolRefusal, Will,
     WillProperties,
 };
+pub use disconnect::{Disconnect, DisconnectProperties};
 pub use error::Error;
 pub use primitives::{
     MAX_PACKET_SIZE, MAX_STRING_LEN, MAX_VARIABLE_BYTE_INTEGER, disallowed_code_point,
