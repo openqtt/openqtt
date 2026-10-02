@@ -365,6 +365,20 @@ impl Driver {
                 self.keep_alive_due()?;
                 continue;
             }
+            // What the server has sent already is read every round, before the select below,
+            // which prefers the client's own calls and writes and takes one of them per round:
+            // a client that keeps sending would otherwise never read the acknowledgements and
+            // the DISCONNECT the server sends meanwhile.
+            if self.outbox.is_empty() {
+                match self.read_now().await {
+                    Some(Ok(0)) => {
+                        return Err(Stop::Lost("the server closed the control stream".into()));
+                    }
+                    Some(Ok(_)) => self.decode_buffered()?,
+                    Some(Err(error)) => return Err(Stop::Lost(error.to_string())),
+                    None => {}
+                }
+            }
             let pending = !self.outbox.is_empty();
             let writing = !self.write_buf.is_empty();
             let (events, outbox) = (&self.events, &mut self.outbox);
@@ -436,6 +450,20 @@ impl Driver {
                 () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {}
             }
         }
+    }
+
+    /// Reads what the server has sent already, without waiting: `None` when nothing has
+    /// arrived since the last read.
+    async fn read_now(&mut self) -> Option<std::io::Result<usize>> {
+        let (reader, buffer) = (&mut self.reader, &mut self.read_buf);
+        std::future::poll_fn(|cx| {
+            let read = std::pin::pin!(reader.read_buf(&mut *buffer));
+            std::task::Poll::Ready(match read.poll(cx) {
+                std::task::Poll::Ready(result) => Some(result),
+                std::task::Poll::Pending => None,
+            })
+        })
+        .await
     }
 
     /// Queues an event for the application, unless it stopped listening.

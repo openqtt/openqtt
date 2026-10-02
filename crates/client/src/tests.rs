@@ -1658,3 +1658,135 @@ async fn an_unread_pingresp_does_not_end_the_connection_while_the_application_is
     assert!(!client.is_closed());
     client.disconnect().await.unwrap();
 }
+
+/// A link that takes a few bytes per write, within the task's budget, as a slow link does.
+struct Trickle;
+
+impl tokio::io::AsyncWrite for Trickle {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<io::Result<usize>> {
+        let coop = std::task::ready!(tokio::task::coop::poll_proceed(cx));
+        coop.made_progress();
+        std::task::Poll::Ready(Ok(buf.len().min(16)))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// When the scripted server may send what it holds back.
+#[derive(Default)]
+struct Release {
+    open: std::sync::atomic::AtomicBool,
+    waker: Mutex<Option<std::task::Waker>>,
+}
+
+impl Release {
+    fn open(&self) {
+        self.open.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(waker) = self.waker.lock().unwrap().take() {
+            waker.wake();
+        }
+    }
+}
+
+/// A server that sends CONNACK, then, once released, DISCONNECT 0x8E, and nothing else.
+struct Scripted {
+    release: std::sync::Arc<Release>,
+    pending: Vec<Vec<u8>>,
+}
+
+impl tokio::io::AsyncRead for Scripted {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        let coop = std::task::ready!(tokio::task::coop::poll_proceed(cx));
+        let this = self.get_mut();
+        // The CONNACK goes at once; the DISCONNECT only once released.
+        let ready =
+            this.pending.len() == 2 || this.release.open.load(std::sync::atomic::Ordering::SeqCst);
+        if !ready || this.pending.is_empty() {
+            *this.release.waker.lock().unwrap() = Some(cx.waker().clone());
+            return std::task::Poll::Pending;
+        }
+        let bytes = this.pending.remove(0);
+        buf.put_slice(&bytes);
+        coop.made_progress();
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// A transport whose server is [`Scripted`] behind a [`Trickle`] link.
+struct SlowLink(std::sync::Arc<Release>);
+
+impl Transport for SlowLink {
+    fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
+        let encoded = |packet: Packet| {
+            let mut bytes = BytesMut::new();
+            packet.encode(&mut bytes).unwrap();
+            bytes.to_vec()
+        };
+        let scripted = Scripted {
+            release: std::sync::Arc::clone(&self.0),
+            pending: vec![
+                encoded(Packet::from(ConnAck::default())),
+                encoded(Packet::Disconnect(Disconnect {
+                    reason_code: DisconnectReasonCode::SessionTakenOver,
+                    ..Disconnect::default()
+                })),
+            ],
+        };
+        Box::pin(async move { Ok(Link::new(scripted, Trickle, Unclosable)) })
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_server_is_heard_while_the_client_keeps_sending() {
+    let release = std::sync::Arc::new(Release::default());
+    let (client, mut events) = Client::connect(
+        &SlowLink(std::sync::Arc::clone(&release)),
+        ConnectOptions::new("c").keep_alive(0),
+    )
+    .await
+    .unwrap();
+    // Publishers keep the client writing to a link that takes a few bytes at a time.
+    for _ in 0..8 {
+        let publisher = client.clone();
+        tokio::spawn(async move { while publisher.publish(large(0, 4 * 1024)).await.is_ok() {} });
+    }
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    // The server takes the session over.
+    release.open();
+    for _ in 0..200 {
+        tokio::select! {
+            biased;
+            event = events.recv() => {
+                assert!(
+                    matches!(event, Some(Event::Closed(CloseReason::ByServer(_)))),
+                    "{event:?}"
+                );
+                return;
+            }
+            () = tokio::task::yield_now() => {}
+        }
+    }
+    panic!("the server's DISCONNECT went unread while the client kept sending");
+}
