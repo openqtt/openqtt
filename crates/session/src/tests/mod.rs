@@ -7,6 +7,7 @@ mod auth;
 mod connect;
 mod deliver;
 mod ending;
+mod properties;
 mod publish;
 mod streams;
 mod subscribe;
