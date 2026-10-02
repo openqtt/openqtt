@@ -13,6 +13,7 @@ use openqtt_core::{ClientId, Username};
 /// name, so two sets with the same pairs compare equal however they were built. A clone shares
 /// the text.
 #[derive(Clone, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Attributes(Vec<(Arc<str>, Arc<str>)>);
 
 impl Attributes {

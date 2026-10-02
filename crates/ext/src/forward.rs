@@ -11,6 +11,7 @@ use crate::{BoxFuture, Error};
 /// A destination outside the cluster, numbered by the extension that serves it. Each
 /// [`Forwarder`] has its own numbers; the node tells apart two forwarders' destinations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub struct ExternalId(u32);
 
 impl ExternalId {

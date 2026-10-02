@@ -15,6 +15,7 @@ use crate::{BoxFuture, Principal};
 /// by accident. It has no `PartialEq` either: comparing a secret is the authenticator's job,
 /// and it compares in constant time. A clone shares the bytes.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct Secret(Bytes);
 
 impl Secret {
@@ -47,6 +48,7 @@ impl fmt::Debug for Secret {
 
 /// A certificate, DER encoded, as a client presented it in the TLS handshake.
 #[derive(Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Certificate(Bytes);
 
 impl Certificate {

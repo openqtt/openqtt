@@ -63,6 +63,7 @@ impl Redirect {
 /// (section 4.11). Its format is the deployment's; MQTT suggests a host, an optional port, and
 /// a space between several.
 #[derive(Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct ServerReference(Box<str>);
 
 impl ServerReference {

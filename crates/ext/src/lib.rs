@@ -75,6 +75,7 @@ pub const API_VERSION: ApiVersion = ApiVersion::new(1, 0);
 /// the previous one may no longer compile or may behave wrongly; the minor number when
 /// something is added, a trait method with a default, a type, a variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub struct ApiVersion {
     major: u16,
     minor: u16,
