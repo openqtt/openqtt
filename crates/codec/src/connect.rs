@@ -120,12 +120,18 @@ impl Connect {
     /// Decodes the variable header and payload of a CONNECT.
     pub(crate) fn decode(body: &Bytes) -> Result<Self, Error> {
         let mut reader = Reader::new(body);
-        let name = reader.string("Protocol Name")?;
+        // The name tells MQTT from other protocols (section 3.1.2.1), so it is compared as
+        // bytes: one that is not "MQTT", even one that is not UTF-8, names another protocol
+        // rather than a malformed MQTT packet.
+        let name = reader.binary("Protocol Name")?;
         let level = reader.u8("Protocol Version")?;
-        if name != PROTOCOL_NAME || level != PROTOCOL_VERSION {
+        if name != PROTOCOL_NAME.as_bytes() || level != PROTOCOL_VERSION {
             // An older protocol lays the rest out differently, so reading on would only
             // invent errors. [MQTT-3.1.2-1] [MQTT-3.1.2-2]
-            return Err(Error::UnsupportedProtocol { name, level });
+            return Err(Error::UnsupportedProtocol {
+                name: String::from_utf8_lossy(&name).into_owned(),
+                level,
+            });
         }
 
         let flags = reader.u8("Connect Flags")?;
@@ -568,6 +574,34 @@ mod tests {
             Connect::decode(&body),
             Err(Error::UnsupportedProtocol { level: 5, .. })
         ));
+    }
+
+    #[test]
+    fn mqtt_3_1_2_1_any_name_but_mqtt_is_another_protocol_whatever_its_bytes() {
+        // Not UTF-8, and containing U+0000: still a Protocol Name that is not "MQTT", never a
+        // malformed string.
+        let cases: [(&[u8], &str); 4] = [
+            (&[0xFF, 0xFE], "\u{FFFD}\u{FFFD}"),
+            (b"MQ\0T", "MQ\0T"),
+            (b"mqtt", "mqtt"),
+            (b"", ""),
+        ];
+        for (raw, name) in cases {
+            let body = concat(&[&prefixed(raw), &[0x05, 0x02, 0x00, 0x3C, 0x00, 0x00, 0x00]]);
+            let error = Connect::decode(&body).unwrap_err();
+            assert_eq!(
+                error,
+                Error::UnsupportedProtocol {
+                    name: name.into(),
+                    level: 5
+                },
+                "{raw:02X?}"
+            );
+            assert_eq!(
+                error.connack_reason_code(),
+                ConnectReasonCode::UnsupportedProtocolVersion
+            );
+        }
     }
 
     #[test]

@@ -214,13 +214,16 @@ pub enum Error {
         /// The maximum it exceeds.
         maximum: u32,
     },
-    /// A CONNECT whose Protocol Name is not `"MQTT"` or whose Protocol Version is not 5
-    /// ([MQTT-3.1.2-1], [MQTT-3.1.2-2]). The rest of the packet is not read, since an older
+    /// A CONNECT whose Protocol Name is not `"MQTT"`, whatever its bytes, or whose Protocol
+    /// Version is not 5 ([MQTT-3.1.2-1], [MQTT-3.1.2-2]). The name tells protocols apart
+    /// (section 3.1.2.1), so one that is not even UTF-8 still names another protocol rather
+    /// than making a malformed MQTT packet. The rest of the packet is not read, since another
     /// protocol lays it out differently. CONNACK 0x84, Unsupported Protocol Version; see
     /// [`ProtocolRefusal`](crate::ProtocolRefusal) for the bytes to answer with.
     #[error("protocol {name:?} version {level} is not MQTT 5.0")]
     UnsupportedProtocol {
-        /// The Protocol Name, such as `"MQIsdp"` for MQTT 3.1.
+        /// The Protocol Name, such as `"MQIsdp"` for MQTT 3.1, with any bytes that are not
+        /// UTF-8 replaced by U+FFFD.
         name: String,
         /// The Protocol Version, such as 4 for MQTT 3.1.1.
         level: u8,
