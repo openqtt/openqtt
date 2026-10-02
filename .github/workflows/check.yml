@@ -36,8 +36,16 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      # Minor versions pinned: cargo-deny 0.x changes its config schema between minors.
+      # Minor versions pinned: cargo-deny 0.x changes its config schema between minors, and
+      # cargo-semver-checks reads the rustdoc JSON of a range of compilers, so it moves with
+      # rust-toolchain.toml.
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest@0.9,cargo-deny@0.20
+          tool: cargo-nextest@0.9,cargo-deny@0.20,cargo-semver-checks@0.50
       - run: make check
+      # The extension seam is public API for other builds (crates/ext/README.md): compare it with
+      # main, which the shallow checkout above does not have.
+      - name: Check the extension seam against main
+        run: |
+          git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
+          make semver

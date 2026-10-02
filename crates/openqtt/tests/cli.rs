@@ -1,5 +1,5 @@
-//! The binary as an operator meets it: help, the subcommands, the configuration commands, and
-//! the logs.
+//! The binary as an operator meets it: help, the subcommands, the configuration commands, the
+//! logs, and the 1.x converters.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -69,7 +69,7 @@ fn help_lists_every_subcommand() {
 
 #[test]
 fn the_tools_say_they_are_not_implemented_and_fail() {
-    for name in ["ctl", "convert", "migrate"] {
+    for name in ["ctl", "migrate"] {
         let out = openqtt().arg(name).output().unwrap();
         assert_eq!(out.status.code(), Some(1), "openqtt {name}");
         let stderr = stderr(&out);
@@ -392,4 +392,120 @@ fn a_headers_file_the_exporter_cannot_use_stops_run_and_fails_the_check() {
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(stderr(&out), expected);
+}
+
+const ACL_CONF: &str = "%% A 1.x acl.conf.\n\
+    {allow, {username, \"svc:platform\"}, all, all}.\n\
+    {deny, all, publish, [\"commands/#\"]}.\n\
+    {allow, all, publish, [\"telemetry/#\"]}.\n\
+    {allow, {ipaddr, \"127.0.0.1\"}, subscribe, [\"$SYS/#\"]}.\n\
+    {deny, all}.\n";
+
+#[test]
+fn convert_names_its_two_converters() {
+    let out = openqtt().arg("convert").output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let usage = String::from_utf8(out.stderr).unwrap();
+    assert!(usage.contains("acl") && usage.contains("authn"), "{usage}");
+}
+
+#[test]
+fn convert_acl_writes_the_rules_and_names_each_conflict() {
+    let conf = file("cli-acl.conf", ACL_CONF);
+    let out = openqtt()
+        .args(["convert", "acl", "--service-prefix", "svc:"])
+        .arg(&conf)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    let acl = openqtt_auth::Acl::from_toml(&text).unwrap();
+    assert_eq!(acl.len(), 4, "{text}");
+    let notes = String::from_utf8(out.stderr).unwrap();
+    let place = conf.display().to_string();
+    assert!(
+        notes.contains(&format!("{place}:5: conflict: R2 rule 14: not converted")),
+        "{notes}"
+    );
+    assert!(
+        notes.contains(&format!("{place}:4: conflict: R2 rule 16")),
+        "{notes}"
+    );
+    // --strict writes nothing and fails.
+    let strict = openqtt()
+        .args(["convert", "acl", "--strict", "--service-prefix", "svc:"])
+        .arg(&conf)
+        .output()
+        .unwrap();
+    assert_eq!(strict.status.code(), Some(1));
+    assert!(strict.stdout.is_empty());
+    let message = String::from_utf8(strict.stderr).unwrap();
+    assert!(
+        message.contains("--strict refuses them; nothing was written"),
+        "{message}"
+    );
+}
+
+#[test]
+fn convert_acl_reports_what_it_cannot_convert_by_line() {
+    let conf = file(
+        "cli-bad.conf",
+        "{allow, all, all, all}.\n{allow, X, all, all}.\n",
+    );
+    let out = openqtt()
+        .args(["convert", "acl"])
+        .arg(&conf)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    let message = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        message.contains(&format!("{}:2: error: a variable", conf.display())),
+        "{message}"
+    );
+    let missing = openqtt()
+        .args(["convert", "acl", "/nonexistent/acl.conf"])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(1));
+    let message = String::from_utf8(missing.stderr).unwrap();
+    assert!(
+        message.contains("cannot read /nonexistent/acl.conf"),
+        "{message}"
+    );
+}
+
+#[test]
+fn convert_authn_writes_a_hashed_file_and_refuses_superusers() {
+    let csv = file(
+        "cli-authn.csv",
+        "user_id,password,is_superuser\nsvc:platform,Synthetic-pw,false\n",
+    );
+    let out = openqtt()
+        .args(["convert", "authn"])
+        .arg(&csv)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(!text.contains("Synthetic-pw"), "{text}");
+    let list =
+        openqtt_auth::PasswordList::parse(&text, openqtt_auth::BootstrapFormat::Hashed, None)
+            .unwrap();
+    assert_eq!(list.len(), 1);
+    let superuser = file(
+        "cli-superuser.csv",
+        "user_id,password,is_superuser\nroot,Synthetic-root,true\n",
+    );
+    let out = openqtt()
+        .args(["convert", "authn"])
+        .arg(&superuser)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    let message = String::from_utf8(out.stderr).unwrap();
+    assert!(message.contains("superusers"), "{message}");
+    assert!(!message.contains("Synthetic-root"), "{message}");
 }

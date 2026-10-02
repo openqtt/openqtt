@@ -62,9 +62,11 @@ proptest = { version = "1.11", default-features = false, features = ["std"] }
 # The settings types derive their reading from TOML and their writing back to it. Never in the
 # codec, which stays free of any serialization framework.
 serde = { version = "1.0.229", features = ["derive"] }
-# TOML: the configuration file's format, and the differential harness's list of intended
-# divergences. Without `preserve_order`, tables keep their keys sorted, so errors about a file
-# come out in the same order every time; without `display`, since nothing writes TOML through it.
+# TOML: the configuration file's format, the differential harness's list of intended
+# divergences, and openqtt-auth's ACL files. Without `preserve_order`, tables keep their keys
+# sorted, so errors about a file come out in the same order every time; without `display`, since
+# nothing writes TOML through it: the ACL converter writes its TOML by hand, so that each rule
+# keeps a comment naming the line it came from.
 toml = { version = "1.1.6", default-features = false, features = ["std", "parse", "serde"] }
 # URLs parsed by the WHATWG rules, which openqtt-config checks the OTLP endpoint against. It is
 # in the tree anyway, under reqwest.
@@ -116,6 +118,24 @@ roaring = { version = "0.11", default-features = false }
 # xxh3-64, which places a session on its log partition (openqtt-core's partition_of, R3). Only
 # that hash: the default features add four others and a random seed source.
 twox-hash = { version = "2.1", default-features = false, features = ["xxhash3_64"] }
+# The crypto of openqtt-auth outside TLS: PBKDF2-HMAC-SHA256 for password hashes, the salts'
+# random bytes, and SHA-256 for a pinned CA's fingerprint. aws-lc-rs is already the one crypto
+# provider (deny.toml bans ring); these are the features rustls turns on, so nothing new is
+# built.
+aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "prebuilt-nasm"] }
+# The salt and hash of a PHC string, in base64 without padding. The version and features rcgen's
+# pem already brings, so not the default simd-unsafe.
+base64 = { version = "0.23.1", default-features = false, features = ["alloc"] }
+# Client certificates for identity: the subject CN, the extended key usage and the key
+# identifiers (R2 rules 2 to 4). verify-aws checks a signature with aws-lc-rs, to find the CA
+# that really issued a leaf; its other feature, verify, would bring ring.
+x509-parser = { version = "0.18.1", default-features = false, features = ["verify-aws"] }
+# The user name and client identifier patterns of the ACL. Linear time in the input, whatever the
+# pattern, so a rule cannot be written that a client's name makes slow.
+regex = "1.12"
+# The literals every match of a pattern begins with, so the 1.x converter can tell whether an ACL
+# pattern may match the names reserved for services. The version regex already brings.
+regex-syntax = "0.8.11"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

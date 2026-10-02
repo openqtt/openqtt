@@ -1,9 +1,9 @@
 //! The `openqtt` binary: one executable for every role.
 //!
 //! `openqtt run` will start the roles this process is configured for: edge, router, log and
-//! admin, any of them or all of them. `openqtt config` checks and prints the configuration. The
-//! other subcommands are the operator's tools; none is implemented yet, and each says so and
-//! exits with status 1.
+//! admin, any of them or all of them. `openqtt config` checks and prints the configuration, and
+//! `openqtt convert` converts the files of 1.x. The other subcommands are the operator's tools;
+//! none is implemented yet, and each says so and exits with status 1.
 //!
 //! Settings come from openqtt-config, the one crate that reads the environment, from the file
 //! `--config` names. The exit status is 0 for success, 1 for a failure while running, and 2 for
@@ -18,6 +18,7 @@
     reason = "a command line reports to its operator on stderr"
 )]
 
+mod convert;
 mod logging;
 mod telemetry;
 
@@ -55,7 +56,8 @@ enum Command {
     #[command(subcommand)]
     Config(ConfigCommand),
     /// Convert 1.x ACL and password files to their 2.0 formats.
-    Convert,
+    #[command(subcommand)]
+    Convert(convert::ConvertCommand),
     /// Migrate state, such as retained messages, from a 1.x broker.
     Migrate,
 }
@@ -80,7 +82,7 @@ impl Command {
             Self::Run => "run",
             Self::Ctl => "ctl",
             Self::Config(_) => "config",
-            Self::Convert => "convert",
+            Self::Convert(_) => "convert",
             Self::Migrate => "migrate",
         }
     }
@@ -94,6 +96,7 @@ fn main() -> ExitCode {
         Command::Run => run(cli.config),
         Command::Config(ConfigCommand::Check) => check(cli.config),
         Command::Config(ConfigCommand::Print { effective }) => print(cli.config, effective),
+        Command::Convert(command) => convert::run(command),
         other => {
             eprintln!("openqtt {}: not implemented yet", other.name());
             ExitCode::FAILURE
