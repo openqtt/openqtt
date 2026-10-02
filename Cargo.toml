@@ -55,6 +55,10 @@ thiserror = "2.0"
 # Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
 # payload is a slice of the buffer it arrived in rather than a copy.
 bytes = "1.12"
+# A counting global allocator, a dev-dependency only: the client listener's soak test reports
+# the heap an idle connection costs against report R7's budget (D1). Implementing one takes the
+# unsafe code the workspace forbids. It has no dependencies of its own.
+cap = "0.1.2"
 # Property tests, a dev-dependency only: random valid packets must round-trip and random bytes
 # must never panic the decoder. Without the fork and timeout features, which run each case in
 # a child process and bring tempfile and rusty-fork for it.
