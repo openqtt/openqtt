@@ -1,0 +1,284 @@
+# The intended differences between OpenQTT 2.0 and OpenQTT 1.x (EMQX 5.8.9), from report R1
+# (docs/reports/R01-conformance.md), where each is argued: the decisions D1 to D32, then the
+# behaviours the specification leaves open, O-entries, where OpenQTT chooses otherwise than
+# EMQX and no decision already explains the difference (O4 and O26). Once 2.0 runs, the
+# differential harness expects these differences in the traces of the scenarios listed, and
+# no others.
+#
+# Each entry: `id`, the decision or open choice; `statements`, the R1 statements it bears on;
+# `summary`; `emqx`, what OpenQTT 1.x does; `openqtt`, what 2.0 does; `scenarios`, the
+# scenarios of scenarios.rs whose traces show it (empty while none does). The test
+# the_divergences_list_d1_to_d32_and_the_differing_choices_and_name_what_exists keeps this
+# file and the catalogue consistent with each other and with R1.
+
+[[divergence]]
+id = "D1"
+statements = ["MQTT-3.1.2-1", "MQTT-3.1.2-2"]
+summary = "What a client of an older MQTT version receives."
+emqx = "Accepts MQTT 3.1 and 3.1.1, and level 0x85 as a bridge; another level gets 20 02 00 01 if the CONNECT parses in the 3.1.1 layout and a close without a reply if not; another protocol name, a close without a reply."
+openqtt = "Levels 3 and 4, with or without the bridge bit, get 20 02 00 01; any other level, 0x85 included, gets 20 03 00 84 00; then close. Another protocol name, a close without a reply."
+scenarios = ["unsupported_protocol"]
+
+[[divergence]]
+id = "D2"
+statements = ["MQTT-3.8.4-7"]
+summary = "A denied PUBLISH or SUBSCRIBE."
+emqx = "With deny_action = ignore, PUBACK or PUBREC 0x87 and SUBACK 0x87; a denied QoS 0 PUBLISH is dropped. deny_action = disconnect closes the connection."
+openqtt = "0x87 in PUBACK, PUBREC and SUBACK every time, never a disconnect for a policy refusal; a denied QoS 0 PUBLISH is dropped and counted."
+scenarios = []
+
+[[divergence]]
+id = "D3"
+statements = ["MQTT-1.5.4-1", "MQTT-1.5.4-2", "MQTT-1.5.5-1", "MQTT-1.5.7-1", "MQTT-2.1.3-1", "MQTT-2.2.1-3", "MQTT-2.2.2-1", "MQTT-3.1.3-4", "MQTT-3.1.3-12", "MQTT-3.3.1-2", "MQTT-3.3.1-11", "MQTT-3.3.2-19", "MQTT-3.6.1-1", "MQTT-3.8.1-1", "MQTT-3.8.3-5", "MQTT-3.10.1-1", "MQTT-3.14.1-1", "MQTT-3.14.2-1", "MQTT-3.15.1-1"]
+summary = "Malformed input."
+emqx = "strict_mode is off: fixed-header flags, UTF-8 outside topics, Packet Identifier 0 and DUP on QoS 0 pass, and some checks are never made in any mode."
+openqtt = "Always strict, with no setting: each is a Malformed Packet or a Protocol Error, as the standard classes it."
+scenarios = ["malformed_packets"]
+
+[[divergence]]
+id = "D4"
+statements = ["MQTT-3.1.2-3", "MQTT-3.1.2-9", "MQTT-3.1.2-11", "MQTT-3.1.2-30", "MQTT-3.1.4-1", "MQTT-3.3.1-4", "MQTT-3.8.3-2", "MQTT-3.10.3-2", "MQTT-3.14.0-1"]
+summary = "Reason codes for errors."
+emqx = "A malformed MQTT 5 CONNECT gets CONNACK 0x95; a PUBLISH with both QoS bits set gets DISCONNECT 0x9B; an empty SUBSCRIBE or UNSUBSCRIBE gets DISCONNECT 0x8F; a packet during enhanced authentication gets DISCONNECT 0x82 before any CONNACK."
+openqtt = "0x81 for a malformed packet and 0x82 for a protocol error; before acceptance a refusal is a CONNACK, never a DISCONNECT."
+scenarios = ["malformed_packets"]
+
+[[divergence]]
+id = "D5"
+statements = ["MQTT-3.1.2-22"]
+summary = "When a silent client is disconnected."
+emqx = "Idleness is sampled every check interval, so DISCONNECT 0x8D comes between 1.5 and 2 times the Keep Alive."
+openqtt = "A deadline at 1.5 times the Keep Alive, reset by every packet, with Keep Alive held to 10 to 1,200 seconds through Server Keep Alive (O4): a Keep Alive of 2 becomes 10."
+scenarios = ["keep_alive_timeout"]
+
+[[divergence]]
+id = "D6"
+statements = ["MQTT-3.1.2-24", "MQTT-3.1.2-25"]
+summary = "A packet too large for the client."
+emqx = "Dropped by the connection after the message entered the window, where it keeps its slot; a packet exactly at the client's Maximum Packet Size is dropped too."
+openqtt = "The session checks the size first and completes the message; a packet equal to the limit is sent."
+scenarios = ["client_maximum_packet_size"]
+
+[[divergence]]
+id = "D7"
+statements = ["MQTT-2.2.1-4", "MQTT-4.3.2-1", "MQTT-4.3.3-1"]
+summary = "Packet Identifiers the server chooses."
+emqx = "A wrapping counter; meeting an identifier still in flight crashes the connection."
+openqtt = "The next identifier not in flight."
+scenarios = []
+
+[[divergence]]
+id = "D8"
+statements = ["MQTT-4.3.3-9", "MQTT-4.3.3-10"]
+summary = "A QoS 2 PUBLISH repeated before its PUBREL."
+emqx = "PUBREC 0x91, which a conforming client takes as a failure; the identifier is kept for await_rel_timeout (300 s) and then forgotten, so a later repeat is delivered twice."
+openqtt = "PUBREC 0x00 again and no second delivery; the identifier is held until PUBREL or the end of the session."
+scenarios = ["qos2_repeated_publish"]
+
+[[divergence]]
+id = "D9"
+statements = ["MQTT-4.3.3-4", "MQTT-4.4.0-2"]
+summary = "A failure PUBREC from the client."
+emqx = "The reason code is ignored and PUBREL sent."
+openqtt = "The exchange ends and the identifier is free again."
+scenarios = ["qos2_refused_by_the_subscriber"]
+
+[[divergence]]
+id = "D10"
+statements = ["MQTT-3.6.2-1"]
+summary = "A repeated PUBREC."
+emqx = "PUBREL 0x91, which is not a PUBREL reason code."
+openqtt = "PUBREL 0x00 again."
+scenarios = ["qos2_refused_by_the_subscriber"]
+
+[[divergence]]
+id = "D11"
+statements = ["MQTT-4.4.0-1", "MQTT-4.6.0-5"]
+summary = "The order of resends after a reconnect."
+emqx = "Identifier order, which stops being send order once identifiers wrap."
+openqtt = "The original send order."
+scenarios = []
+
+[[divergence]]
+id = "D12"
+statements = ["MQTT-3.3.4-6"]
+summary = "Subscription Identifiers."
+emqx = "A client PUBLISH may carry one, and it is forwarded; a SUBSCRIBE with the largest legal value, 268,435,455, gets DISCONNECT 0xA1."
+openqtt = "One on a client PUBLISH is a Protocol Error; every value from 1 to 268,435,455 is accepted."
+scenarios = ["subscription_identifiers"]
+
+[[divergence]]
+id = "D13"
+statements = ["MQTT-3.3.4-7", "MQTT-3.3.4-9"]
+summary = "Receive Maximum."
+emqx = "Announced as the client's own value capped at 32; inbound, only QoS 2 is limited, at 100."
+openqtt = "Announces its own limit, 32, and holds inbound QoS 1 and 2 to it with DISCONNECT 0x93."
+scenarios = ["connect_and_connack"]
+
+[[divergence]]
+id = "D14"
+statements = ["MQTT-3.3.4-2", "MQTT-3.3.4-3", "MQTT-3.3.4-4", "MQTT-3.3.4-5"]
+summary = "Overlapping subscriptions."
+emqx = "One copy per matching subscription, each with its own Subscription Identifier."
+openqtt = "One copy per session, at the highest QoS, with every matching Subscription Identifier."
+scenarios = ["subscription_identifiers"]
+
+[[divergence]]
+id = "D15"
+statements = ["MQTT-3.3.1-5", "MQTT-3.3.1-6", "MQTT-3.3.1-9", "MQTT-3.3.2-5"]
+summary = "Retained messages."
+emqx = "Stores are skipped above a size, a rate or a table limit with a normal PUBACK; held in RAM; an interval of 0 never expires; delivered by a worker pool after the subscription, so a live message can come first."
+openqtt = "The retained write is part of accepting the publish: committed before PUBACK, or refused with 0x97 and not routed. Durable, one expiry rule, and delivered after the SUBACK and before live messages."
+scenarios = ["retained_after_subscribe", "retained_cleared_by_zero_bytes"]
+
+[[divergence]]
+id = "D16"
+statements = ["MQTT-4.1.0-1"]
+summary = "A full queue."
+emqx = "Drops its oldest message and keeps the session; QoS 0 is queued for offline sessions."
+openqtt = "Ends the session after DISCONNECT 0x97; QoS 0 is not queued for offline sessions."
+scenarios = []
+
+[[divergence]]
+id = "D17"
+statements = ["MQTT-4.8.2-1", "MQTT-3.10.4-1"]
+summary = "$queue/ and $exclusive/ filters."
+emqx = "$queue/t is the shared subscription $share/$queue/t, and $exclusive/t an exclusive subscription to t."
+openqtt = "Ordinary filters with no special meaning; $share/ is the one shared form."
+scenarios = []
+
+[[divergence]]
+id = "D18"
+statements = ["MQTT-3.1.2-23"]
+summary = "Session Expiry Interval."
+emqx = "MQTT 5 values are used as sent, up to never."
+openqtt = "Capped at 7 days (604,800 s) and returned in CONNACK whenever the value used differs."
+scenarios = ["connect_and_connack"]
+
+[[divergence]]
+id = "D19"
+statements = ["MQTT-3.1.3-6"]
+summary = "A zero-length Client Identifier with Clean Start 0."
+emqx = "Refused with CONNACK 0x85."
+openqtt = "Accepted, with an assigned identifier."
+scenarios = ["assigned_client_identifier"]
+
+[[divergence]]
+id = "D20"
+statements = ["MQTT-3.1.3-2", "MQTT-3.2.2-16"]
+summary = "Certificate identity."
+emqx = "peer_cert_as_clientid = cn replaces the Client Identifier and tells the client nothing; over QUIC the peer certificate cannot be read at all."
+openqtt = "On a listener configured for certificate identity, the subject CN names the session and is returned as Assigned Client Identifier, whatever was sent."
+scenarios = []
+
+[[divergence]]
+id = "D21"
+statements = ["MQTT-3.3.1-6", "MQTT-3.8.4-8", "MQTT-4.3.3-7", "MQTT-4.4.0-1"]
+summary = "Settings not carried over."
+emqx = "upgrade_qos, retry_interval, retainer.stop_publish_clear_msg and strict_mode exist."
+openqtt = "None of them: the first three break the statements listed, and strict checking is always on."
+scenarios = []
+
+[[divergence]]
+id = "D22"
+statements = ["MQTT-3.3.2-12"]
+summary = "Topic Alias Maximum."
+emqx = "Announces 65,535."
+openqtt = "Announces 64, and aliases travel on the control stream only."
+scenarios = ["connect_and_connack", "topic_aliases"]
+
+[[divergence]]
+id = "D23"
+statements = ["MQTT-3.2.2-15"]
+summary = "The server's Maximum Packet Size."
+emqx = "1 MB, compared with the Remaining Length, so a packet a few bytes over 1 MiB in all is accepted."
+openqtt = "1 MiB, compared with the whole packet."
+scenarios = ["connect_and_connack", "server_maximum_packet_size"]
+
+[[divergence]]
+id = "D24"
+statements = ["MQTT-4.8.2-3"]
+summary = "Shared subscriptions."
+emqx = "Round robin per publishing connection by default, with six other strategies."
+openqtt = "Round robin per publishing edge over connected members, or by publisher Client Identifier."
+scenarios = []
+
+[[divergence]]
+id = "D25"
+statements = ["MQTT-3.1.3-5", "MQTT-3.2.2-16"]
+summary = "Client Identifier format and length."
+emqx = "Assigned: 16 base62 characters. Accepted: up to 65,535 bytes."
+openqtt = "Assigned: oq and 21 base62 characters, 23 in all. Accepted: up to 256 bytes."
+scenarios = ["assigned_client_identifier"]
+
+[[divergence]]
+id = "D26"
+statements = ["MQTT-4.3.2-4", "MQTT-4.3.3-8"]
+summary = "What an acknowledgement means."
+emqx = "PUBACK once the message is routed in memory."
+openqtt = "PUBACK once it is durable: the retained write and every durable partition commit are done."
+scenarios = []
+
+[[divergence]]
+id = "D27"
+statements = []
+summary = "Limits on topic levels and subscriptions (R2 rule 8)."
+emqx = "A PUBLISH over 128 levels gets DISCONNECT 0x90; subscriptions per session are unlimited."
+openqtt = "A PUBLISH over 128 levels gets PUBACK or PUBREC 0x90 and the connection stays; at most 1,000 subscriptions per session."
+scenarios = []
+
+[[divergence]]
+id = "D28"
+statements = []
+summary = "Capabilities in CONNACK."
+emqx = "Retain Available, Wildcard, Subscription Identifier and Shared Subscription Available are sent explicitly."
+openqtt = "Every property whose absence means the same is left out."
+scenarios = ["connect_and_connack"]
+
+[[divergence]]
+id = "D29"
+statements = ["MQTT-3.1.2-8"]
+summary = "Wills when a node stops."
+emqx = "The session ends with the node, so its will goes out at once, whatever the Will Delay."
+openqtt = "The session outlives the edge; the will waits for its delay and is dropped if the client reconnects."
+scenarios = []
+
+[[divergence]]
+id = "D30"
+statements = []
+summary = "Reason Strings."
+emqx = "Only THROTTLED, on CONNACK."
+openqtt = "A fixed phrase on each refusal, left out when Request Problem Information is 0 or it would not fit."
+scenarios = []
+
+[[divergence]]
+id = "D31"
+statements = []
+summary = "A reconnect while the previous connection is still being cleaned up."
+emqx = "Refused with CONNACK 0x89 and the Reason String THROTTLED."
+openqtt = "The claim at the log orders the two connections; the new one waits for it rather than being refused."
+scenarios = []
+
+[[divergence]]
+id = "D32"
+statements = ["MQTT-3.3.2-2", "MQTT-3.3.2-14", "MQTT-4.7.0-1", "MQTT-4.7.1-1", "MQTT-4.7.1-2", "MQTT-4.7.3-1", "MQTT-4.8.2-1", "MQTT-4.8.2-2"]
+summary = "Topic syntax errors."
+emqx = "A bad Topic Name gets DISCONNECT 0x90 and a bad Response Topic DISCONNECT 0x82; one bad filter turns the whole SUBSCRIBE or UNSUBSCRIBE into DISCONNECT 0x8F."
+openqtt = "The one item is refused and the connection stays: PUBACK or PUBREC 0x90 for the PUBLISH, dropped and counted at QoS 0, and 0x8F in the SUBACK or UNSUBACK for that filter alone."
+scenarios = ["invalid_topic_filters", "invalid_topic_names"]
+
+[[divergence]]
+id = "O4"
+statements = ["MQTT-3.1.2-22", "MQTT-3.2.2-22"]
+summary = "Keep Alive bounds and Server Keep Alive."
+emqx = "Uses every client's Keep Alive as sent, 0 included; server_keepalive, off by default, would impose one value on every client."
+openqtt = "Uses values from 10 to 1,200 seconds as sent; 0 and values above 1,200 get Server Keep Alive 1,200, and values below 10 get 10, in CONNACK."
+scenarios = ["connect_and_connack", "keep_alive_timeout"]
+
+[[divergence]]
+id = "O26"
+statements = []
+summary = "The reason code of PUBACK and PUBREC for a message no subscription matched."
+emqx = "0x10 No matching subscribers whenever routing found no subscriber, even for a retained message it stored for later subscribers."
+openqtt = "0x00 whenever the message was accepted, retained or committed for a durable session included; 0x10 only when the message is not retained and nothing matched."
+scenarios = ["retained_after_subscribe", "retained_cleared_by_zero_bytes"]

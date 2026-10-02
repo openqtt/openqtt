@@ -1,0 +1,64 @@
+{
+  "clients": {
+    "ping_first": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "type": "PINGREQ"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ],
+    "twice": [
+      {
+        "connection": 1
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-twice",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "properties": {
+            "maximum_packet_size": 1048576,
+            "receive_maximum": 32,
+            "retain_available": true,
+            "shared_subscription_available": true,
+            "subscription_identifier_available": true,
+            "topic_alias_maximum": 65535,
+            "wildcard_subscription_available": true
+          },
+          "reason_code": "0x00 Success",
+          "session_present": false,
+          "type": "CONNACK"
+        }
+      },
+      {
+        "sent": {
+          "clean_start": true,
+          "client_id": "{ns}-twice",
+          "keep_alive": 60,
+          "type": "CONNECT"
+        }
+      },
+      {
+        "received": {
+          "reason_code": "0x82 ProtocolError",
+          "type": "DISCONNECT"
+        }
+      },
+      {
+        "ended": "by the server"
+      }
+    ]
+  },
+  "scenario": "first_packet_and_second_connect"
+}

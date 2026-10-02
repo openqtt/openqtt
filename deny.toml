@@ -1,8 +1,21 @@
-# cargo-deny, run by `make deny` (part of `make check`). Every target is checked, not only the
-# host's, and dev-dependencies count too.
+# cargo-deny, run by `make deny` (part of `make check`). Every platform OpenQTT is built for is
+# checked, not only the host's, and dev-dependencies count too.
 
 [graph]
-targets = []
+# The platforms OpenQTT is built for; PLATFORMS in the Makefile lists the same. Not every
+# target: quinn-proto depends on ring for wasm32-unknown-unknown, which nothing here is built
+# for, and the ban on ring below is about what OpenQTT links.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "armv7-unknown-linux-gnueabihf",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+]
 all-features = false
 
 [advisories]
