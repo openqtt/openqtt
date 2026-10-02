@@ -22,7 +22,7 @@ EMQX or from a measured spike. They go in `reports/`; a spike's code is in
 | R4 | The log: storage engine, partitioning, what durable means before a PUBACK, data model | to be written |
 | R5 | Sessions and handoff: takeover, drain, rolling upgrade, wills | to be written |
 | [R6](reports/R06-routing.md) | Routing at scale: interest aggregation, wildcard index, memory, fan-out | draft |
-| R7 | QUIC in a cluster: migration, 0-RTT and load balancers | to be written |
+| [R7](reports/R07-quic.md) | QUIC in a cluster: migration, 0-RTT and load balancers | draft: S4 measured, S3 to come |
 | R8 | Security model: authentication, authorization, revocation, admin API | to be written |
 | R9 | Operations contract: metrics, logs, health, admin API and CLI | to be written |
 | R10 | Migration from 1.x | to be written |
