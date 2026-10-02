@@ -1,7 +1,7 @@
 //! The connection task: everything the client does on an open connection, from the CONNACK
 //! to the close.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
 use std::num::NonZeroU16;
 use std::sync::Arc;
@@ -174,6 +174,11 @@ pub(crate) struct Driver {
     queued: VecDeque<(Publish, oneshot::Sender<Result<Published, Error>>)>,
     /// Callers waiting for an acknowledgement, by Packet Identifier.
     replies: HashMap<u16, Reply>,
+    /// Identifiers of QoS 2 PUBLISH packets the server sent on this connection whose PUBREL
+    /// has not come: what counts against the client's Receive Maximum, which, like every send
+    /// quota, starts afresh with each connection (section 4.9). The session's own set, which
+    /// outlives the connection, only keeps a repeat from being delivered twice.
+    inbound_here: HashSet<u16>,
     /// Topic Aliases the server set on this connection ([MQTT-3.3.2-7]: none carry over).
     inbound_aliases: HashMap<u16, String>,
     /// Topic Aliases this client set on this connection.
@@ -226,6 +231,7 @@ impl Driver {
             in_flight: 0,
             queued: VecDeque::new(),
             replies: HashMap::new(),
+            inbound_here: HashSet::new(),
             inbound_aliases: HashMap::new(),
             outbound_aliases: HashMap::new(),
             last_sent: Instant::now(),
@@ -840,6 +846,7 @@ impl Driver {
             }
             Packet::PubRec(pubrec) => self.on_pubrec(pubrec),
             Packet::PubRel(pubrel) => {
+                self.inbound_here.remove(&pubrel.packet_id.get());
                 let known = self.session.inbound.remove(&pubrel.packet_id.get());
                 let reason_code = if known {
                     PubCompReasonCode::Success
@@ -931,14 +938,16 @@ impl Driver {
                 self.send(&Packet::PubAck(PubAck::new(id)))?;
             }
             (QoS::ExactlyOnce, Some(id)) => {
-                if !self.session.inbound.contains(&id.get()) {
-                    if self.session.inbound.len() >= usize::from(self.negotiated.receive_maximum) {
+                if !self.inbound_here.contains(&id.get()) {
+                    if self.inbound_here.len() >= usize::from(self.negotiated.receive_maximum) {
                         return Err(self.protocol_error(
                             DisconnectReasonCode::ReceiveMaximumExceeded,
                             "more QoS 2 messages than the client's Receive Maximum".into(),
                         ));
                     }
-                    self.session.inbound.insert(id.get());
+                    self.inbound_here.insert(id.get());
+                }
+                if self.session.inbound.insert(id.get()) {
                     self.emit(Event::Message(publish));
                 }
                 // A repeat before PUBREL gets PUBREC again and is not delivered twice

@@ -1560,3 +1560,59 @@ async fn publications_whose_callers_gave_up_are_dropped_unsent() {
     server.send(PubAck::new(first.packet_id.unwrap())).await;
     assert!(server.silent_for(Duration::from_secs(1)).await);
 }
+
+#[tokio::test(start_paused = true)]
+async fn the_inbound_quota_starts_afresh_on_each_connection() {
+    let options = || {
+        ConnectOptions::new("c")
+            .keep_alive(0)
+            .receive_maximum(NonZeroU16::new(2).unwrap())
+    };
+    // Two QoS 2 messages arrive, and their PUBREL has not come when the connection ends.
+    let (client, mut events, mut server) = connect(options()).await;
+    for id in [1, 2] {
+        server
+            .send(Publish {
+                qos: QoS::ExactlyOnce,
+                packet_id: Some(pid(id)),
+                ..qos1("t", "before")
+            })
+            .await;
+        assert_eq!(server.recv().await, Packet::PubRec(PubRec::new(pid(id))));
+        assert!(events.next_message().await.is_some());
+    }
+    let session = client.disconnect().await.unwrap();
+
+    // The Receive Maximum is per connection: on the resumed one, the server may send two QoS 2
+    // messages again, whatever the session still remembers.
+    let resumed = ConnAck {
+        session_present: true,
+        ..ConnAck::default()
+    };
+    let (_client, mut events, mut server, _) =
+        connect_with(options().resume(session), resumed).await;
+    server
+        .send(Publish {
+            qos: QoS::ExactlyOnce,
+            packet_id: Some(pid(3)),
+            ..qos1("t", "after")
+        })
+        .await;
+    assert_eq!(server.recv().await, Packet::PubRec(PubRec::new(pid(3))));
+    // What the session remembers still holds: a repeat of 1 is not delivered again, and its
+    // PUBREL completes it.
+    server
+        .send(Publish {
+            dup: true,
+            qos: QoS::ExactlyOnce,
+            packet_id: Some(pid(1)),
+            ..qos1("t", "before")
+        })
+        .await;
+    assert_eq!(server.recv().await, Packet::PubRec(PubRec::new(pid(1))));
+    server.send(PubRel::new(pid(1))).await;
+    assert_eq!(server.recv().await, Packet::PubComp(PubComp::new(pid(1))));
+    let message = events.next_message().await.unwrap();
+    assert_eq!(message.payload, "after");
+    assert!(server.silent_for(Duration::from_secs(1)).await);
+}
