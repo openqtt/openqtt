@@ -401,7 +401,26 @@ fn mqtt_3_2_2_3_clean_start_0_resumes_the_session_the_claim_found() {
 
 #[test]
 fn mqtt_3_2_2_6_a_refusing_connack_has_session_present_0() {
-    // A 0-RTT connection whose claim resumed a session, refused before its CONNACK went out.
+    // The claim resumed the session, and the CONNACK announcing it cannot reach the client.
+    let mut harness = Harness::new();
+    harness.stored = Some(SessionState::new(ClientId::new("client-1").unwrap(), 60));
+    let packets = harness.send(connect_with("client-1", |connect| {
+        connect.clean_start = false;
+        connect.properties = ConnectProperties {
+            session_expiry_interval: Some(60),
+            maximum_packet_size: std::num::NonZeroU32::new(15),
+            ..ConnectProperties::default()
+        };
+    }));
+    let connack = refusal(&packets);
+    assert_eq!(connack.reason_code, ConnectReasonCode::PacketTooLarge);
+    assert!(!connack.session_present);
+}
+
+#[test]
+fn no_connack_before_the_handshake_completes_a_refusal_included() {
+    // A 0-RTT connection, claimed and waiting for its handshake, is shut down: no CONNACK may
+    // go before the handshake completes (docs/spec/mqtt-over-quic.md, section 4).
     let mut harness = Harness::with_peer(
         Config::default(),
         Peer {
@@ -409,19 +428,11 @@ fn mqtt_3_2_2_6_a_refusing_connack_has_session_present_0() {
             ..Peer::new(0)
         },
     );
-    harness.stored = Some(SessionState::new(ClientId::new("client-1").unwrap(), 60));
-    assert!(
-        harness
-            .send(connect_with("client-1", |connect| {
-                connect.clean_start = false;
-                connect.properties = expiry(60);
-            }))
-            .is_empty()
-    );
+    assert!(harness.send(connect("client-1")).is_empty());
     let packets = harness.input(Input::Shutdown(crate::Shutdown::ServerShuttingDown));
-    let connack = refusal(&packets);
-    assert_eq!(connack.reason_code, ConnectReasonCode::ServerUnavailable);
-    assert!(!connack.session_present);
+    assert!(packets.is_empty());
+    assert_eq!(harness.closed(), Some(CloseCode::NoError));
+    assert_eq!(harness.releases().len(), 1);
 }
 
 #[test]

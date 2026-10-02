@@ -571,6 +571,28 @@ fn the_message_carries_what_subscribers_must_receive_unaltered() {
 }
 
 #[test]
+fn r1_o8_the_deadline_runs_from_the_moment_of_receipt() {
+    let mut harness = Harness::connected();
+    harness.auto.authorize = None;
+    // The first PUBLISH waits for its authorization; the second arrives meanwhile, at 0 s.
+    harness.send(publish1("a", 1, "x"));
+    let mut expiring = publish1("b", 2, "y");
+    expiring.properties.message_expiry_interval = Some(10);
+    harness.send(expiring);
+    harness.advance(seconds(4));
+    for _ in 0..2 {
+        let request = harness.authorizations.remove(0);
+        harness.input(Input::Authorized {
+            request: request.request,
+            decisions: vec![Decision::Allow],
+        });
+    }
+    // Processed at 4 s, it still expires 10 s after it arrived.
+    let deadline = harness.published()[1].expiry.unwrap();
+    assert_eq!(deadline.at(), at(10));
+}
+
+#[test]
 fn r2_rules_6_and_7_a_publish_is_authorized_as_sent_then_mounted() {
     let config = Config {
         mountpoint: Some(Mountpoint::parse("ingest/${username}/").unwrap()),

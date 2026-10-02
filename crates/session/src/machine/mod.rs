@@ -208,11 +208,12 @@ impl Default for Limits {
 /// Something the client sent.
 #[derive(Debug)]
 enum Received {
-    /// A packet.
+    /// A packet, and when it arrived.
     Packet {
         stream: StreamId,
         packet: Packet,
         early: bool,
+        at: Timestamp,
     },
     /// Bytes that did not decode.
     Error {
@@ -285,6 +286,8 @@ enum Authorizing {
     Publish {
         request: u64,
         stream: StreamId,
+        /// When the PUBLISH arrived, which its message's deadline runs from.
+        received_at: Timestamp,
         publish: Box<Publish>,
         topic: TopicName,
         response_topic: Option<TopicName>,
@@ -549,6 +552,7 @@ impl Session {
                     stream,
                     packet,
                     early,
+                    at: now,
                 },
                 now,
             ),
@@ -657,12 +661,14 @@ impl Session {
 
     /// A packet, or an error, once the connection is accepted.
     fn connected(&mut self, received: Received, now: Timestamp, fx: &mut Effects) {
-        let (stream, packet) = match received {
+        let (stream, packet, received_at) = match received {
             Received::Error { error, .. } => {
                 // [MQTT-4.13.1-1]
                 return self.close_with(error.disconnect_reason_code(), None, now, fx);
             }
-            Received::Packet { stream, packet, .. } => (stream, packet),
+            Received::Packet {
+                stream, packet, at, ..
+            } => (stream, packet, at),
         };
         // Only the client's packets, with the client's reason codes and properties (Table 2-1,
         // [MQTT-3.3.4-6]); a decoder told the sender refuses these already.
@@ -677,7 +683,7 @@ impl Session {
         match packet {
             // [MQTT-3.1.0-2]
             Packet::Connect(_) => self.protocol_error(now, fx),
-            Packet::Publish(publish) => self.publish(stream, publish, now, fx),
+            Packet::Publish(publish) => self.publish(stream, publish, received_at, now, fx),
             Packet::PubAck(ack) => self.puback(&ack, now, fx),
             Packet::PubRec(rec) => self.pubrec(stream, &rec, now, fx),
             Packet::PubRel(rel) => self.pubrel(stream, &rel, now, fx),
@@ -860,6 +866,12 @@ impl Session {
         now: Timestamp,
         fx: &mut Effects,
     ) {
+        if !self.handshake_complete {
+            // No CONNACK before the handshake completes, a refusal included
+            // (docs/spec/mqtt-over-quic.md, section 4): the refusal is a close without a reply,
+            // which report R1 (D4) allows before acceptance.
+            return self.finish(ending, CloseCode::NoError, fx);
+        }
         let code = if code.is_error() {
             code
         } else {

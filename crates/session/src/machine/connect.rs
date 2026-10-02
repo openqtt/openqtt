@@ -29,6 +29,7 @@ impl Session {
                 stream: StreamId::Control,
                 packet: Packet::Connect(connect),
                 early,
+                ..
             } => self.connect(*connect, early, now, fx),
             // [MQTT-3.1.0-1]: anything else is closed on without a reply.
             Received::Packet { .. } => {

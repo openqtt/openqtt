@@ -25,6 +25,7 @@ impl Session {
         &mut self,
         stream: StreamId,
         mut publish: Publish,
+        received_at: Timestamp,
         now: Timestamp,
         fx: &mut Effects,
     ) {
@@ -118,6 +119,7 @@ impl Session {
         self.authorizing = Some(Authorizing::Publish {
             request,
             stream,
+            received_at,
             publish: Box::new(publish),
             topic,
             response_topic,
@@ -144,13 +146,21 @@ impl Session {
         match self.authorizing.take() {
             Some(Authorizing::Publish {
                 stream,
+                received_at,
                 publish,
                 topic,
                 response_topic,
                 ..
             }) => {
                 let allowed = decisions.first() == Some(&Decision::Allow);
-                self.route(stream, *publish, &topic, response_topic, allowed, now, fx);
+                let route = Route {
+                    stream,
+                    received_at,
+                    topic: &topic,
+                    response_topic,
+                    allowed,
+                };
+                self.route(route, *publish, now, fx);
             }
             Some(Authorizing::Subscribe {
                 stream,
@@ -164,20 +174,14 @@ impl Session {
     }
 
     /// Publishes an authorized PUBLISH into the broker, or refuses it.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the parts of one PUBLISH, taken apart where it was checked"
-    )]
-    fn route(
-        &mut self,
-        stream: StreamId,
-        publish: Publish,
-        topic: &TopicName,
-        response_topic: Option<TopicName>,
-        allowed: bool,
-        now: Timestamp,
-        fx: &mut Effects,
-    ) {
+    fn route(&mut self, route: Route<'_>, publish: Publish, now: Timestamp, fx: &mut Effects) {
+        let Route {
+            stream,
+            received_at,
+            topic,
+            response_topic,
+            allowed,
+        } = route;
         if !allowed {
             // Report R1, D2 and O14; report R2, rule 12.
             return self.refuse_publish(stream, &publish, AckCode::NotAuthorized, now, fx);
@@ -213,7 +217,7 @@ impl Session {
         // ([MQTT-3.3.1-3]).
         message.payload_format = properties.payload_format_indicator.map(core_format);
         // Report R1, O8: the deadline is the moment of receipt plus the interval.
-        message.expiry = deadline(now, properties.message_expiry_interval);
+        message.expiry = deadline(received_at, properties.message_expiry_interval);
         message.content_type = properties.content_type;
         message.response_topic = response_topic;
         message.correlation_data = properties.correlation_data;
@@ -450,4 +454,18 @@ impl Session {
         );
         self.finish_stream_if_done(stream, fx);
     }
+}
+
+/// What the checks before authorization found out about a PUBLISH.
+struct Route<'a> {
+    /// The stream it came on.
+    stream: StreamId,
+    /// When it arrived.
+    received_at: Timestamp,
+    /// Its Topic Name, checked and not mounted.
+    topic: &'a TopicName,
+    /// Its Response Topic, checked.
+    response_topic: Option<TopicName>,
+    /// Whether the authorizer allowed it.
+    allowed: bool,
 }
