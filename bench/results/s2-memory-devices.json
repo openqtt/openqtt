@@ -1,0 +1,290 @@
+{
+  "args": {
+    "n": "100000,1000000,10000000",
+    "out": "../../bench/results/s2-memory-devices.json",
+    "workload": "a"
+  },
+  "experiment": "memory",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:15:49Z",
+    "memory_bytes": "17179869184",
+    "note": "laptop numbers: absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "mixed_kinds": [
+      [
+        "device commands, ingest/o/n/d/commands/#",
+        90000
+      ],
+      [
+        "device exact, ingest/o/n/d/config",
+        5000
+      ],
+      [
+        "namespace, ingest/o/n/+/telemetry",
+        1500
+      ],
+      [
+        "namespace, ingest/o/n/+/events/#",
+        1500
+      ],
+      [
+        "organisation, ingest/o/+/+/status",
+        990
+      ],
+      [
+        "organisation, ingest/o/#",
+        990
+      ],
+      [
+        "global, ingest/+/+/+/alerts/+ and +/+/+/+/telemetry",
+        15
+      ],
+      [
+        "system and everything, $SYS/brokers/+/clients/# and #",
+        5
+      ]
+    ],
+    "rows": [
+      {
+        "allocations_per_filter": 0.00006,
+        "entries": 100000,
+        "entries_left_after_remove_all": 0,
+        "filters": 100000,
+        "generate_seconds": 0.01798575,
+        "group_members": 0,
+        "heap_bytes": 17170448,
+        "heap_bytes_after_churn": 17563704,
+        "heap_bytes_left_after_drop": 131112,
+        "heap_bytes_per_entry": 171.70448,
+        "heap_bytes_per_filter": 171.70448,
+        "heap_bytes_per_filter_shrunk": 138.01455,
+        "heap_bytes_shrunk": 13801455,
+        "insert_per_second": 2263521.018309214,
+        "insert_per_second_net_of_generation": 3817783.6025278005,
+        "insert_seconds": 0.044178958,
+        "levels": 101006,
+        "max_children_by_depth": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            1000
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            9025
+          ],
+          [
+            4,
+            1
+          ]
+        ],
+        "mean_filter_chars": 53.9832,
+        "n": 100000,
+        "nodes": 203464,
+        "parts": {
+          "child_table": 1310728,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 2097152,
+          "level_spans": 1572864,
+          "level_table": 655368,
+          "nodes": 6291456,
+          "terms": 5242880
+        },
+        "parts_shrunk": {
+          "child_table": 1310728,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 1609039,
+          "level_spans": 1212072,
+          "level_table": 655368,
+          "nodes": 4883136,
+          "terms": 4000000
+        },
+        "parts_total": 17170448,
+        "reinsert_tenth_per_second": 2452338.3613542393,
+        "remove_all_per_second": 1984597.853593914,
+        "remove_tenth_random_order_per_second": 1618186.3413555447,
+        "sizes": {
+          "destset": 32,
+          "node": 24,
+          "term": 40
+        },
+        "workload": "a"
+      },
+      {
+        "allocations_per_filter": 6e-6,
+        "entries": 1000000,
+        "entries_left_after_remove_all": 0,
+        "filters": 1000000,
+        "generate_seconds": 0.19272625,
+        "group_members": 0,
+        "heap_bytes": 153092112,
+        "heap_bytes_after_churn": 173015096,
+        "heap_bytes_left_after_drop": 1048616,
+        "heap_bytes_per_entry": 153.092112,
+        "heap_bytes_per_filter": 153.092112,
+        "heap_bytes_per_filter_shrunk": 149.541815,
+        "heap_bytes_shrunk": 149541815,
+        "insert_per_second": 1392835.2554459858,
+        "insert_per_second_net_of_generation": 1903914.209625714,
+        "insert_seconds": 0.71796,
+        "levels": 1010006,
+        "max_children_by_depth": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            10000
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            68143
+          ],
+          [
+            4,
+            1
+          ]
+        ],
+        "mean_filter_chars": 53.925707,
+        "n": 1000000,
+        "nodes": 2034408,
+        "parts": {
+          "child_table": 20971528,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 16777216,
+          "level_spans": 12582912,
+          "level_table": 10485768,
+          "nodes": 50331648,
+          "terms": 41943040
+        },
+        "parts_shrunk": {
+          "child_table": 20971528,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 16090039,
+          "level_spans": 12120072,
+          "level_table": 10485768,
+          "nodes": 48825792,
+          "terms": 40000000
+        },
+        "parts_total": 153092112,
+        "reinsert_tenth_per_second": 1563223.8028254674,
+        "remove_all_per_second": 791444.4331259975,
+        "remove_tenth_random_order_per_second": 552268.6137924719,
+        "sizes": {
+          "destset": 32,
+          "node": 24,
+          "term": 40
+        },
+        "workload": "a"
+      },
+      {
+        "allocations_per_filter": 6e-7,
+        "entries": 10000000,
+        "entries_left_after_remove_all": 0,
+        "filters": 10000000,
+        "generate_seconds": 2.182423708,
+        "group_members": 0,
+        "heap_bytes": 2197815312,
+        "heap_bytes_after_churn": 2222981176,
+        "heap_bytes_left_after_drop": 8388648,
+        "heap_bytes_per_entry": 219.7815312,
+        "heap_bytes_per_filter": 219.7815312,
+        "heap_bytes_per_filter_shrunk": 143.0312037,
+        "heap_bytes_shrunk": 1430312037,
+        "insert_per_second": 846920.6101191752,
+        "insert_per_second_net_of_generation": 1038954.7288087754,
+        "insert_seconds": 11.807482166,
+        "levels": 10100004,
+        "max_children_by_depth": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            99998
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            551759
+          ],
+          [
+            4,
+            1
+          ]
+        ],
+        "mean_filter_chars": 53.888939,
+        "n": 10000000,
+        "nodes": 20340211,
+        "parts": {
+          "child_table": 167772168,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 268435456,
+          "level_spans": 201326592,
+          "level_table": 83886088,
+          "nodes": 805306368,
+          "terms": 671088640
+        },
+        "parts_shrunk": {
+          "child_table": 167772168,
+          "dest_bitmaps": 0,
+          "dest_vectors": 0,
+          "free_lists": 0,
+          "groups": 0,
+          "level_arena": 160900021,
+          "level_spans": 121200048,
+          "level_table": 83886088,
+          "nodes": 488165064,
+          "terms": 400000000
+        },
+        "parts_total": 2197815312,
+        "reinsert_tenth_per_second": 979753.8066609607,
+        "remove_all_per_second": 612790.2328184459,
+        "remove_tenth_random_order_per_second": 555367.5003952669,
+        "sizes": {
+          "destset": 32,
+          "node": 24,
+          "term": 40
+        },
+        "workload": "a"
+      }
+    ]
+  },
+  "spike": "S2"
+}

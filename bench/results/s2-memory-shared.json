@@ -1,0 +1,134 @@
+{
+  "args": {
+    "n": "1000000",
+    "out": "../../bench/results/s2-memory-shared.json",
+    "workload": "c"
+  },
+  "experiment": "memory",
+  "machine": {
+    "cores": "10",
+    "cpu": "Apple M2 Pro",
+    "date": "2026-10-02T05:15:54Z",
+    "memory_bytes": "17179869184",
+    "note": "laptop numbers: absolute values are for this machine only",
+    "os": "macOS 26.5",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)"
+  },
+  "results": {
+    "mixed_kinds": [
+      [
+        "device commands, ingest/o/n/d/commands/#",
+        90000
+      ],
+      [
+        "device exact, ingest/o/n/d/config",
+        5000
+      ],
+      [
+        "namespace, ingest/o/n/+/telemetry",
+        1500
+      ],
+      [
+        "namespace, ingest/o/n/+/events/#",
+        1500
+      ],
+      [
+        "organisation, ingest/o/+/+/status",
+        990
+      ],
+      [
+        "organisation, ingest/o/#",
+        990
+      ],
+      [
+        "global, ingest/+/+/+/alerts/+ and +/+/+/+/telemetry",
+        15
+      ],
+      [
+        "system and everything, $SYS/brokers/+/clients/# and #",
+        5
+      ]
+    ],
+    "rows": [
+      {
+        "allocations_per_filter": 0.0013378662133786622,
+        "entries": 1043524,
+        "entries_left_after_remove_all": 43524,
+        "filters": 1000100,
+        "generate_seconds": 0.192773,
+        "group_members": 43527,
+        "heap_bytes": 153368192,
+        "heap_bytes_after_churn": 173291176,
+        "heap_bytes_left_after_drop": 1048616,
+        "heap_bytes_per_entry": 146.97140841993092,
+        "heap_bytes_per_filter": 153.35285671432857,
+        "heap_bytes_per_filter_shrunk": 149.83202279772024,
+        "heap_bytes_shrunk": 149847006,
+        "insert_per_second": 1522578.5077754043,
+        "insert_per_second_net_of_generation": 2155137.19309195,
+        "insert_seconds": 0.656780583,
+        "levels": 1011007,
+        "max_children_by_depth": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            10000
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            68143
+          ],
+          [
+            4,
+            1
+          ]
+        ],
+        "mean_filter_chars": 53.925707,
+        "n": 1000000,
+        "nodes": 2034708,
+        "parts": {
+          "child_table": 20971528,
+          "dest_bitmaps": 21594,
+          "dest_vectors": 175008,
+          "free_lists": 0,
+          "groups": 66400,
+          "level_arena": 16777216,
+          "level_spans": 12582912,
+          "level_table": 10485768,
+          "nodes": 50331648,
+          "terms": 41943040
+        },
+        "parts_shrunk": {
+          "child_table": 20971528,
+          "dest_bitmaps": 21594,
+          "dest_vectors": 175008,
+          "free_lists": 0,
+          "groups": 66400,
+          "level_arena": 16095938,
+          "level_spans": 12132084,
+          "level_table": 10485768,
+          "nodes": 48832992,
+          "terms": 40004000
+        },
+        "parts_total": 153355114,
+        "reinsert_tenth_per_second": 1753079.6292344215,
+        "remove_all_per_second": 1009940.8049253665,
+        "remove_tenth_random_order_per_second": 769233.7872014252,
+        "sizes": {
+          "destset": 32,
+          "node": 24,
+          "term": 40
+        },
+        "workload": "c"
+      }
+    ]
+  },
+  "spike": "S2"
+}

@@ -1,0 +1,38 @@
+# Spike S4: what an idle QUIC connection costs on quinn 0.11, rustls 0.23 and aws-lc-rs, with a
+# client certificate. Feeds report R7 (docs/reports/R07-quic.md, which says how to rerun it). A
+# crate and workspace of its own, excluded from the product workspace, every dependency at an
+# exact version, and no ring anywhere in the tree.
+[package]
+name = "openqtt-spike-s4"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "s4"
+path = "src/main.rs"
+
+[dependencies]
+# QUIC. Not the default features: those bring rustls-ring and the platform verifier.
+quinn = { version = "=0.11.12", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs", "log"] }
+# TLS 1.3 on aws-lc-rs, as the broker will run it. prefer-post-quantum is rustls's default and
+# makes X25519MLKEM768 the first key share; the spike measures with and without it.
+rustls = { version = "=0.23.45", default-features = false, features = ["aws_lc_rs", "std", "logging", "prefer-post-quantum"] }
+# A CA, a server certificate and client certificates for every run, signed with aws-lc-rs.
+rcgen = { version = "=0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
+tokio = { version = "=1.53.1", features = ["rt", "rt-multi-thread", "macros", "time", "sync", "io-util"] }
+# Socket buffers for the UDP sockets the endpoints use.
+socket2 = "=0.6.5"
+# Process CPU time, memory footprint and thread priority, read from the OS.
+libc = "=0.2.189"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+
+[workspace]
+members = ["."]
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+debug = "line-tables-only"
