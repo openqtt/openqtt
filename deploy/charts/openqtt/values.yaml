@@ -78,9 +78,20 @@ podLabels: {}
 podManagementPolicy: Parallel
 
 ## What lives in /opt/openqtt/data: the Mnesia/Mria disc tables (REST API users,
-## retained messages, built-in authn/authz) and cluster.hocon, which is where
-## every config change made through the REST API is persisted. With persistence
-## off a rolling restart is survivable, but a full cluster stop loses all of it.
+## built-in authn/authz) and cluster.hocon, which is where every config change
+## made through the REST API is persisted. With persistence off a rolling
+## restart is survivable, but a full cluster stop loses all of it.
+##
+## RETAINED MESSAGES ARE NOT IN THAT LIST BY DEFAULT, and this comment used to
+## say they were. `retainer.backend.storage_type` defaults to `ram`
+## (emqx_retainer_schema.erl:138-143), which makes the table `ram_copies`, so a
+## volume here does not save it and a full cluster stop loses every retained
+## message however this is set. Set `storage_type = disc` as well if you are
+## keeping anything in the retained store that has to survive.
+##
+## Changing it on a running cluster is safe: `emqx_retainer_mnesia.erl:190-200`
+## calls `mnesia:change_table_copy_type/3` when the configured type differs from
+## the one on disc, so it converts in place rather than starting empty.
 persistence:
   enabled: false
   size: 1Gi

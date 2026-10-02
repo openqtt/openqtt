@@ -56,7 +56,7 @@ init_per_testcase(t_status_non_official, Config) ->
 init_per_testcase(t_status_official, Config) ->
     meck:new(emqx_telemetry_config, [non_strict, passthrough]),
     meck:expect(emqx_telemetry_config, is_official_version, 0, true),
-    %% check official telemetry is enable by default
+    %% check official telemetry is disabled by default too
     {ok, _} = emqx:update_config([telemetry], #{}),
     Config;
 init_per_testcase(_TestCase, Config) ->
@@ -85,9 +85,11 @@ set_special_configs(_App) ->
 %% Tests
 %%------------------------------------------------------------------------------
 
-%% official's telemetry is enabled by default
+%% OpenQTT: official's telemetry is disabled by default as well. Upstream
+%% enabled it here, so a build whose version reads as a release reported to
+%% telemetry.emqx.io (#9).
 t_status_official(_) ->
-    check_status(true).
+    check_status(false).
 
 %% non official's telemetry is disabled by default
 t_status_non_official(_) ->

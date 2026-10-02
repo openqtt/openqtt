@@ -52,11 +52,40 @@ digest recorded in the release notes rather than by tag. The chart's README
 covers the value you must set before installing it.
 
 ```
-docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.0
+docker run --rm -p 1883:1883 -p 18083:18083 ghcr.io/openqtt/openqtt:1.0.1
 ```
 
 The version the broker reports is the EMQX version inside, `5.8.9`. OpenQTT's
 own version is the image tag and the chart version.
+
+## Usage reports
+
+OpenQTT sends no usage reports unless you turn them on.
+
+Upstream's telemetry application is still in the tree, and from 1.0.1 its
+`telemetry.enable` defaults to `false`. In 1.0.0 an unset `telemetry.enable`
+fell back to whether the broker's version string looked like an official
+release. A node that reported `5.8.9` posted a usage report to EMQ at
+`https://telemetry.emqx.io/api/telemetry` 10 seconds after it started and every
+7 days after that: node and cluster UUIDs, OS and Erlang/OTP versions, client
+and message counts, and which authentication, gateway and bridge features were
+configured. The published 1.0.0 images report `5.8.9-g49aaa3f5`, which does not
+look like a release, so they send nothing; a 1.0.0 build stamped `5.8.9`, for
+example with `PKG_VSN=5.8.9`, does. See
+[#9](https://github.com/openqtt/OpenQTT/issues/9).
+`GET /api/v5/telemetry/status` says which a node is doing.
+
+To be certain on 1.0.0, set `OPENQTT_TELEMETRY__ENABLE=false` in the node's
+environment. With the chart, pass it as a string:
+`--set-string openqttConfig.OPENQTT_TELEMETRY__ENABLE=false`, or `"false"` in
+quotes in a values file. The chart drops any `openqttConfig` value that is a
+boolean false, so a plain `--set` does nothing. On a running node,
+`PUT /api/v5/telemetry/status` with `{"enable": false}` stops it without a
+restart, but that setting lives in the data directory, so set the variable too.
+
+To turn reports on from 1.0.1, set `OPENQTT_TELEMETRY__ENABLE=true` (or
+`telemetry.enable = true` in `etc/emqx.conf`), or send
+`PUT /api/v5/telemetry/status` with `{"enable": true}`.
 
 ## Upgrading from EMQX
 

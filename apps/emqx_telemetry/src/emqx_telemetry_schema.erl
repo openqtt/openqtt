@@ -34,7 +34,8 @@ namespace() -> "emqxtel".
 roots() -> ["telemetry"].
 
 fields("telemetry") ->
-    [{enable, ?HOCON(boolean(), #{required => false, desc => ?DESC("enable")})}].
+    %% OpenQTT: off unless set to true, see emqx_telemetry_config:is_enabled/0.
+    [{enable, ?HOCON(boolean(), #{required => false, default => false, desc => ?DESC("enable")})}].
 
 desc("telemetry") ->
     ?DESC("telemetry_root_doc");

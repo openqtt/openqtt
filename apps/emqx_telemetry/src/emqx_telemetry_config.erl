@@ -36,9 +36,12 @@
     is_official_version/0
 ]).
 
+%% OpenQTT: unset means off. Upstream fell back to is_official_version/0, so a
+%% build whose version reads as a release, 5.8.9 for one, posted usage reports
+%% to telemetry.emqx.io without being asked (#9). Reporting starts only when
+%% enable is set to true.
 is_enabled() ->
-    IsOfficial = ?MODULE:is_official_version(),
-    emqx_conf:get([telemetry, enable], IsOfficial).
+    emqx_conf:get([telemetry, enable], false).
 
 on_server_start() ->
     emqx_conf:add_handler([telemetry], ?MODULE).
@@ -70,7 +73,8 @@ post_config_update(
         false -> emqx_telemetry:stop_reporting()
     end;
 post_config_update(_, _UpdateReq, NewConf, _OldConf, _AppEnvs) ->
-    case maps:get(enable, NewConf, ?MODULE:is_official_version()) of
+    %% OpenQTT: unset means off here too, see is_enabled/0.
+    case maps:get(enable, NewConf, false) of
         true -> emqx_telemetry:start_reporting();
         false -> emqx_telemetry:stop_reporting()
     end.
