@@ -1,6 +1,9 @@
 //! The transport's one error type.
 
 use std::fmt;
+use std::io;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use bytes::Bytes;
 use openqtt_codec::{DisconnectReasonCode, PacketType};
@@ -11,6 +14,42 @@ use crate::StreamTag;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A setting of the listener is missing, out of the range the transport supports, or at
+    /// odds with another.
+    #[error("{setting}: {reason}")]
+    Setting {
+        /// The setting, dotted as in the configuration file where it comes from there.
+        setting: String,
+        /// Why it is refused.
+        reason: String,
+    },
+    /// A file a setting names cannot be read, or does not hold what it should. The reason never
+    /// quotes the file, which may hold a private key.
+    #[error("{setting}: {}: {reason}", .path.display())]
+    File {
+        /// The setting that names the file.
+        setting: String,
+        /// The file.
+        path: PathBuf,
+        /// What is wrong with it.
+        reason: String,
+    },
+    /// rustls refused the TLS configuration, such as a key that does not match its certificate.
+    #[error("TLS: {0}")]
+    Tls(#[from] rustls::Error),
+    /// The UDP socket of an endpoint cannot be set up.
+    #[error("cannot bind {address}: {source}")]
+    Bind {
+        /// The address.
+        address: SocketAddr,
+        /// Why.
+        #[source]
+        source: io::Error,
+    },
+    /// A connection attempt ended before its handshake completed: refused for its certificate
+    /// or its application protocol, or silent for too long.
+    #[error("the handshake failed: {0}")]
+    Handshake(Closed),
     /// Bytes on a stream do not decode as a packet the client may send. The session answers
     /// with the CONNACK or DISCONNECT whose reason code the codec error names, then closes the
     /// connection (MQTT 5.0, section 4.13).

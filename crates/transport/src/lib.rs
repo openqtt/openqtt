@@ -9,8 +9,14 @@
 //!
 //! It must not depend on `openqtt-session`, `openqtt-wire` or `openqtt-auth` (`make layers`).
 
+mod cid;
+mod config;
 mod error;
 mod seam;
+mod tls;
 
+pub use cid::{CID_LEN, CidRoute};
+pub use config::{ClientAuth, DEFAULT_PORT, ListenerConfig, Resumption};
 pub use error::{Closed, Error, Violation};
 pub use seam::{CloseCode, Event, MqttConnection, Peer, StreamEnd, StreamTag};
+pub use tls::ALPN;

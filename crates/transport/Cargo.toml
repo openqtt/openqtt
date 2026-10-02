@@ -11,9 +11,17 @@ publish.workspace = true
 [dependencies]
 bytes.workspace = true
 openqtt-codec.workspace = true
+openqtt-config.workspace = true
+openqtt-core.workspace = true
 openqtt-ext.workspace = true
+quinn.workspace = true
+quinn-proto.workspace = true
+rustls.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["time"] }
+
+[dev-dependencies]
+openqtt-testkit.workspace = true
 
 [lints]
 workspace = true

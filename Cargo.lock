@@ -1121,7 +1121,13 @@ version = "2.0.0-alpha.0"
 dependencies = [
  "bytes",
  "openqtt-codec",
+ "openqtt-config",
+ "openqtt-core",
  "openqtt-ext",
+ "openqtt-testkit",
+ "quinn",
+ "quinn-proto",
+ "rustls",
  "thiserror",
  "tokio",
 ]
