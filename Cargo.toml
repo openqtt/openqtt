@@ -88,6 +88,14 @@ roaring = { version = "0.11", default-features = false }
 # xxh3-64, which places a session on its log partition (openqtt-core's partition_of, R3). Only
 # that hash: the default features add four others and a random seed source.
 twox-hash = { version = "2.1", default-features = false, features = ["xxhash3_64"] }
+# The crypto of openqtt-auth outside TLS: PBKDF2-HMAC-SHA256 for password hashes, the salts'
+# random bytes, and SHA-256 for a pinned CA's fingerprint. aws-lc-rs is already the one crypto
+# provider (deny.toml bans ring); these are the features rustls turns on, so nothing new is
+# built.
+aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "prebuilt-nasm"] }
+# The salt and hash of a PHC string, in base64 without padding. The version and features rcgen's
+# pem already brings, so not the default simd-unsafe.
+base64 = { version = "0.23.1", default-features = false, features = ["alloc"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
