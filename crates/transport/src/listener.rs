@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::num::{NonZeroU8, NonZeroU32};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
 use quinn::{TokioRuntime, VarInt};
 use socket2::{Domain, Protocol, Socket, Type};
@@ -19,6 +20,7 @@ pub(crate) struct Shared {
     pub(crate) max_packet_size: NonZeroU32,
     pub(crate) send_backlog: usize,
     early_data: bool,
+    handshake_timeout: Duration,
     endpoints: NonZeroU8,
     server: quinn::ServerConfig,
     config: ListenerConfig,
@@ -93,6 +95,7 @@ impl Listener {
                 max_packet_size: config.max_packet_size,
                 send_backlog: config.send_backlog,
                 early_data: config.early_data,
+                handshake_timeout: config.handshake_timeout,
                 endpoints: config.endpoints,
                 server,
                 config,
@@ -322,54 +325,65 @@ impl Accepting {
     }
 
     /// Completes the handshake: TLS 1.3 with ALPN `mqtt`, and the client's certificate checked
-    /// as the listener requires.
+    /// as the listener requires, within the listener's handshake timeout.
     ///
     /// With 0-RTT on, the connection comes as soon as the client opens a stream in 0-RTT data,
     /// and [`Event::HandshakeComplete`](crate::Event::HandshakeComplete) follows once the
-    /// handshake confirms it; otherwise it comes once the handshake is complete.
+    /// handshake confirms it, or the connection closes when the timeout runs out first;
+    /// otherwise it comes once the handshake is complete.
     ///
     /// # Errors
     ///
     /// [`Error::Handshake`] when the handshake fails: a client certificate missing or not
-    /// issued by the listener's CAs, no ALPN `mqtt`, or a client that went silent.
+    /// issued by the listener's CAs, no ALPN `mqtt`, or, with [`Closed::TimedOut`], a client too
+    /// slow to complete it.
     pub async fn establish(self) -> Result<QuicConnection, Error> {
+        let deadline = tokio::time::Instant::now() + self.shared.handshake_timeout;
+        // Dropping the attempt when time runs out closes it.
+        tokio::time::timeout_at(deadline, self.handshake(deadline))
+            .await
+            .unwrap_or(Err(Error::Handshake(Closed::TimedOut)))
+    }
+
+    async fn handshake(self, deadline: tokio::time::Instant) -> Result<QuicConnection, Error> {
         let failed = |error: quinn::ConnectionError| Error::Handshake(Closed::of(&error));
         let connecting = self.incoming.accept().map_err(failed)?;
-        if self.shared.early_data {
-            // A server's attempt always converts: it may then read 0-RTT data.
-            match connecting.into_0rtt() {
-                Ok((connection, mut handshake)) => {
-                    // Whichever comes first: the end of the handshake, or a stream the client
-                    // opened, in 0-RTT data if the handshake is still going on.
-                    let first = tokio::select! {
-                        biased;
-                        _ = &mut handshake => None,
-                        stream = connection.accept_bi() => Some(stream),
-                    };
-                    return match first {
-                        None => match connection.close_reason() {
-                            Some(error) => Err(failed(error)),
-                            None => Ok(QuicConnection::new(connection, &self.shared, None, None)),
-                        },
-                        Some(stream) => {
-                            let (send, recv) = stream.map_err(failed)?;
-                            let handshake = recv.is_0rtt().then_some(handshake);
-                            Ok(QuicConnection::new(
-                                connection,
-                                &self.shared,
-                                handshake,
-                                Some((send, recv)),
-                            ))
-                        }
-                    };
-                }
-                Err(connecting) => {
-                    let connection = connecting.await.map_err(failed)?;
-                    return Ok(QuicConnection::new(connection, &self.shared, None, None));
-                }
-            }
+        if !self.shared.early_data {
+            let connection = connecting.await.map_err(failed)?;
+            return Ok(QuicConnection::new(connection, &self.shared, None, None));
         }
-        let connection = connecting.await.map_err(failed)?;
-        Ok(QuicConnection::new(connection, &self.shared, None, None))
+        // A server's attempt always converts: it may then read 0-RTT data.
+        let (connection, mut handshake) = match connecting.into_0rtt() {
+            Ok(converted) => converted,
+            Err(connecting) => {
+                let connection = connecting.await.map_err(failed)?;
+                return Ok(QuicConnection::new(connection, &self.shared, None, None));
+            }
+        };
+        // Whichever comes first: the end of the handshake, or a stream the client opened, in
+        // 0-RTT data if the handshake is still going on.
+        let first = tokio::select! {
+            biased;
+            _ = &mut handshake => None,
+            stream = connection.accept_bi() => Some(stream),
+        };
+        let Some(stream) = first else {
+            return match connection.close_reason() {
+                Some(error) => Err(failed(error)),
+                None => Ok(QuicConnection::new(connection, &self.shared, None, None)),
+            };
+        };
+        let (send, recv) = stream.map_err(failed)?;
+        let handshake = recv.is_0rtt().then(|| {
+            // The rest of the handshake keeps the deadline of the whole.
+            Box::pin(async move { tokio::time::timeout_at(deadline, handshake).await.is_ok() })
+                as crate::connection::Handshake
+        });
+        Ok(QuicConnection::new(
+            connection,
+            &self.shared,
+            handshake,
+            Some((send, recv)),
+        ))
     }
 }

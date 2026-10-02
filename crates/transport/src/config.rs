@@ -28,6 +28,9 @@ const DEFAULT_MAX_PACKET_SIZE: NonZeroU32 = match NonZeroU32::new(1 << 20) {
     None => NonZeroU32::MIN,
 };
 
+/// How long a handshake may take by default: msquic's, and so EMQX's, handshake idle timeout.
+const DEFAULT_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// How much longer than 1.5 times the longest Keep Alive the QUIC idle timeout is. The session
 /// closes a silent client at 1.5 times its Keep Alive, within a second (R2 rule 24), so QUIC
 /// never closes a connection MQTT still considers alive (docs/spec/mqtt-over-quic.md, section
@@ -85,6 +88,7 @@ pub struct ListenerConfig {
     pub(crate) resumption: Resumption,
     pub(crate) early_data: bool,
     keep_alive_max: Duration,
+    pub(crate) handshake_timeout: Duration,
     pub(crate) max_packet_size: NonZeroU32,
     node: Option<NodeId>,
     pub(crate) socket_buffer: Option<usize>,
@@ -107,6 +111,7 @@ impl fmt::Debug for ListenerConfig {
             .field("resumption", &self.resumption)
             .field("early_data", &self.early_data)
             .field("keep_alive_max", &self.keep_alive_max)
+            .field("handshake_timeout", &self.handshake_timeout)
             .field("max_packet_size", &self.max_packet_size)
             .field("node", &self.node)
             .field("socket_buffer", &self.socket_buffer)
@@ -131,7 +136,7 @@ impl ListenerConfig {
     /// `key`, and otherwise the defaults of docs/spec/config.md and report R7: UDP 14567 on
     /// every address, one endpoint, no client certificate, 8 bidirectional streams and no
     /// unidirectional ones, 1 MiB windows, MTU discovery, stateless tickets, no 0-RTT, a Keep
-    /// Alive of at most 20 minutes and packets of at most 1 MiB.
+    /// Alive of at most 20 minutes, 10 seconds for a handshake and packets of at most 1 MiB.
     pub fn new(
         name: &str,
         chain: Vec<CertificateDer<'static>>,
@@ -153,6 +158,7 @@ impl ListenerConfig {
             resumption: Resumption::Tickets,
             early_data: false,
             keep_alive_max: Duration::from_secs(1_200),
+            handshake_timeout: DEFAULT_HANDSHAKE_TIMEOUT,
             max_packet_size: DEFAULT_MAX_PACKET_SIZE,
             node: None,
             socket_buffer: None,
@@ -332,6 +338,15 @@ impl ListenerConfig {
     #[must_use]
     pub fn keep_alive_max(mut self, keep_alive_max: Duration) -> Self {
         self.keep_alive_max = keep_alive_max;
+        self
+    }
+
+    /// How long a client has to complete its handshake: 10 seconds by default. Without it, a
+    /// client that starts one and goes silent holds its connection for the whole idle timeout,
+    /// half an hour by default.
+    #[must_use]
+    pub fn handshake_timeout(mut self, timeout: Duration) -> Self {
+        self.handshake_timeout = timeout;
         self
     }
 

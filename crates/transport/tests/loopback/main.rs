@@ -9,12 +9,16 @@ mod handshake;
 mod streams;
 
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
+use bytes::Bytes;
 use openqtt_testkit::{RawConnection, Target, TestPki};
+use openqtt_transport::CID_LEN;
 use openqtt_transport::{
     Endpoint, Error, Event, Listener, ListenerConfig, MqttConnection, QuicConnection, StreamTag,
 };
+use tokio::net::UdpSocket;
 
 /// How long a test waits for something that must happen.
 pub(crate) const WAIT: Duration = Duration::from_secs(5);
@@ -109,4 +113,78 @@ pub(crate) async fn take_connect(server: &mut QuicConnection) {
         ),
         "{event:?}"
     );
+}
+
+/// A UDP relay between one client and a server, which records the destination connection ID of
+/// every short-header packet the client sends, and can lose what the client sends.
+pub(crate) struct Relay {
+    pub(crate) address: SocketAddr,
+    ids: Arc<Mutex<Vec<Bytes>>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+impl Relay {
+    /// Relays to `server` the first `forwarded` datagrams the client sends, and drops the rest.
+    pub(crate) async fn start(server: SocketAddr, forwarded: usize) -> Self {
+        let outside = UdpSocket::bind("127.0.0.1:0").await.expect("a socket");
+        let inside = UdpSocket::bind("127.0.0.1:0").await.expect("a socket");
+        inside.connect(server).await.expect("the server's address");
+        let address = outside.local_addr().expect("a bound socket");
+        let ids = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&ids);
+        let task = tokio::spawn(async move {
+            let mut from_client = vec![0; 65_536];
+            let mut from_server = vec![0; 65_536];
+            let mut client = None;
+            let mut forwarded = forwarded;
+            loop {
+                tokio::select! {
+                    received = outside.recv_from(&mut from_client) => {
+                        let Ok((length, from)) = received else { return };
+                        client = Some(from);
+                        let datagram = &from_client[..length];
+                        // A short header: the form bit clear, the connection ID right after.
+                        if datagram.first().is_some_and(|first| first & 0x80 == 0)
+                            && let Some(id) = datagram.get(1..1 + CID_LEN)
+                        {
+                            recorded
+                                .lock()
+                                .unwrap_or_else(PoisonError::into_inner)
+                                .push(Bytes::copy_from_slice(id));
+                        }
+                        if forwarded == 0 {
+                            continue;
+                        }
+                        forwarded -= 1;
+                        if inside.send(datagram).await.is_err() {
+                            return;
+                        }
+                    }
+                    received = inside.recv(&mut from_server) => {
+                        let Ok(length) = received else { return };
+                        if let Some(client) = client
+                            && outside.send_to(&from_server[..length], client).await.is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+        Self { address, ids, task }
+    }
+
+    /// The destination connection IDs of the client's short-header packets.
+    pub(crate) fn short_header_ids(&self) -> Vec<Bytes> {
+        self.ids
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
 }

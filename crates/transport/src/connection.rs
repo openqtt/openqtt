@@ -15,10 +15,7 @@ use std::task::{Context, Poll};
 use bytes::{Bytes, BytesMut};
 use openqtt_codec::{Decoder, Packet, Sender};
 use openqtt_ext::Certificate;
-use quinn::{
-    ConnectionError, ReadError, RecvStream, SendStream, StoppedError, VarInt, WriteError,
-    ZeroRttAccepted,
-};
+use quinn::{ConnectionError, ReadError, RecvStream, SendStream, StoppedError, VarInt, WriteError};
 use rustls::pki_types::CertificateDer;
 
 use crate::listener::Shared;
@@ -28,6 +25,10 @@ use crate::{
 
 /// A future the connection keeps between polls.
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+
+/// The rest of a handshake, for a connection yielded with 0-RTT data: whether it completed in
+/// time.
+pub(crate) type Handshake = BoxFuture<bool>;
 
 /// The most bytes taken from a stream at a time.
 const READ_CHUNK: usize = 64 * 1024;
@@ -54,7 +55,7 @@ pub struct QuicConnection {
     /// The client's next bidirectional stream, or why the connection closed.
     accept: Option<BoxFuture<Result<(SendStream, RecvStream), ConnectionError>>>,
     /// Completes with the handshake, when the connection was yielded before it.
-    handshake: Option<ZeroRttAccepted>,
+    handshake: Option<Handshake>,
     handshake_done: bool,
     handshake_reported: bool,
     paused: bool,
@@ -422,7 +423,7 @@ impl QuicConnection {
     pub(crate) fn new(
         connection: quinn::Connection,
         shared: &Shared,
-        handshake: Option<ZeroRttAccepted>,
+        handshake: Option<Handshake>,
         first: Option<(SendStream, RecvStream)>,
     ) -> Self {
         let certificates: Vec<Certificate> = connection
@@ -539,10 +540,16 @@ impl QuicConnection {
             let Some(handshake) = self.handshake.as_mut() else {
                 return false;
             };
-            if Pin::new(handshake).poll(cx).is_ready() {
+            if let Poll::Ready(in_time) = handshake.as_mut().poll(cx) {
                 self.handshake = None;
                 self.handshake_done = true;
-                if let Some(error) = self.connection.close_reason() {
+                if !in_time {
+                    // The client sent 0-RTT data and never completed the handshake.
+                    self.connection
+                        .close(VarInt::from_u32(CloseCode::ProtocolError.value()), b"");
+                    self.handshake_reported = true;
+                    self.closed.get_or_insert(Closed::TimedOut);
+                } else if let Some(error) = self.connection.close_reason() {
                     // The handshake failed rather than completed, and is never reported.
                     self.handshake_reported = true;
                     self.lose(&error);

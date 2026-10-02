@@ -2,6 +2,7 @@
 //! listener's CAs alone (R2 rules 1 to 3, docs/spec/mqtt-over-quic.md sections 1 and 3).
 
 use std::net::Ipv4Addr;
+use std::time::{Duration, Instant};
 
 use openqtt_testkit::codec::Packet;
 use openqtt_testkit::{Close, RawConnection, TestPki, packets};
@@ -9,7 +10,7 @@ use openqtt_transport::{
     ClientAuth, Closed, Error, Event, MqttConnection, QuicConnection, StreamTag,
 };
 
-use crate::{bind, config, connected, next, pair, target};
+use crate::{Relay, bind, config, connected, next, pair, target};
 
 /// The QUIC transport error code of TLS alert `alert` (RFC 9001, section 4.8).
 const fn crypto_error(alert: u64) -> u64 {
@@ -171,4 +172,24 @@ async fn an_application_protocol_other_than_mqtt_is_refused_with_alert_120() {
             (crypto_error(120), crypto_error(120))
         );
     }
+}
+
+#[tokio::test]
+async fn a_client_that_stalls_its_handshake_is_dropped_in_time() {
+    let pki = TestPki::new("Handshake CA").unwrap();
+    let endpoint = bind(config(&pki).handshake_timeout(Duration::from_millis(300)));
+    // Only the client's first datagram reaches the server: the handshake starts and stalls.
+    let relay = Relay::start(endpoint.local_address(), 1).await;
+    let target =
+        openqtt_testkit::Target::new(relay.address, "localhost", vec![pki.ca_certificate()]);
+    let client = tokio::spawn(async move { RawConnection::connect(&target).await.is_ok() });
+    let accepting = endpoint.accept().await.unwrap();
+    let started = Instant::now();
+    let error = accepting.establish().await.err().unwrap();
+    assert!(
+        matches!(error, Error::Handshake(Closed::TimedOut)),
+        "{error}"
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+    client.abort();
 }

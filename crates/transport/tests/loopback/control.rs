@@ -1,12 +1,10 @@
 //! The control stream in single-stream mode (docs/spec/mqtt-over-quic.md, sections 2.1 and 2.2),
 //! the packets it may carry, closing (section 7), connection IDs and endpoints.
 
-use std::net::SocketAddr;
 use std::num::{NonZeroU8, NonZeroU32};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use bytes::Bytes;
 use openqtt_client::{Client, ConnectOptions, QuicTransport, TlsConfig};
 use openqtt_core::NodeId;
 use openqtt_testkit::codec::{
@@ -17,9 +15,8 @@ use openqtt_transport::{
     CID_LEN, CidRoute, CloseCode, Closed, Error, Event, Listener, MqttConnection, QuicConnection,
     StreamEnd, StreamTag, Violation,
 };
-use tokio::net::UdpSocket;
 
-use crate::{QUIET, WAIT, bind, config, connected, next, quiet, take_connect, target};
+use crate::{QUIET, Relay, WAIT, bind, config, connected, next, quiet, take_connect, target};
 
 #[tokio::test]
 async fn the_control_stream_must_begin_with_connect() {
@@ -208,9 +205,12 @@ async fn the_server_closes_after_its_disconnect_is_delivered() {
     server
         .send(StreamTag::Control, &Packet::from(disconnect.clone()))
         .unwrap();
+    // The close follows the client's acknowledgement, long before the linger runs out.
+    let started = std::time::Instant::now();
     server
-        .shutdown(CloseCode::NoError, Duration::from_secs(1))
+        .shutdown(CloseCode::NoError, Duration::from_secs(5))
         .await;
+    assert!(started.elapsed() < Duration::from_secs(2));
     assert!(matches!(
         client.recv_packet(WAIT).await,
         Some(Packet::ConnAck(_))
@@ -340,7 +340,7 @@ async fn connection_ids_name_the_node_and_the_endpoint() {
     let pki = TestPki::new("Control CA").unwrap();
     let node = NodeId::new(0x0123_4567_89AB_CDEF);
     let endpoint = bind(config(&pki).node(node));
-    let relay = Relay::start(endpoint.local_address()).await;
+    let relay = Relay::start(endpoint.local_address(), usize::MAX).await;
     let target =
         openqtt_testkit::Target::new(relay.address, "localhost", vec![pki.ca_certificate()]);
     let (mut client, mut server) = connected(&endpoint, &target).await;
@@ -368,73 +368,6 @@ fn route(node: NodeId, endpoint: u8) -> CidRoute {
     cid[1..9].copy_from_slice(&node.get().to_be_bytes());
     cid[9] = endpoint;
     CidRoute::of(&cid).expect("a route")
-}
-
-/// A UDP relay between one client and a server, which records the destination connection ID of
-/// every short-header packet the client sends.
-struct Relay {
-    address: SocketAddr,
-    ids: Arc<Mutex<Vec<Bytes>>>,
-    task: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for Relay {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-
-impl Relay {
-    async fn start(server: SocketAddr) -> Self {
-        let outside = UdpSocket::bind("127.0.0.1:0").await.expect("a socket");
-        let inside = UdpSocket::bind("127.0.0.1:0").await.expect("a socket");
-        inside.connect(server).await.expect("the server's address");
-        let address = outside.local_addr().expect("a bound socket");
-        let ids = Arc::new(Mutex::new(Vec::new()));
-        let recorded = Arc::clone(&ids);
-        let task = tokio::spawn(async move {
-            let mut from_client = vec![0; 65_536];
-            let mut from_server = vec![0; 65_536];
-            let mut client = None;
-            loop {
-                tokio::select! {
-                    received = outside.recv_from(&mut from_client) => {
-                        let Ok((length, from)) = received else { return };
-                        client = Some(from);
-                        let datagram = &from_client[..length];
-                        // A short header: the form bit clear, the connection ID right after.
-                        if datagram.first().is_some_and(|first| first & 0x80 == 0)
-                            && let Some(id) = datagram.get(1..1 + CID_LEN)
-                        {
-                            recorded
-                                .lock()
-                                .unwrap_or_else(PoisonError::into_inner)
-                                .push(Bytes::copy_from_slice(id));
-                        }
-                        if inside.send(datagram).await.is_err() {
-                            return;
-                        }
-                    }
-                    received = inside.recv(&mut from_server) => {
-                        let Ok(length) = received else { return };
-                        if let Some(client) = client
-                            && outside.send_to(&from_server[..length], client).await.is_err()
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-        });
-        Self { address, ids, task }
-    }
-
-    fn short_header_ids(&self) -> Vec<Bytes> {
-        self.ids
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
 }
 
 #[cfg(unix)]
