@@ -7,6 +7,7 @@ report quotes into `bench/results/`.
 
 | Spike | Question | Report |
 | --- | --- | --- |
+| [`s1-log`](s1-log) | The log role's storage engine, replication scheme, group commit and shared fsync | [R4](../docs/reports/R04-log.md) |
 | [`s2-routing`](s2-routing) | Router memory, match latency, fan-out, interest coarsening and route-view churn | [R6](../docs/reports/R06-routing.md) |
 | [`s4-quinn`](s4-quinn) | Memory and CPU per idle QUIC connection, handshake rates, transport settings | [R7](../docs/reports/R07-quic.md), section S4 |
 
