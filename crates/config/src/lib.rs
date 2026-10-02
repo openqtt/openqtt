@@ -32,7 +32,7 @@
 //! that prints as `<redacted>`. A URL that carries a password is refused, and no error repeats
 //! the value of an unknown key or variable, which may be a secret set by mistake.
 //!
-//! docs/spec/config.md lists every setting. [`reference`] writes its tables from the
+//! docs/spec/config.md lists every setting. [`reference()`] writes its tables from the
 //! declarations in `settings.rs`, and a test holds the document to them.
 
 mod load;
