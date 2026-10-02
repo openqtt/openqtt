@@ -1,6 +1,7 @@
 //! Messages to the client: deliveries and retained messages, the queue, Packet Identifiers,
 //! Receive Maximum, Maximum Packet Size and Topic Aliases, and the client's acknowledgements.
 
+use std::collections::BTreeSet;
 use std::num::{NonZeroU16, NonZeroU32};
 
 use openqtt_codec::{
@@ -72,7 +73,14 @@ impl Session {
         let mut chosen: Option<&Subscription> = None;
         let mut retain_as_published = false;
         let mut ids = Vec::new();
+        // Each subscription once, however often the edge named it, in the order it named them:
+        // its identifier goes in once, and two subscriptions with the same identifier put it in
+        // twice ([MQTT-3.3.4-4]).
+        let mut seen: BTreeSet<&TopicFilter> = BTreeSet::new();
         for filter in &delivery.subscriptions {
+            if !seen.insert(filter) {
+                continue;
+            }
             let Some(subscription) = self.subscriptions.get(filter) else {
                 // Unsubscribed: no new message is added for it ([MQTT-3.10.4-2]).
                 continue;
@@ -104,8 +112,6 @@ impl Session {
         let Some(chosen) = chosen else {
             return Err(Counter::DeliveryUnmatched);
         };
-        ids.sort_unstable();
-        ids.dedup();
         Ok(Queued {
             message: message.clone(),
             topic,

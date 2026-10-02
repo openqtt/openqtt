@@ -432,6 +432,34 @@ fn r1_o11_overlapping_subscriptions_deliver_one_copy_at_the_highest_qos() {
     assert_eq!(ids, [7, 268_435_455]);
 }
 
+#[test]
+fn mqtt_3_3_4_4_each_matching_subscription_gives_its_identifier_once_even_when_two_are_equal() {
+    let mut harness = Harness::connected();
+    for (packet_id, filter) in [(1, "t/+"), (2, "t/#")] {
+        let mut identified = subscribe1(packet_id, filter, QoS::AtLeastOnce);
+        identified.properties.subscription_identifier = NonZeroU32::new(7);
+        harness.send(identified);
+    }
+    // The edge naming one subscription twice still counts it once.
+    let packets = deliver(
+        &mut harness,
+        "t/a",
+        CoreQoS::AtLeastOnce,
+        "x",
+        &["t/+", "t/#", "t/+"],
+    );
+    let [publish] = publishes(&packets)[..] else {
+        panic!("{packets:?}");
+    };
+    let ids: Vec<_> = publish
+        .properties
+        .subscription_identifiers
+        .iter()
+        .map(|id| id.get())
+        .collect();
+    assert_eq!(ids, [7, 7]);
+}
+
 // covers: MQTT-3.3.2-3, MQTT-4.7.2-1
 #[test]
 fn r2_rule_6_a_delivery_is_stripped_and_checked_against_the_clients_own_filter() {
