@@ -4,8 +4,10 @@
 resolver = "3"
 members = ["crates/*"]
 # The codec's fuzz targets are a crate of their own: cargo-fuzz needs a nightly compiler, and
-# the gate builds this workspace on the pinned stable one.
-exclude = ["fuzz"]
+# the gate builds this workspace on the pinned stable one. The spikes are measurements kept
+# beside the code, not part of it: each is a crate of its own with exact versions and its own
+# lock file, so nothing they pull in reaches the product's.
+exclude = ["fuzz", "spikes/s2-routing", "spikes/s4-quinn"]
 
 [workspace.package]
 version = "2.0.0-alpha.0"
