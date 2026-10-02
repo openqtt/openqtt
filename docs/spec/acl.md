@@ -285,7 +285,9 @@ conversion and nothing is written.
 `openqtt convert authn <file.csv>` converts the user file of 1.x's built-in database, the header
 `user_id,password,is_superuser` and plain passwords, into a bootstrap file in the `hashed`
 format, read as 1.x reads it: fields split on commas and spaces. A superuser skips every rule in
-1.x and 2.0 has none, so a file that names one is refused.
+1.x and 2.0 has none, so a file that names one is refused. So is a name the bootstrap file
+could not read back as written, one beginning with `#` or starting or ending with white space,
+each named by its line.
 
 ## How it is decided
 

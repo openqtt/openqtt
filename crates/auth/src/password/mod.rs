@@ -5,8 +5,9 @@
 //! after the comma, exactly. In the `hashed` format the secret is a PHC string ([`PasswordHash`]);
 //! in the `plain` format it is the password, hashed as the file is loaded so that no plain
 //! password stays in memory. Blank lines and lines starting with `#` are skipped. A name is at
-//! least one character, holds no comma and no U+0000, and neither starts nor ends with
-//! whitespace.
+//! least one character, holds no comma, line break or U+0000, does not begin with `#`, and
+//! neither starts nor ends with whitespace: a name outside those rules could not be read back
+//! as it was written.
 //!
 //! With a [`ReservedPrefix`], a name that begins with it is a service credential and any other
 //! name an ordinary user, and the list refuses to give the prefix to anything but a service
@@ -139,12 +140,9 @@ impl PasswordList {
             let (name, secret) = line.split_once(',').ok_or_else(|| {
                 fail("a user is `name,secret`, and this line has no comma".into())
             })?;
-            if name.trim() != name {
-                return Err(fail(
-                    "a user name neither starts nor ends with whitespace".into(),
-                ));
+            if let Some(problem) = bootstrap_name_problem(name) {
+                return Err(fail(format!("the user name {} {problem}", shown(name))));
             }
-            check_name(name).map_err(|error| fail(error.to_string()))?;
             if let Some(first) = lines.insert(name.to_owned(), number) {
                 return Err(fail(format!(
                     "the user `{name}` is already on line {first}"
@@ -283,6 +281,36 @@ impl<'a> Iterator for Iter<'a> {
 fn decoy() -> &'static PasswordHash {
     static DECOY: OnceLock<PasswordHash> = OnceLock::new();
     DECOY.get_or_init(|| PasswordHash::derive(b"", DEFAULT_ITERATIONS, b"openqtt-no-user!"))
+}
+
+/// Why a bootstrap file cannot hold the user name `name`, if it cannot: a name the reader would
+/// take for a comment, split, trim or refuse. The reader and the 1.x converter, its one writer,
+/// both hold names to this, so that every name written reads back as it was.
+pub(crate) fn bootstrap_name_problem(name: &str) -> Option<&'static str> {
+    if name.is_empty() {
+        Some("is empty")
+    } else if name.len() > 65_535 {
+        Some("is longer than 65,535 bytes")
+    } else if name.contains('\0') {
+        Some("contains U+0000")
+    } else if name.contains([',', '\n', '\r']) {
+        Some("contains a comma or a line break, which separate users in a bootstrap file")
+    } else if name.starts_with('#') {
+        Some("begins with `#`, which makes a line of a bootstrap file a comment")
+    } else if name.trim() != name {
+        Some("starts or ends with whitespace, which a bootstrap file does not keep")
+    } else {
+        None
+    }
+}
+
+/// A name as a message shows it: quoted, and cut at 64 characters.
+pub(crate) fn shown(name: &str) -> String {
+    let mut short: String = name.chars().take(64).collect();
+    if short.len() < name.len() {
+        short.push_str("...");
+    }
+    format!("{short:?}")
 }
 
 /// The rules every name in the list follows.

@@ -17,7 +17,7 @@ use std::fmt::Write as _;
 
 use super::acl::Note;
 use crate::Error;
-use crate::password::{DEFAULT_ITERATIONS, PasswordHash};
+use crate::password::{DEFAULT_ITERATIONS, PasswordHash, bootstrap_name_problem, shown};
 
 /// A converted user file.
 #[derive(Clone, Debug)]
@@ -26,6 +26,8 @@ pub struct AuthnConversion {
     pub text: String,
     /// How many users it holds.
     pub users: usize,
+    /// Their names, in the order of the file.
+    pub names: Vec<String>,
     /// What the conversion read differently from what the file may have meant, by line.
     pub warnings: Vec<Note>,
 }
@@ -39,6 +41,15 @@ pub struct AuthnConversion {
 /// column 1.x does not know, a row with the wrong number of fields, a user named twice, or a
 /// superuser. [`Error::Random`] when no salt can be drawn.
 pub fn convert_authn(source: &str) -> Result<AuthnConversion, Error> {
+    convert_authn_with(source, &PasswordHash::new)
+}
+
+/// [`convert_authn`], hashing each password with `hash`, so that a test need not pay for the
+/// real cost of a hash.
+pub(crate) fn convert_authn_with(
+    source: &str,
+    hash: &dyn Fn(&[u8]) -> Result<PasswordHash, Error>,
+) -> Result<AuthnConversion, Error> {
     // Lines are counted by line feeds; a carriage return separates rows within one.
     let mut rows = source
         .split('\n')
@@ -82,6 +93,7 @@ pub fn convert_authn(source: &str) -> Result<AuthnConversion, Error> {
     let mut seen = HashSet::new();
     let mut warnings = Vec::new();
     let mut superusers = Vec::new();
+    let mut names = Vec::new();
     let mut users = 0;
     for (line, row) in rows {
         let values = fields(row);
@@ -96,8 +108,17 @@ pub fn convert_authn(source: &str) -> Result<AuthnConversion, Error> {
         }
         let user = values[user_column];
         let password = values[password_column];
-        if user.contains('\0') || password.contains('\0') {
-            problems.push(format!("line {line}: a field contains U+0000"));
+        // A name the bootstrap file would read back differently, or not at all, is refused
+        // here rather than written and lost.
+        if let Some(problem) = bootstrap_name_problem(user) {
+            problems.push(format!(
+                "line {line}: the user name {} {problem}",
+                shown(user)
+            ));
+            continue;
+        }
+        if password.contains('\0') {
+            problems.push(format!("line {line}: the password contains U+0000"));
             continue;
         }
         if !seen.insert(user) {
@@ -117,8 +138,9 @@ pub fn convert_authn(source: &str) -> Result<AuthnConversion, Error> {
                 ),
             }),
         }
-        let hash = PasswordHash::new(password.as_bytes())?;
+        let hash = hash(password.as_bytes())?;
         let _ = writeln!(text, "{user},{hash}");
+        names.push(user.to_owned());
         users += 1;
     }
     if !superusers.is_empty() {
@@ -134,6 +156,7 @@ pub fn convert_authn(source: &str) -> Result<AuthnConversion, Error> {
     Ok(AuthnConversion {
         text,
         users,
+        names,
         warnings,
     })
 }
@@ -147,8 +170,12 @@ fn fields(row: &str) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::OnceLock;
+
+    use proptest::prelude::*;
+
     use super::*;
-    use crate::password::{BootstrapFormat, Check, CredentialClass, PasswordList};
+    use crate::password::{BootstrapFormat, Check, CredentialClass, MIN_ITERATIONS, PasswordList};
 
     fn problems(source: &str) -> Vec<String> {
         match convert_authn(source) {
@@ -205,6 +232,89 @@ mod tests {
         let converted = convert_authn("user,password,is_superuser\ndave,p,TRUE\n").unwrap();
         assert_eq!(converted.warnings.len(), 1);
         assert_eq!(converted.warnings[0].line, 2);
+    }
+
+    /// One hash for every user of the property below: it is about names, and a real hash per
+    /// user would take most of a second in a debug build.
+    fn fixed_hash() -> &'static PasswordHash {
+        static HASH: OnceLock<PasswordHash> = OnceLock::new();
+        HASH.get_or_init(|| PasswordHash::with_iterations(b"pw", MIN_ITERATIONS).unwrap())
+    }
+
+    /// A name, mostly ordinary, sometimes with what a bootstrap file reads specially: `#`, a
+    /// comma, white space of several kinds, line breaks, U+0000.
+    fn name() -> impl Strategy<Value = String> {
+        let ordinary =
+            prop::sample::select(&['a', 'b', 'Z', '7', '-', '_', ':', '/', '.', '\u{e9}'][..]);
+        let special = prop::sample::select(
+            &['#', ',', ' ', '\t', '\u{a0}', '\u{3000}', '\r', '\n', '\0'][..],
+        );
+        prop::collection::vec(prop_oneof![9 => ordinary, 1 => special], 0..10)
+            .prop_map(|chars| chars.into_iter().collect())
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1_000))]
+
+        #[test]
+        fn every_name_the_converter_takes_reads_back_the_same(
+            names in prop::collection::vec(name(), 1..5),
+        ) {
+            let mut source = String::from("user_id,password\n");
+            for name in &names {
+                source.push_str(name);
+                source.push_str(",pw\n");
+            }
+            if let Ok(converted) = convert_authn_with(&source, &|_| Ok(fixed_hash().clone())) {
+                let list = PasswordList::parse(&converted.text, BootstrapFormat::Hashed, None);
+                prop_assert!(list.is_ok(), "{:?}\n{}", list, converted.text);
+                let list = list.unwrap();
+                let mut read: Vec<&str> = list.names().collect();
+                read.sort_unstable();
+                let mut written: Vec<&str> = converted.names.iter().map(String::as_str).collect();
+                written.sort_unstable();
+                prop_assert_eq!(read, written, "{}", converted.text);
+            }
+        }
+    }
+
+    /// The property means something only if many of the files drawn convert.
+    #[test]
+    fn the_files_drawn_often_convert() {
+        use proptest::strategy::ValueTree;
+        use proptest::test_runner::TestRunner;
+
+        let mut runner = TestRunner::deterministic();
+        let strategy = prop::collection::vec(name(), 1..5);
+        let mut converted = 0;
+        for _ in 0..500 {
+            let names = strategy.new_tree(&mut runner).unwrap().current();
+            let mut source = String::from("user_id,password\n");
+            for name in &names {
+                source.push_str(name);
+                source.push_str(",pw\n");
+            }
+            if convert_authn_with(&source, &|_| Ok(fixed_hash().clone())).is_ok() {
+                converted += 1;
+            }
+        }
+        assert!(converted >= 50, "{converted} of 500 converted");
+    }
+
+    #[test]
+    fn names_a_bootstrap_file_cannot_hold_are_refused_by_line() {
+        let long = "n".repeat(65_536);
+        for name in [
+            "#alice",
+            "\talice",
+            "alice\u{a0}",
+            "\u{3000}",
+            long.as_str(),
+        ] {
+            let found = problems(&format!("user_id,password\nbob,pw\n{name},pw\n"));
+            assert_eq!(found.len(), 1, "{name:?}: {found:?}");
+            assert!(found[0].starts_with("line 3: the user name "), "{found:?}");
+        }
     }
 
     #[test]
