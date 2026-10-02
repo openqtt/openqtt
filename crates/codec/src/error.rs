@@ -1,6 +1,8 @@
 //! The codec's one error type.
 
-use crate::{ConnectReasonCode, DisconnectReasonCode, PacketType, PropertyContext, PropertyId};
+use crate::{
+    ConnectReasonCode, DisconnectReasonCode, PacketType, PropertyContext, PropertyId, QoS,
+};
 
 /// Why bytes could not be decoded as a packet, or a packet could not be encoded.
 ///
@@ -38,6 +40,17 @@ pub enum Error {
         packet_type: PacketType,
         /// How many bytes are left over.
         count: usize,
+    },
+    /// The low four bits of the first byte break Table 2-2 ([MQTT-2.1.3-1], and for PUBREL,
+    /// SUBSCRIBE, UNSUBSCRIBE and AUTH [MQTT-3.6.1-1], [MQTT-3.8.1-1], [MQTT-3.10.1-1] and
+    /// [MQTT-3.15.1-1]), or a PUBLISH sets both QoS bits ([MQTT-3.3.1-4]) or DUP at QoS 0
+    /// ([MQTT-3.3.1-2]). Malformed.
+    #[error("the flags {flags:#06b} are not valid for {packet_type}")]
+    InvalidFlags {
+        /// The packet.
+        packet_type: PacketType,
+        /// The low four bits of its first byte.
+        flags: u8,
     },
     /// A UTF-8 Encoded String is not well-formed UTF-8, which includes encoding a surrogate
     /// ([MQTT-1.5.4-1]). Malformed.
@@ -95,6 +108,16 @@ pub enum Error {
         /// The value.
         value: u32,
     },
+    /// A Packet Identifier of 0 ([MQTT-2.2.1-3], [MQTT-2.2.1-4]). Protocol Error.
+    #[error("the {packet_type} has Packet Identifier 0")]
+    ZeroPacketIdentifier {
+        /// The packet.
+        packet_type: PacketType,
+    },
+    /// A PUBLISH with an empty Topic Name and no Topic Alias to stand for it (section
+    /// 3.3.2.1). Protocol Error.
+    #[error("the PUBLISH has an empty Topic Name and no Topic Alias")]
+    EmptyTopicName,
     /// A reason code that the packet's table does not list ([MQTT-3.2.2-8], [MQTT-3.4.2-1] and
     /// the like). Protocol Error.
     #[error("{code:#04x} is not a {packet_type} reason code")]
@@ -145,6 +168,14 @@ pub enum Error {
     },
 
     // Encoding only.
+    /// A PUBLISH with a Packet Identifier at QoS 0 ([MQTT-2.2.1-2]), or without one at QoS 1
+    /// or 2 (section 3.3.2.2). Only encoding reports it: on the wire the QoS decides whether
+    /// the field is there.
+    #[error("the Packet Identifier does not match the PUBLISH's {qos}")]
+    PacketIdentifierMismatch {
+        /// The packet's QoS.
+        qos: QoS,
+    },
     /// A string or Binary Data value is longer than its Two Byte Integer length prefix can say
     /// (sections 1.5.4 and 1.5.6). Only encoding reports it.
     #[error("the {field} is {len} bytes long, more than the 65535 a length prefix can say")]
@@ -181,6 +212,7 @@ impl Error {
             Self::MalformedVariableByteInteger { .. }
             | Self::Truncated { .. }
             | Self::TrailingBytes { .. }
+            | Self::InvalidFlags { .. }
             | Self::InvalidUtf8 { .. }
             | Self::NullCharacter { .. }
             | Self::InvalidPropertyId { .. }
@@ -188,13 +220,15 @@ impl Error {
             | Self::InvalidConnAckFlags { .. } => Class::Malformed,
             Self::DuplicateProperty { .. }
             | Self::InvalidPropertyValue { .. }
+            | Self::ZeroPacketIdentifier { .. }
+            | Self::EmptyTopicName
             | Self::InvalidReasonCode { .. }
             | Self::MissingAuthenticationMethod { .. }
             | Self::SessionPresentWithError => Class::Protocol,
             Self::ZeroTopicAlias => Class::TopicAlias,
             Self::PacketTooLarge { .. } => Class::TooLarge,
             Self::UnsupportedProtocol { .. } => Class::Version,
-            Self::TooLong { .. } => Class::Local,
+            Self::PacketIdentifierMismatch { .. } | Self::TooLong { .. } => Class::Local,
         }
     }
 

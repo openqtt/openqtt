@@ -15,7 +15,7 @@
 
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::{Error, PacketType};
+use crate::{Error, PacketId, PacketType};
 
 /// The largest value a Variable Byte Integer holds: four bytes of seven bits (section 1.5.5,
 /// Table 1-1). It bounds the Remaining Length, every Property Length and the Subscription
@@ -219,6 +219,14 @@ impl<'a> Reader<'a> {
     /// A Four Byte Integer, big-endian (section 1.5.3).
     pub(crate) fn u32(&mut self, field: &'static str) -> Result<u32, Error> {
         self.array(field).map(u32::from_be_bytes)
+    }
+
+    /// A Packet Identifier, which is never 0 where a packet carries one ([MQTT-2.2.1-3],
+    /// [MQTT-2.2.1-4]; an acknowledgement repeats one of those, [MQTT-2.2.1-5] and
+    /// [MQTT-2.2.1-6]).
+    pub(crate) fn packet_id(&mut self, packet_type: PacketType) -> Result<PacketId, Error> {
+        PacketId::new(self.u16("Packet Identifier")?)
+            .ok_or(Error::ZeroPacketIdentifier { packet_type })
     }
 
     /// A Variable Byte Integer (section 1.5.5).

@@ -10,17 +10,20 @@
 //! Statement numbers such as `[MQTT-1.5.4-2]` refer to the OASIS MQTT Version 5.0 standard of
 //! 7 March 2019, which the codec implements and its tests cite.
 
+mod ack;
 mod connack;
 mod connect;
 mod encode;
 mod error;
 mod primitives;
 mod property;
+mod publish;
 mod reason;
 #[cfg(test)]
 mod test_util;
 mod types;
 
+pub use ack::{AckProperties, PubAck, PubComp, PubRec, PubRel};
 pub use connack::{ConnAck, ConnAckProperties};
 pub use connect::{
     Connect, ConnectProperties, PROTOCOL_NAME, PROTOCOL_VERSION, ProtocolRefusal, Will,
@@ -32,6 +35,7 @@ pub use primitives::{
     is_disallowed_code_point,
 };
 pub use property::{DataType, PropertyContext, PropertyId};
+pub use publish::{Publish, PublishProperties};
 pub use reason::{
     AuthReasonCode, ConnectReasonCode, DisconnectReasonCode, PubAckReasonCode, PubCompReasonCode,
     PubRecReasonCode, PubRelReasonCode, ReasonCode, SubAckReasonCode, UnsubAckReasonCode,

@@ -413,6 +413,8 @@ pub(crate) enum Value<'a> {
     TwoByteInteger(u16),
     /// A Four Byte Integer.
     FourByteInteger(u32),
+    /// A Variable Byte Integer.
+    VariableByteInteger(u32),
     /// A UTF-8 Encoded String.
     String(&'a str),
     /// Binary Data.
@@ -428,6 +430,7 @@ impl Value<'_> {
             Self::Byte(_) => 1,
             Self::TwoByteInteger(_) => 2,
             Self::FourByteInteger(_) => 4,
+            Self::VariableByteInteger(value) => variable_byte_integer_len(value),
             Self::String(text) => 2 + text.len(),
             Self::Binary(data) => 2 + data.len(),
             Self::Pair(name, value) => 4 + name.len() + value.len(),
@@ -439,7 +442,9 @@ impl Value<'_> {
         match self {
             Self::Byte(value) => check_number(id, value.into()),
             Self::TwoByteInteger(value) => check_number(id, value.into()),
-            Self::FourByteInteger(value) => check_number(id, value),
+            Self::FourByteInteger(value) | Self::VariableByteInteger(value) => {
+                check_number(id, value)
+            }
             Self::String(text) => string_len(text, id.name()).map(drop),
             Self::Binary(data) => binary_len(data, id.name()).map(drop),
             Self::Pair(name, value) => {
@@ -458,6 +463,7 @@ impl Value<'_> {
             Self::Byte(value) => dst.put_u8(value),
             Self::TwoByteInteger(value) => dst.put_u16(value),
             Self::FourByteInteger(value) => dst.put_u32(value),
+            Self::VariableByteInteger(value) => put_variable_byte_integer(dst, value),
             Self::String(text) => put_string(dst, text),
             Self::Binary(data) => put_binary(dst, data),
             Self::Pair(name, value) => {
@@ -655,6 +661,19 @@ pub(crate) fn read_nonzero_u32(
     NonZeroU32::new(read_u32(reader, id)?).ok_or(Error::InvalidPropertyValue {
         property: id,
         value: 0,
+    })
+}
+
+/// A Subscription Identifier, a Variable Byte Integer from 1 to 268,435,455.
+pub(crate) fn read_subscription_identifier(
+    reader: &mut Reader<'_>,
+    id: PropertyId,
+) -> Result<NonZeroU32, Error> {
+    let value = reader.variable_byte_integer(id.name())?;
+    check_number(id, value)?;
+    NonZeroU32::new(value).ok_or(Error::InvalidPropertyValue {
+        property: id,
+        value,
     })
 }
 
