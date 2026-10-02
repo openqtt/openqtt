@@ -127,6 +127,19 @@ A process writes its logs to stderr. In the default format, `json`, each line is
 the spans the event was written in with their fields, among them `client_id`, `partition` and
 `node`. The format `text` writes the same as plain lines, for a person at a terminal.
 
+## Metrics
+
+With `observability.otlp.endpoint` set, a process pushes its metrics to that collector every
+`interval`, by OTLP over HTTP with protobuf bodies, to `<endpoint>/v1/metrics`, as cumulative
+sums. Each push names its sender: `service.name` is `openqtt`, `service.version` the version,
+`service.namespace` the cluster's name and `service.instance.id` the node's name.
+
+`headers_file` holds one `name: value` per line, for a collector that wants a token; blank lines
+and lines starting `#` are skipped. An `https` endpoint is checked against the certificates in
+`ca_file`, or against the Mozilla roots built into OpenQTT; the system's trust store is not read,
+and neither are proxy variables such as `HTTPS_PROXY`. A collector that cannot be reached does not
+stop the process: the next push that arrives carries the totals.
+
 ## Settings
 
 <!-- BEGIN SETTINGS: written by `make config-doc` from crates/config/src/settings.rs -->

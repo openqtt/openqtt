@@ -9,9 +9,9 @@
 //! `--config` names. The exit status is 0 for success, 1 for a failure while running, and 2 for
 //! a command line or a configuration the process cannot start with.
 //!
-//! When rustls arrives with QUIC, `main` installs aws-lc-rs as the process-wide crypto provider
-//! before anything builds a TLS configuration. `make layers` already refuses ring in this
-//! binary's tree, so there is only ever one provider to install.
+//! `main` installs aws-lc-rs as the process-wide crypto provider before anything builds a TLS
+//! configuration: the OTLP exporter's today, QUIC's when the transport arrives. `make layers`
+//! refuses ring in this binary's tree, so there is only ever the one provider.
 
 #![expect(
     clippy::print_stderr,
@@ -19,6 +19,7 @@
 )]
 
 mod logging;
+mod telemetry;
 
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -86,6 +87,8 @@ impl Command {
 }
 
 fn main() -> ExitCode {
+    // Fails only when a provider is already installed, which nothing does before this line.
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let cli = Cli::parse();
     match cli.command {
         Command::Run => run(cli.config),
@@ -98,7 +101,8 @@ fn main() -> ExitCode {
     }
 }
 
-/// Starts the roles. Today it loads and checks the settings, starts logging, and stops there.
+/// Starts the roles. Today it loads and checks the settings, starts logging and metrics, and
+/// stops there.
 fn run(config: Option<PathBuf>) -> ExitCode {
     let settings = match load(config).and_then(|loaded| {
         let settings = loaded.into_settings();
@@ -111,8 +115,16 @@ fn run(config: Option<PathBuf>) -> ExitCode {
         eprintln!("openqtt: {error}");
         return ExitCode::from(EXIT_CONFIG);
     }
+    let telemetry = match telemetry::start(&settings) {
+        Ok(telemetry) => telemetry,
+        Err(error) => {
+            eprintln!("openqtt: {error}");
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
     tracing::debug!(roles = ?settings.cluster.roles, "loaded the configuration");
     eprintln!("openqtt run: not implemented yet");
+    telemetry.shutdown();
     ExitCode::FAILURE
 }
 
@@ -124,10 +136,13 @@ fn check(config: Option<PathBuf>) -> ExitCode {
     };
     let settings = loaded.settings();
     let mut problems: Vec<String> = Vec::new();
-    for checked in [settings.validate(), settings.check_files()] {
-        if let Err(error) = checked {
-            problems.extend(error.problems().iter().map(ToString::to_string));
-        }
+    if let Err(error) = settings.validate() {
+        problems.extend(error.problems().iter().map(ToString::to_string));
+    }
+    match settings.check_files() {
+        // What the files hold is worth reading only once they can all be opened.
+        Ok(()) => problems.extend(telemetry::check(settings)),
+        Err(error) => problems.extend(error.problems().iter().map(ToString::to_string)),
     }
     if let Err(problem) = logging::filter(&settings.observability.log_level) {
         problems.push(problem);

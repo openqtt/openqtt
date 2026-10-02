@@ -335,3 +335,61 @@ fn no_secret_reaches_stdout_or_stderr() {
     assert!(!stderr(&out).contains(SECRET), "{}", stderr(&out));
     assert!(!stdout(&out).contains(SECRET));
 }
+
+#[test]
+fn run_starts_the_exporter_and_a_collector_that_is_down_does_not_hold_it() {
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let started = std::time::Instant::now();
+    let out = openqtt()
+        .arg("run")
+        .envs(CERTIFICATE)
+        .env("OPENQTT_OBSERVABILITY__OTLP__ENDPOINT", &endpoint)
+        .env("OPENQTT_OBSERVABILITY__OTLP__TIMEOUT", "2s")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(stderr(&out).contains("openqtt run: not implemented yet"));
+    assert!(started.elapsed() < std::time::Duration::from_secs(20));
+}
+
+#[test]
+fn a_headers_file_the_exporter_cannot_use_stops_run_and_fails_the_check() {
+    let headers = file("headers", "Authorization Bearer hunter2\n");
+    let otlp = [
+        (
+            "OPENQTT_OBSERVABILITY__OTLP__ENDPOINT",
+            "http://127.0.0.1:4318",
+        ),
+        (
+            "OPENQTT_OBSERVABILITY__OTLP__HEADERS_FILE",
+            headers.to_str().unwrap(),
+        ),
+    ];
+    let expected = format!(
+        "openqtt: observability.otlp.headers_file: line 1 of {} is not `name: value`\n",
+        headers.display()
+    );
+
+    let out = openqtt()
+        .arg("run")
+        .envs(CERTIFICATE)
+        .envs(otlp)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(stderr(&out), expected);
+
+    let certificate = file("tls.crt", "certificate");
+    let key = file("tls.key", "key");
+    let out = openqtt()
+        .args(["config", "check"])
+        .env("OPENQTT_LISTENERS__QUIC__DEFAULT__CERT_FILE", &certificate)
+        .env("OPENQTT_LISTENERS__QUIC__DEFAULT__KEY_FILE", &key)
+        .envs(otlp)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(stderr(&out), expected);
+}
