@@ -302,9 +302,22 @@ pub struct Interest {
     pub filter: TopicFilter,
     /// The options granted, the Subscription Identifier included.
     pub options: SubOpts,
-    /// Whether to read the retained messages matching the filter and answer with
-    /// [`Input::Retained`](crate::Input::Retained) ([MQTT-3.3.1-9], [MQTT-3.3.1-10]).
-    pub send_retained: bool,
+    /// A read of the retained messages matching the filter, to answer with
+    /// [`Input::Retained`](crate::Input::Retained) naming it ([MQTT-3.3.1-9],
+    /// [MQTT-3.3.1-10]); `None` when none are sent.
+    pub retained: Option<RetainedRead>,
+}
+
+/// Names a read of retained messages, so that its answer finds the subscription that asked for
+/// it, and an answer for a subscription since replaced or removed is told from the current one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RetainedRead(pub(crate) u64);
+
+impl RetainedRead {
+    /// The number.
+    pub const fn get(self) -> u64 {
+        self.0
+    }
 }
 
 /// A Will Message, as stored with a claim and published at the end of a connection.

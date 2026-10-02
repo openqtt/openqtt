@@ -428,7 +428,7 @@ struct Driver {
     authorizations: VecDeque<crate::Authorization>,
     claim: Option<crate::Claim>,
     commits: Vec<PublishToken>,
-    reads: VecDeque<TopicFilter>,
+    reads: VecDeque<crate::RetainedRead>,
     interest: BTreeMap<TopicFilter, ()>,
     timers: BTreeMap<Timer, Timestamp>,
     /// What the first CONNECT asked for, once the machine read it.
@@ -686,7 +686,7 @@ impl Driver {
                 }));
             }
             Step::Retained { count } => {
-                if let Some(filter) = self.reads.pop_front() {
+                if let Some(read) = self.reads.pop_front() {
                     let messages = (0..count)
                         .filter_map(|n| {
                             let topic = TopicName::new(&format!("a/{n}")).ok()?;
@@ -696,7 +696,7 @@ impl Driver {
                             Some(message)
                         })
                         .collect();
-                    self.feed(Input::Retained { filter, messages });
+                    self.feed(Input::Retained { read, messages });
                 }
             }
             Step::Acknowledge { pick, failure } => {
@@ -852,8 +852,8 @@ impl Driver {
                     }
                 }
                 Effect::Subscribe(interest) => {
-                    if interest.send_retained {
-                        self.reads.push_back(interest.filter.clone());
+                    if let Some(read) = interest.retained {
+                        self.reads.push_back(read);
                     }
                     self.interest.insert(interest.filter, ());
                 }

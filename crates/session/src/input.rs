@@ -6,7 +6,7 @@ use openqtt_codec::{ConnectReasonCode, Packet, PacketType};
 use openqtt_core::{Message, TopicFilter};
 
 use crate::redact::Redacted;
-use crate::{PublishToken, RequestId, SessionState, Timer};
+use crate::{PublishToken, RequestId, RetainedRead, SessionState, Timer};
 
 /// A stream of the QUIC connection (docs/spec/mqtt-over-quic.md, section 2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -71,12 +71,13 @@ pub enum Input {
     },
     /// A message for this session, from the broker.
     Deliver(Delivery),
-    /// The retained messages an [`Interest`](crate::Interest) with `send_retained` asked for.
-    /// It must come for every such interest, with no messages when there are none: live
-    /// deliveries for the subscription wait for it (report R1, O2).
+    /// The retained messages a read of an [`Interest`](crate::Interest) asked for. It must come
+    /// for every read, with no messages when there are none: live deliveries for the
+    /// subscription wait for it (report R1, O2). An answer for a read whose subscription was
+    /// replaced or removed since is ignored.
     Retained {
-        /// The mounted filter of the interest.
-        filter: TopicFilter,
+        /// The read it answers.
+        read: RetainedRead,
         /// The retained messages matching it, in the log's order.
         messages: Vec<Message>,
     },

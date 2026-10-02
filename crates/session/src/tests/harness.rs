@@ -23,7 +23,7 @@ use openqtt_core::{Message, SubOpts, Timestamp, TopicFilter, TopicName};
 use crate::{
     Action, AuthResult, Authentication, Authorization, Claim, ClaimResult, CloseCode, Config,
     Counter, Decision, Delivery, Effect, Input, Peer, Publication, PublishOutcome, Release,
-    Session, SessionState, StreamId, Timer, WillOrder,
+    RetainedRead, Session, SessionState, StreamId, Timer, WillOrder,
 };
 
 /// When the scripts start: 2026-10-01T00:00:00Z.
@@ -78,7 +78,7 @@ pub(crate) struct Harness {
     pub(crate) authorizations: Vec<Authorization>,
     pub(crate) claims: Vec<Claim>,
     pub(crate) commits: Vec<Publication>,
-    pub(crate) retained_reads: Vec<TopicFilter>,
+    pub(crate) retained_reads: Vec<RetainedRead>,
     /// The session a claim finds, for a resumed session.
     pub(crate) stored: Option<SessionState>,
     /// The session's interest, by mounted filter.
@@ -323,7 +323,7 @@ impl Harness {
                 }
                 Effect::Publish(publication) => self.route(publication),
                 Effect::Subscribe(interest) => {
-                    if interest.send_retained {
+                    if let Some(read) = interest.retained {
                         if self.auto.retained {
                             let messages = self
                                 .retained
@@ -331,12 +331,9 @@ impl Harness {
                                 .filter(|message| interest.filter.matches(&message.topic))
                                 .cloned()
                                 .collect();
-                            self.answers.push_back(Input::Retained {
-                                filter: interest.filter.clone(),
-                                messages,
-                            });
+                            self.answers.push_back(Input::Retained { read, messages });
                         } else {
-                            self.retained_reads.push(interest.filter.clone());
+                            self.retained_reads.push(read);
                         }
                     }
                     self.interest.insert(interest.filter, interest.options);

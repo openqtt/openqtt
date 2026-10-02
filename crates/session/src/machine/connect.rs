@@ -482,7 +482,7 @@ impl Session {
                     options: stored.options,
                     stream: StreamId::Control,
                     order,
-                    retained_reads: 0,
+                    awaiting_read: None,
                 },
             );
         }

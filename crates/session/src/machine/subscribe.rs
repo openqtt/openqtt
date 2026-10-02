@@ -9,7 +9,9 @@ use openqtt_core::{SubOpts, SubscriptionId, Timestamp, TopicFilter};
 use super::{Authorizing, Planned, Session, Subscription as Held};
 use crate::convert::{codec_qos, core_qos, core_retain_handling, core_subscription_id, granted};
 use crate::phrase::phrase;
-use crate::{Action, Authorization, Decision, Effect, Effects, Interest, RequestId, StreamId};
+use crate::{
+    Action, Authorization, Decision, Effect, Effects, Interest, RequestId, RetainedRead, StreamId,
+};
 
 impl Session {
     /// A SUBSCRIBE: each filter is handled as if it came alone, and one SUBACK answers them
@@ -139,6 +141,10 @@ impl Session {
             now,
             fx,
         );
+        // A replacement that asks for no retained messages ends the wait of the deliveries
+        // held for the subscription it replaced.
+        self.release_held(now, fx);
+        self.pump(now, fx);
         self.finish_stream_if_done(stream, fx);
     }
 
@@ -178,8 +184,16 @@ impl Session {
                 RetainHandling::SendIfNew => existing.is_none(),
                 RetainHandling::DoNotSend => false,
             };
-        let retained_reads =
-            existing.map_or(0, |held| held.retained_reads) + u32::from(send_retained);
+        // A read the subscription it replaces waited for is stale from now on.
+        if let Some(stale) = existing.and_then(|held| held.awaiting_read) {
+            self.reads.remove(&stale);
+        }
+        let awaiting_read = send_retained.then(|| {
+            let read = self.next_read;
+            self.next_read += 1;
+            self.reads.insert(read, mounted.clone());
+            read
+        });
         let mut granted_options = SubOpts::new(core_qos(qos));
         granted_options.no_local = options.no_local;
         granted_options.retain_as_published = options.retain_as_published;
@@ -196,13 +210,13 @@ impl Session {
                 options: granted_options,
                 stream,
                 order,
-                retained_reads,
+                awaiting_read,
             },
         );
         fx.push(Effect::Subscribe(Interest {
             filter: mounted,
             options: granted_options,
-            send_retained,
+            retained: awaiting_read.map(RetainedRead),
         }));
         granted(codec_qos(granted_options.qos))
     }
@@ -235,7 +249,11 @@ impl Session {
                 };
                 // [MQTT-3.10.4-1]: compared byte for byte, and deleted on an exact match.
                 // Deliveries already started complete ([MQTT-3.10.4-3]).
-                if self.subscriptions.remove(&mounted).is_some() {
+                if let Some(removed) = self.subscriptions.remove(&mounted) {
+                    // An answer to the read it waited for is stale.
+                    if let Some(stale) = removed.awaiting_read {
+                        self.reads.remove(&stale);
+                    }
                     fx.push(Effect::Unsubscribe(mounted));
                     UnsubAckReasonCode::Success
                 } else {

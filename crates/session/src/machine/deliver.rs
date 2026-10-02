@@ -49,7 +49,7 @@ impl Session {
         delivery.subscriptions.iter().any(|filter| {
             self.subscriptions
                 .get(filter)
-                .is_some_and(|subscription| subscription.retained_reads > 0)
+                .is_some_and(|subscription| subscription.awaiting_read.is_some())
         })
     }
 
@@ -181,7 +181,7 @@ impl Session {
     /// before any live message for the subscription (report R1, O2; [MQTT-3.3.1-9]).
     pub(super) fn retained(
         &mut self,
-        filter: &TopicFilter,
+        read: u64,
         messages: Vec<Message>,
         now: Timestamp,
         fx: &mut Effects,
@@ -189,9 +189,14 @@ impl Session {
         if self.phase == Phase::Closed {
             return;
         }
-        let subscription = match self.subscriptions.get_mut(filter) {
-            Some(subscription) if subscription.retained_reads > 0 => {
-                subscription.retained_reads -= 1;
+        let Some(filter) = self.reads.remove(&read) else {
+            return;
+        };
+        // Only the read the subscription waits for: one for a subscription since replaced or
+        // removed is stale, and its messages are not sent.
+        let subscription = match self.subscriptions.get_mut(&filter) {
+            Some(subscription) if subscription.awaiting_read == Some(read) => {
+                subscription.awaiting_read = None;
                 Some(subscription.clone())
             }
             _ => None,

@@ -160,7 +160,7 @@ fn mqtt_3_3_1_11_retain_handling_2_sends_no_retained_messages() {
     assert_eq!(packets.len(), 1);
     assert!(!harness.log.iter().any(|effect| matches!(
         effect,
-        Effect::Subscribe(interest) if interest.send_retained
+        Effect::Subscribe(interest) if interest.retained.is_some()
     )));
 }
 
@@ -169,7 +169,9 @@ fn r1_o2_live_messages_wait_for_the_retained_ones() {
     let mut harness = Harness::connected();
     harness.auto.retained = false;
     harness.send(subscribe1(1, "t/#", QoS::AtLeastOnce));
-    assert_eq!(harness.retained_reads, [filter("t/#")]);
+    let [read] = harness.retained_reads[..] else {
+        panic!("one retained read");
+    };
     // A live message for the subscription arrives before the retained read completes.
     let live = harness.input(Input::Deliver(Delivery {
         message: message("t/live", CoreQoS::AtMostOnce, "live"),
@@ -180,7 +182,7 @@ fn r1_o2_live_messages_wait_for_the_retained_ones() {
     let mut kept = message("t/kept", CoreQoS::AtMostOnce, "kept");
     kept.retain = true;
     let packets = harness.input(Input::Retained {
-        filter: filter("t/#"),
+        read,
         messages: vec![kept],
     });
     assert_eq!(payloads(&packets), ["kept", "live"]);
@@ -192,6 +194,57 @@ fn r1_o2_live_messages_wait_for_the_retained_ones() {
         subscriptions: vec![filter("u")],
     }));
     assert_eq!(payloads(&other), ["other"]);
+}
+
+#[test]
+fn an_answer_to_a_retained_read_whose_subscription_was_replaced_is_ignored() {
+    let retained = |payload| {
+        let mut kept = message("t", CoreQoS::AtMostOnce, payload);
+        kept.retain = true;
+        kept
+    };
+    let live = |harness: &mut Harness| {
+        harness.input(Input::Deliver(Delivery {
+            message: message("t", CoreQoS::AtMostOnce, "live"),
+            subscriptions: vec![filter("t")],
+        }))
+    };
+    // Subscribed, unsubscribed and subscribed again, with both reads unanswered.
+    let mut harness = Harness::connected();
+    harness.auto.retained = false;
+    harness.send(subscribe1(1, "t", QoS::AtLeastOnce));
+    harness.send(unsubscribe(2, &["t"]));
+    harness.send(subscribe1(3, "t", QoS::AtLeastOnce));
+    let [stale, current] = harness.retained_reads[..] else {
+        panic!("two retained reads");
+    };
+    assert!(live(&mut harness).is_empty());
+    let packets = harness.input(Input::Retained {
+        read: stale,
+        messages: vec![retained("old")],
+    });
+    assert!(packets.is_empty(), "{packets:?}");
+    let packets = harness.input(Input::Retained {
+        read: current,
+        messages: vec![retained("new")],
+    });
+    assert_eq!(payloads(&packets), ["new", "live"]);
+
+    // Replaced by a subscription that asks for none: the old read is stale, and live
+    // messages wait for nothing.
+    let mut harness = Harness::connected();
+    harness.auto.retained = false;
+    harness.send(subscribe1(1, "t", QoS::AtLeastOnce));
+    harness.send(subscribe(2, &[("t", handling(RetainHandling::DoNotSend))]));
+    let [stale] = harness.retained_reads[..] else {
+        panic!("one retained read");
+    };
+    assert_eq!(payloads(&live(&mut harness)), ["live"]);
+    let packets = harness.input(Input::Retained {
+        read: stale,
+        messages: vec![retained("old")],
+    });
+    assert!(packets.is_empty(), "{packets:?}");
 }
 
 #[test]

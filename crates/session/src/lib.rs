@@ -29,8 +29,8 @@
 //! | [`Effect::Claim`] | [`Input::Claimed`] | CONNACK waits (report R3, Sessions) |
 //! | [`Effect::Publish`] with a token | [`Input::Committed`] | its PUBACK or PUBREC waits, and so do the acknowledgements after it on its stream (report R1, D26 and O15); everything else goes on |
 //!
-//! An [`Interest`] with `send_retained` is a fifth: live deliveries for that subscription wait
-//! for [`Input::Retained`] (report R1, O2).
+//! An [`Interest`] with a retained read is a fifth: live deliveries for that subscription wait
+//! for the [`Input::Retained`] that answers it (report R1, O2).
 //!
 //! # What is left to others
 //!
@@ -61,8 +61,8 @@ mod tests;
 pub use config::{Config, Identity, KeepAliveBounds, Peer};
 pub use effect::{
     Action, AuthStep, Authentication, Authorization, Claim, CloseCode, Counter, Effect, Effects,
-    Interest, Publication, PublishToken, Release, RequestId, SessionEnd, Timer, WillMessage,
-    WillOrder,
+    Interest, Publication, PublishToken, Release, RequestId, RetainedRead, SessionEnd, Timer,
+    WillMessage, WillOrder,
 };
 pub use error::Error;
 pub use input::{

@@ -119,6 +119,9 @@ pub struct Session {
     held: VecDeque<Delivery>,
     /// Subscriptions, by mounted filter.
     subscriptions: BTreeMap<TopicFilter, Subscription>,
+    /// Retained reads not answered yet, by token, with the mounted filter that asked.
+    reads: BTreeMap<u64, TopicFilter>,
+    next_read: u64,
     next_subscription: u64,
     /// Data streams the client ended, by QUIC stream id.
     streams: BTreeMap<u64, DataStream>,
@@ -478,9 +481,9 @@ struct Subscription {
     stream: StreamId,
     /// When it was made, for the oldest among equals.
     order: u64,
-    /// Retained reads asked for and not answered yet; live deliveries wait while there are any
-    /// (report R1, O2).
-    retained_reads: u32,
+    /// The retained read the subscription waits for; live deliveries for it wait too (report
+    /// R1, O2). An answer to any other read of the same filter is stale.
+    awaiting_read: Option<u64>,
 }
 
 /// A data stream the client ended.
@@ -534,6 +537,8 @@ impl Session {
             queue: VecDeque::new(),
             held: VecDeque::new(),
             subscriptions: BTreeMap::new(),
+            reads: BTreeMap::new(),
+            next_read: 1,
             next_subscription: 0,
             streams: BTreeMap::new(),
             last_activity: now,
@@ -594,7 +599,7 @@ impl Session {
             Input::Claimed(result) => self.claimed(result, now, &mut fx),
             Input::Committed { token, outcome } => self.committed(token.0, outcome, now, &mut fx),
             Input::Deliver(delivery) => self.deliver(delivery, now, &mut fx),
-            Input::Retained { filter, messages } => self.retained(&filter, messages, now, &mut fx),
+            Input::Retained { read, messages } => self.retained(read.0, messages, now, &mut fx),
             Input::Timer(timer) => self.timer(timer, now, &mut fx),
             Input::StepDown { session_ends } => self.step_down(session_ends, now, &mut fx),
             Input::StreamEnded { stream, end } => self.stream_ended(stream, end, now, &mut fx),
