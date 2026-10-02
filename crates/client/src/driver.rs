@@ -14,6 +14,7 @@ use openqtt_codec::{
     Subscribe, SubscribeProperties, Subscription, UnsubAck, Unsubscribe, UnsubscribeProperties,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Instant, sleep_until, timeout};
 
@@ -31,6 +32,9 @@ const LINGER: Duration = Duration::from_secs(1);
 /// How many bytes may wait to be written before publications wait too. A server that stops
 /// reading holds the client to about this much, besides what callers have in hand.
 pub(crate) const WRITE_LIMIT: usize = 64 * 1024;
+
+/// How many events a round hands to the application at most.
+const DELIVERIES: usize = 16;
 
 /// How many publications may wait in the connection task, for room to write or for a slot of
 /// the server's Receive Maximum. Past it, the task takes no more from the publication channel,
@@ -345,6 +349,13 @@ impl Driver {
     }
 
     /// Runs until the connection ends; the error says why.
+    ///
+    /// The loop runs in rounds. Each round gives every source of work one bounded turn, in a
+    /// fixed order and without waiting ([`round`](Self::round)): the Keep Alive, deliveries to
+    /// the application, a read, one call, one publication and a write. Only a round in which
+    /// none of them had anything to do waits, for whichever becomes ready first
+    /// ([`wait`](Self::wait)). So however busy one of them is, the others still get their turn
+    /// every round, and the order is the same on every run.
     async fn serve(&mut self) -> Result<Infallible, Stop> {
         if let Some(connack) = self.connack.take() {
             self.emit(Event::Received(connack));
@@ -353,103 +364,184 @@ impl Driver {
         // Packets that came in the same read as the CONNACK.
         self.decode_buffered()?;
         loop {
-            // A publication whose caller gave up, by a timeout or by dropping the call, is
-            // not sent and not held.
-            self.queued.retain(|(_, reply)| !reply.is_closed());
-            self.track_pause();
-            let ping_at = self.ping_deadline();
-            // A due PINGREQ, or an overdue PINGRESP, comes before anything else: the timer
-            // branch below is reached only when nothing else is ready, and a server that
-            // keeps sending keeps the reads ready.
-            if ping_at.is_some_and(|at| at <= Instant::now()) {
-                self.keep_alive_due()?;
-                continue;
-            }
-            // What the server has sent already is read every round, before the select below,
-            // which prefers the client's own calls and writes and takes one of them per round:
-            // a client that keeps sending would otherwise never read the acknowledgements and
-            // the DISCONNECT the server sends meanwhile.
-            if self.outbox.is_empty() {
-                match self.read_now().await {
-                    Some(Ok(0)) => {
-                        return Err(Stop::Lost("the server closed the control stream".into()));
-                    }
-                    Some(Ok(_)) => self.decode_buffered()?,
-                    Some(Err(error)) => return Err(Stop::Lost(error.to_string())),
-                    None => {}
-                }
-            }
-            let pending = !self.outbox.is_empty();
-            let writing = !self.write_buf.is_empty();
-            let (events, outbox) = (&self.events, &mut self.outbox);
-            // Hands one waiting event over as soon as the channel has room.
-            let deliver = async move {
-                let permit = events.reserve().await.map_err(drop)?;
-                if let Some(event) = outbox.pop_front() {
-                    permit.send(event);
-                }
-                Ok::<(), ()>(())
-            };
-            tokio::select! {
-                biased;
-                delivered = deliver, if pending => {
-                    if delivered.is_err() {
-                        // The application dropped its Events.
-                        self.events_closed = true;
-                        self.outbox.clear();
-                        if !self.commands_open {
-                            return Err(self.abandon());
-                        }
-                    }
-                    // Packets that arrived while the application was behind.
-                    self.decode_buffered()?;
-                }
-                // The application dropped its Events, whether or not one was waiting.
-                () = self.events.closed(), if !self.events_closed => {
-                    self.events_closed = true;
-                    self.outbox.clear();
-                    if !self.commands_open {
-                        return Err(self.abandon());
-                    }
-                }
-                publication = self.publications.recv(),
-                    if self.publications_open && self.queued.len() < QUEUE_LIMIT =>
-                {
-                    match publication {
-                        Some(Publication { publish, reply }) => self.publish(publish, reply),
-                        None => self.publications_open = false,
-                    }
-                }
-                command = self.commands.recv(), if self.commands_open => match command {
-                    Some(command) => self.command(command)?,
-                    None => {
-                        self.commands_open = false;
-                        if self.events_closed {
-                            return Err(self.abandon());
-                        }
-                    }
-                },
-                // Whatever the server can take, while everything else goes on.
-                written = self.writer.write(&self.write_buf), if writing => match written {
-                    Ok(0) => return Err(Stop::Lost("the control stream takes no more data".into())),
-                    Ok(count) => {
-                        self.write_buf.advance(count);
-                        self.last_sent = Instant::now();
-                        self.pump();
-                    }
-                    Err(error) => return Err(Stop::Lost(error.to_string())),
-                },
-                // Nothing more is read while events wait for the application.
-                read = self.reader.read_buf(&mut self.read_buf), if !pending => match read {
-                    Ok(0) => return Err(Stop::Lost("the server closed the control stream".into())),
-                    Ok(_) => self.decode_buffered()?,
-                    Err(error) => return Err(Stop::Lost(error.to_string())),
-                },
-                // Wakes an idle connection when the next PINGREQ falls due; the check at the
-                // top of the loop serves it.
-                () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {}
+            if self.round().await? {
+                // A busy connection still yields to the runtime now and then.
+                tokio::task::coop::consume_budget().await;
+            } else {
+                self.wait().await?;
             }
         }
+    }
+
+    /// One round: every source's turn, none of them waited for. Returns whether any of them
+    /// did something.
+    async fn round(&mut self) -> Result<bool, Stop> {
+        let mut progressed = false;
+
+        // Publications whose callers gave up, by a timeout or by dropping the call, are not
+        // sent and not held; an application that dropped its Events gets no more; and a
+        // connection nothing holds any more ends.
+        self.queued.retain(|(_, reply)| !reply.is_closed());
+        if !self.events_closed && self.events.is_closed() {
+            self.events_closed = true;
+            self.outbox.clear();
+        }
+        if self.events_closed && !self.commands_open {
+            return Err(self.abandon());
+        }
+        self.track_pause();
+
+        // The Keep Alive: a due PINGREQ, or an overdue PINGRESP.
+        if self.ping_deadline().is_some_and(|at| at <= Instant::now()) {
+            self.keep_alive_due()?;
+            progressed = true;
+        }
+
+        // Deliveries: waiting events handed over while the channel has room.
+        progressed |= self.deliver_now();
+
+        // Reads, unless events still wait for the application: first the packets that arrived
+        // while it was behind, then whatever the server has sent since.
+        if self.outbox.is_empty() {
+            let buffered = self.read_buf.len();
+            self.decode_buffered()?;
+            progressed |= self.read_buf.len() != buffered;
+        }
+        if self.outbox.is_empty() {
+            match self.read_now().await {
+                Some(Ok(0)) => {
+                    return Err(Stop::Lost("the server closed the control stream".into()));
+                }
+                Some(Ok(_)) => {
+                    self.decode_buffered()?;
+                    progressed = true;
+                }
+                Some(Err(error)) => return Err(Stop::Lost(error.to_string())),
+                None => {}
+            }
+        }
+
+        // One call.
+        if self.commands_open {
+            match self.commands.try_recv() {
+                Ok(command) => {
+                    self.command(command)?;
+                    progressed = true;
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    self.commands_open = false;
+                    progressed = true;
+                }
+            }
+        }
+
+        // One publication, while the queue has room for it.
+        if self.publications_open && self.queued.len() < QUEUE_LIMIT {
+            match self.publications.try_recv() {
+                Ok(Publication { publish, reply }) => {
+                    self.publish(publish, reply);
+                    progressed = true;
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    self.publications_open = false;
+                    progressed = true;
+                }
+            }
+        }
+
+        // One write, of whatever the server takes now.
+        if !self.write_buf.is_empty() {
+            match self.write_now().await {
+                Some(Ok(0)) => {
+                    return Err(Stop::Lost("the control stream takes no more data".into()));
+                }
+                Some(Ok(count)) => {
+                    self.wrote(count);
+                    progressed = true;
+                }
+                Some(Err(error)) => return Err(Stop::Lost(error.to_string())),
+                None => {}
+            }
+        }
+        Ok(progressed)
+    }
+
+    /// Waits, after a round in which nothing was ready, for whichever source becomes ready
+    /// first, and takes that one item; the next round takes the rest.
+    async fn wait(&mut self) -> Result<(), Stop> {
+        let ping_at = self.ping_deadline();
+        let pending = !self.outbox.is_empty();
+        let writing = !self.write_buf.is_empty();
+        let taking = self.publications_open && self.queued.len() < QUEUE_LIMIT;
+        let (events, outbox) = (&self.events, &mut self.outbox);
+        // Hands one waiting event over as soon as the channel has room.
+        let deliver = async move {
+            let permit = events.reserve().await.map_err(drop)?;
+            if let Some(event) = outbox.pop_front() {
+                permit.send(event);
+            }
+            Ok::<(), ()>(())
+        };
+        tokio::select! {
+            biased;
+            delivered = deliver, if pending => {
+                if delivered.is_err() {
+                    self.events_closed = true;
+                    self.outbox.clear();
+                }
+            }
+            () = self.events.closed(), if !self.events_closed => {
+                self.events_closed = true;
+                self.outbox.clear();
+            }
+            command = self.commands.recv(), if self.commands_open => match command {
+                Some(command) => self.command(command)?,
+                None => self.commands_open = false,
+            },
+            publication = self.publications.recv(), if taking => match publication {
+                Some(Publication { publish, reply }) => self.publish(publish, reply),
+                None => self.publications_open = false,
+            },
+            written = self.writer.write(&self.write_buf), if writing => match written {
+                Ok(0) => return Err(Stop::Lost("the control stream takes no more data".into())),
+                Ok(count) => self.wrote(count),
+                Err(error) => return Err(Stop::Lost(error.to_string())),
+            },
+            read = self.reader.read_buf(&mut self.read_buf), if !pending => match read {
+                Ok(0) => return Err(Stop::Lost("the server closed the control stream".into())),
+                Ok(_) => self.decode_buffered()?,
+                Err(error) => return Err(Stop::Lost(error.to_string())),
+            },
+            // The next round serves the Keep Alive.
+            () = sleep_until(ping_at.unwrap_or_else(Instant::now)), if ping_at.is_some() => {}
+        }
+        Ok(())
+    }
+
+    /// Hands waiting events to the application while the channel has room, at most
+    /// [`DELIVERIES`] in a round. Returns whether any went.
+    fn deliver_now(&mut self) -> bool {
+        let mut delivered = false;
+        for _ in 0..DELIVERIES {
+            let Some(event) = self.outbox.pop_front() else {
+                break;
+            };
+            match self.events.try_send(event) {
+                Ok(()) => delivered = true,
+                Err(TrySendError::Full(event)) => {
+                    self.outbox.push_front(event);
+                    break;
+                }
+                Err(TrySendError::Closed(_)) => {
+                    self.events_closed = true;
+                    self.outbox.clear();
+                    return true;
+                }
+            }
+        }
+        delivered
     }
 
     /// Reads what the server has sent already, without waiting: `None` when nothing has
@@ -464,6 +556,27 @@ impl Driver {
             })
         })
         .await
+    }
+
+    /// Writes what the server takes now, without waiting: `None` when it takes nothing yet.
+    async fn write_now(&mut self) -> Option<std::io::Result<usize>> {
+        let (writer, pending) = (&mut self.writer, &self.write_buf);
+        std::future::poll_fn(|cx| {
+            std::task::Poll::Ready(
+                match std::pin::Pin::new(&mut **writer).poll_write(cx, pending) {
+                    std::task::Poll::Ready(result) => Some(result),
+                    std::task::Poll::Pending => None,
+                },
+            )
+        })
+        .await
+    }
+
+    /// `count` bytes of the write buffer went out.
+    fn wrote(&mut self, count: usize) {
+        self.write_buf.advance(count);
+        self.last_sent = Instant::now();
+        self.pump();
     }
 
     /// Queues an event for the application, unless it stopped listening.
@@ -499,6 +612,8 @@ impl Driver {
                     if read == 0 {
                         break;
                     }
+                    // A server that keeps sending must not keep the linger from running out.
+                    tokio::task::coop::consume_budget().await;
                 }
             })
             .await,

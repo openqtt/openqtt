@@ -1334,16 +1334,22 @@ async fn publications_wait_for_room_to_be_written() {
 
 /// A server that never stops sending: CONNACK, then QoS 0 PUBLISH packets for as long as the
 /// client reads. It is ready whenever it is polled within the task's budget, as a fast link
-/// with a backlog is.
+/// with a backlog is, or, with `coop` off, whenever it is polled at all, as a link whose data
+/// is always there before the task's budget runs out.
 struct Flood {
     connack: Vec<u8>,
     sent: usize,
     publish: Vec<u8>,
     offset: usize,
+    coop: bool,
 }
 
 impl Flood {
     fn new() -> Self {
+        Self::with_coop(true)
+    }
+
+    fn with_coop(coop: bool) -> Self {
         let mut connack = BytesMut::new();
         Packet::from(ConnAck::default())
             .encode(&mut connack)
@@ -1361,6 +1367,7 @@ impl Flood {
             sent: 0,
             publish: publish.to_vec(),
             offset: 0,
+            coop,
         }
     }
 }
@@ -1371,7 +1378,11 @@ impl tokio::io::AsyncRead for Flood {
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<io::Result<()>> {
-        let coop = std::task::ready!(tokio::task::coop::poll_proceed(cx));
+        let coop = if self.coop {
+            Some(std::task::ready!(tokio::task::coop::poll_proceed(cx)))
+        } else {
+            None
+        };
         let this = self.get_mut();
         if this.sent < this.connack.len() {
             let count = buf.remaining().min(this.connack.len() - this.sent);
@@ -1385,7 +1396,9 @@ impl tokio::io::AsyncRead for Flood {
                 this.offset = (this.offset + count) % this.publish.len();
             }
         }
-        coop.made_progress();
+        if let Some(coop) = coop {
+            coop.made_progress();
+        }
         std::task::Poll::Ready(Ok(()))
     }
 }
@@ -1438,6 +1451,16 @@ impl Transport for Flooding {
     fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
         let written = self.0.clone();
         Box::pin(async move { Ok(Link::new(Flood::new(), written, Unclosable)) })
+    }
+}
+
+/// [`Flooding`] with a server whose data is there whenever the client polls it.
+struct Drowning(Written);
+
+impl Transport for Drowning {
+    fn connect(&self) -> BoxFuture<'_, io::Result<Link>> {
+        let written = self.0.clone();
+        Box::pin(async move { Ok(Link::new(Flood::with_coop(false), written, Unclosable)) })
     }
 }
 
@@ -1789,4 +1812,98 @@ async fn the_server_is_heard_while_the_client_keeps_sending() {
         }
     }
     panic!("the server's DISCONNECT went unread while the client kept sending");
+}
+
+#[tokio::test(start_paused = true)]
+async fn disconnect_is_served_while_the_server_floods_a_prompt_application() {
+    let written = Written::default();
+    let (client, mut events) = Client::connect(
+        &Drowning(written.clone()),
+        ConnectOptions::new("c").keep_alive(0),
+    )
+    .await
+    .unwrap();
+    // The application takes every message as it comes, so deliveries never wait.
+    tokio::spawn(async move { while events.recv().await.is_some() {} });
+    let disconnecting = tokio::spawn(async move { client.disconnect().await });
+    for _ in 0..200 {
+        if disconnecting.is_finished() {
+            assert!(disconnecting.await.unwrap().is_ok());
+            assert!(
+                written
+                    .packets()
+                    .contains(&Packet::Disconnect(Disconnect::default()))
+            );
+            return;
+        }
+        // The flood never ends the stream, so the linger after DISCONNECT runs out on the
+        // clock, which only moves when told while the connection is this busy.
+        tokio::time::advance(Duration::from_millis(100)).await;
+        tokio::task::yield_now().await;
+    }
+    panic!("disconnect() was never served while the server flooded the client");
+}
+
+#[tokio::test(start_paused = true)]
+async fn calls_publications_and_the_keep_alive_get_their_turn_while_the_server_floods() {
+    let written = Written::default();
+    let (client, mut events) = Client::connect(
+        &Drowning(written.clone()),
+        ConnectOptions::new("c").keep_alive(10),
+    )
+    .await
+    .unwrap();
+    // The application takes every message as it comes, so deliveries never wait.
+    tokio::spawn(async move { while events.recv().await.is_some() {} });
+    // The server never answers the SUBSCRIBE: that it was written shows it was served.
+    let subscriber = client.clone();
+    tokio::spawn(async move {
+        drop(
+            subscriber
+                .subscribe("a", SubscriptionOptions::default())
+                .await,
+        );
+    });
+    let publisher = client.clone();
+    let publishing = tokio::spawn(async move {
+        publisher
+            .publish(Publish {
+                topic: "t".into(),
+                payload: Bytes::from_static(b"out"),
+                ..Publish::default()
+            })
+            .await
+    });
+    let served = |packets: &[Packet]| {
+        packets
+            .iter()
+            .any(|packet| matches!(packet, Packet::Subscribe(_)))
+            && packets
+                .iter()
+                .any(|packet| matches!(packet, Packet::Publish(sent) if sent.payload == "out"))
+    };
+    for turn in 0.. {
+        if publishing.is_finished() && served(&written.packets()) {
+            break;
+        }
+        assert!(
+            turn < 50,
+            "calls went unserved while the server flooded the client: {:?}",
+            written.packets()
+        );
+        tokio::task::yield_now().await;
+    }
+    assert!(matches!(
+        publishing.await.unwrap(),
+        Ok(Published::AtMostOnce)
+    ));
+    // The client has written nothing since, so PINGREQ falls due, and has to be written too.
+    tokio::time::advance(Duration::from_secs(11)).await;
+    for _ in 0..50 {
+        if written.packets().contains(&Packet::PingReq) {
+            return;
+        }
+        tokio::task::yield_now().await;
+    }
+    panic!("no PINGREQ was written while the server flooded the client");
 }
