@@ -62,6 +62,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytes"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -187,6 +193,10 @@ version = "2.0.0-alpha.0"
 [[package]]
 name = "openqtt-codec"
 version = "2.0.0-alpha.0"
+dependencies = [
+ "bytes",
+ "thiserror",
+]
 
 [[package]]
 name = "openqtt-config"

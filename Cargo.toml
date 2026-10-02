@@ -46,6 +46,9 @@ tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter"] }
 # One error enum per crate, derived rather than written by hand.
 thiserror = "2.0"
+# Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
+# payload is a slice of the buffer it arrived in rather than a copy.
+bytes = "1.12"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

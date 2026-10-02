@@ -9,5 +9,9 @@ repository.workspace = true
 # Meant for crates.io once its API settles; it stays unpublished until then.
 publish.workspace = true
 
+[dependencies]
+bytes.workspace = true
+thiserror.workspace = true
+
 [lints]
 workspace = true
