@@ -338,6 +338,18 @@ impl Stream {
         }
     }
 
+    /// The stop of the server's side, once, when the client stopped it.
+    fn take_stop(&mut self) -> Option<Event> {
+        let Stop::Unreported(code) = self.stop else {
+            return None;
+        };
+        self.stop = Stop::Reported;
+        Some(Event::StreamEnded {
+            stream: self.tag,
+            end: StreamEnd::Stopped(code),
+        })
+    }
+
     /// Holds a packet to what its stream may carry (sections 2.1 and 2.3).
     fn check(&mut self, packet: Packet) -> Result<Event, Error> {
         let violation = match self.tag {
@@ -710,51 +722,14 @@ impl QuicConnection {
             }
     }
 
-    /// The next stop of a server's side to report, once the client's side of that stream has
-    /// nothing left that arrived before it: those packets come first, so that a DISCONNECT
-    /// followed by a stop of the control stream is not taken for an abnormal end, nor a PUBLISH
-    /// whose acknowledgement can no longer be sent missed. While nothing may be read, the stop
-    /// waits too.
-    fn take_stop(&mut self, cx: &mut Context<'_>) -> Option<Result<Event, Error>> {
-        if !self.reading() {
-            return None;
-        }
-        let decoder = self.decoder;
-        let mut lost = None;
-        let mut taken = None;
-        for stream in self.control.iter_mut().chain(self.data.iter_mut()) {
-            let Stop::Unreported(code) = stream.stop else {
-                continue;
-            };
-            match stream.poll_read(decoder, cx) {
-                Read::Event(result) => {
-                    taken = Some(result);
-                    break;
-                }
-                // Nothing more will arrive on it.
-                Read::Lost(error) => lost = Some(error),
-                Read::Pending => {}
-            }
-            stream.stop = Stop::Reported;
-            taken = Some(Ok(Event::StreamEnded {
-                stream: stream.tag,
-                end: StreamEnd::Stopped(code),
-            }));
-            break;
-        }
-        if let Some(error) = lost {
-            self.lose(&error);
-        }
-        if matches!(taken, Some(Err(_))) {
-            self.failed = true;
-        }
-        if taken.is_some() {
-            self.data.retain(|stream| !stream.is_done());
-        }
-        taken
-    }
-
     /// Reads the next packet, taking the streams in turn so that none starves the others.
+    ///
+    /// The stop of a server's side is reported in the same turns, once a turn finds nothing
+    /// left on that stream: the packets that came before it come first, so that a DISCONNECT
+    /// followed by a stop of the control stream is not taken for an abnormal end, nor a PUBLISH
+    /// whose acknowledgement can no longer be sent missed, and a client that goes on publishing
+    /// on a stream it stopped holds up no other stream. While nothing may be read, a stop waits
+    /// too.
     fn drive_reads(&mut self, cx: &mut Context<'_>) -> Option<Result<Event, Error>> {
         if !self.reading() {
             return None;
@@ -771,17 +746,22 @@ impl QuicConnection {
             let Some(stream) = stream else {
                 continue;
             };
-            match stream.poll_read(decoder, cx) {
-                Read::Pending => {}
-                Read::Lost(error) => self.lose(&error),
-                Read::Event(result) => {
-                    self.next_read = slot + 1;
-                    if result.is_err() {
-                        self.failed = true;
-                    }
-                    self.data.retain(|stream| !stream.is_done());
-                    return Some(result);
+            let (taken, lost) = match stream.poll_read(decoder, cx) {
+                Read::Event(result) => (Some(result), None),
+                // Nothing is left on the stream that came before its stop, if it has one.
+                Read::Pending => (stream.take_stop().map(Ok), None),
+                Read::Lost(error) => (stream.take_stop().map(Ok), Some(error)),
+            };
+            if let Some(error) = lost {
+                self.lose(&error);
+            }
+            if let Some(result) = taken {
+                self.next_read = slot + 1;
+                if result.is_err() {
+                    self.failed = true;
                 }
+                self.data.retain(|stream| !stream.is_done());
+                return Some(result);
             }
         }
         None
@@ -816,9 +796,6 @@ impl MqttConnection for QuicConnection {
         }
         self.drive_accept(cx);
         self.drive_stopped(cx);
-        if let Some(result) = self.take_stop(cx) {
-            return Poll::Ready(result);
-        }
         if let Some(result) = self.drive_reads(cx) {
             return Poll::Ready(result);
         }

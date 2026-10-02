@@ -466,3 +466,55 @@ async fn a_publish_comes_before_the_stop_of_its_data_stream() {
         }
     );
 }
+
+#[tokio::test]
+async fn a_flood_on_a_stopped_data_stream_starves_no_other_stream() {
+    let pki = TestPki::new("Streams CA").unwrap();
+    let (mut client, mut server, _endpoint) = accepted(&pki).await;
+    let mut stream = client.open_stream().await.unwrap();
+    // The client stops the server's side of a data stream, and goes on publishing on its own:
+    // a flood the connection holds before it reads any of it, then a PINGREQ on the control
+    // stream behind it.
+    stream.stop(6);
+    let flood = 2_000;
+    for _ in 0..flood {
+        stream
+            .send(packets::publish("t/flood", QoS::AtMostOnce, 0, "x"))
+            .await
+            .unwrap();
+    }
+    client.send(Packet::PingReq).await.unwrap();
+    tokio::time::sleep(QUIET).await;
+
+    let mut publishes = 0;
+    let mut ping_at = None;
+    let mut stopped_at = None;
+    let mut events = 0;
+    while stopped_at.is_none() || ping_at.is_none() {
+        let event = next(&mut server).await.unwrap();
+        events += 1;
+        match event {
+            Event::Packet {
+                stream: StreamTag::Data(1),
+                packet: Packet::Publish(_),
+            } => {
+                // Nothing of a stream comes after its stop.
+                assert!(stopped_at.is_none());
+                publishes += 1;
+            }
+            Event::Packet {
+                stream: StreamTag::Control,
+                packet: Packet::PingReq,
+            } => ping_at = Some(events),
+            Event::StreamEnded {
+                stream: StreamTag::Data(1),
+                end: StreamEnd::Stopped(6),
+            } => stopped_at = Some(events),
+            other => panic!("{other:?}"),
+        }
+    }
+    // The control stream takes its turn among the reads of the flooded one.
+    assert!(ping_at.unwrap() <= 4, "the PINGREQ came {ping_at:?}th");
+    // The stop comes after everything the stream delivered.
+    assert_eq!(publishes, flood);
+}
