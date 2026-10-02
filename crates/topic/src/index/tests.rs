@@ -34,6 +34,14 @@ fn entries(index: &TopicIndex<u32>) -> Vec<(String, u32)> {
 }
 
 #[test]
+fn an_index_can_be_shared_between_threads() {
+    // A route view is read by every publishing thread of an edge.
+    fn shared<T: Send + Sync>() {}
+    shared::<TopicIndex<u32>>();
+    shared::<Scratch>();
+}
+
+#[test]
 fn the_layout_r6_measured_with_a_smaller_terminal() {
     assert_eq!(size_of::<Node>(), 24);
     assert_eq!(size_of::<Term>(), 24);
