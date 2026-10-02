@@ -64,6 +64,14 @@ serde = { version = "1.0.229", features = ["derive"] }
 # The configuration file's format. Without `preserve_order`, tables keep their keys sorted, so
 # errors about a file come out in the same order every time.
 toml = { version = "1.1.6", default-features = false, features = ["std", "serde", "parse"] }
+# The OpenTelemetry API, which every crate records metrics on. It records nothing until the
+# binary installs a provider, so a library takes only this; openqtt-observe must never take the
+# SDK (`make layers`).
+opentelemetry = { version = "0.33", default-features = false, features = ["metrics"] }
+# The OpenTelemetry SDK: the binary's meter provider, and the in-memory exporter tests read.
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["metrics"] }
+# JSON, which tests read to check what the probes and the logs write.
+serde_json = "1.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

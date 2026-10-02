@@ -8,5 +8,17 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+opentelemetry.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+# The SDK's in-memory exporter, to read back what the instruments recorded. A test may use what
+# the crate may not.
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+serde_json.workspace = true
+tracing-subscriber.workspace = true
+
 [lints]
 workspace = true
