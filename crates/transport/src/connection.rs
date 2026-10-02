@@ -12,7 +12,7 @@ use std::slice;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use openqtt_codec::{Decoder, Packet, Sender};
 use openqtt_ext::Certificate;
 use quinn::{ConnectionError, ReadError, RecvStream, SendStream, StoppedError, VarInt, WriteError};
@@ -26,12 +26,29 @@ use crate::{
 /// A future the connection keeps between polls.
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
-/// The rest of a handshake, for a connection yielded with 0-RTT data: whether it completed in
-/// time.
-pub(crate) type Handshake = BoxFuture<bool>;
+/// The rest of a handshake, for a connection yielded with 0-RTT data: whether it ended in time.
+pub(crate) type PendingHandshake = BoxFuture<bool>;
 
 /// The most bytes taken from a stream at a time.
 const READ_CHUNK: usize = 64 * 1024;
+
+/// A packet is copied out of the buffer it was read into when that buffer is this many times its
+/// size or more, so that a packet kept for long, such as a retained message, never keeps a far
+/// larger buffer alive. Below it the packet shares the buffer, as the codec decodes.
+const SHARE_RATIO: usize = 4;
+
+/// Buffers no larger than this are shared whatever the packet: they pin little.
+const SHARE_FLOOR: usize = 16 * 1024;
+
+/// Where the handshake stands.
+enum Handshake {
+    /// Still going on, the connection having come with 0-RTT data.
+    Pending(PendingHandshake),
+    /// Complete; `reported` once the session has heard.
+    Complete { reported: bool },
+    /// Failed or ran out of time: nothing the client sent is confirmed.
+    Failed,
+}
 
 /// One MQTT connection over QUIC, from its handshake to its close: the [`MqttConnection`] of
 /// [`Endpoint`](crate::Endpoint)s.
@@ -54,14 +71,13 @@ pub struct QuicConnection {
     data_accepted: bool,
     /// The client's next bidirectional stream, or why the connection closed.
     accept: Option<BoxFuture<Result<(SendStream, RecvStream), ConnectionError>>>,
-    /// Completes with the handshake, when the connection was yielded before it.
-    handshake: Option<Handshake>,
-    handshake_done: bool,
-    handshake_reported: bool,
+    handshake: Handshake,
     paused: bool,
     /// The client broke the protocol: nothing more is read.
     failed: bool,
     closed: Option<Closed>,
+    /// The session has heard of the close: nothing else is reported after it.
+    close_reported: bool,
     backlog_limit: usize,
     /// The backlog reached its limit, and [`Event::Writable`] is owed once it falls below.
     blocked: bool,
@@ -260,14 +276,8 @@ impl Stream {
     fn poll_read(&mut self, decoder: Decoder, cx: &mut Context<'_>) -> Read {
         loop {
             if !self.read.is_empty() {
-                match decoder.decode(&mut self.read) {
-                    Ok(Some(packet)) => {
-                        if self.read.is_empty() {
-                            // Let the buffer go: the packet keeps what it needs of it.
-                            self.read = BytesMut::new();
-                        }
-                        return Read::Event(self.check(packet));
-                    }
+                match take_packet(&mut self.read, decoder) {
+                    Ok(Some(packet)) => return Read::Event(self.check(packet)),
                     Ok(None) => {}
                     Err(error) => {
                         return Read::Event(Err(Error::Decode {
@@ -355,6 +365,56 @@ impl Stream {
     }
 }
 
+/// Takes the next whole packet off the front of `read`, the bytes a stream delivered.
+///
+/// The codec decodes without copying, so a packet's payload shares the buffer it arrived in, and
+/// keeps all of it alive. A packet small beside that buffer is copied out first, and what is left
+/// after it moves to a buffer of its own size, so that no packet keeps alive a buffer much larger
+/// than itself: a retained message of ten bytes read behind a packet of a megabyte would
+/// otherwise hold the megabyte.
+fn take_packet(
+    read: &mut BytesMut,
+    decoder: Decoder,
+) -> Result<Option<Packet>, openqtt_codec::Error> {
+    let packet = match frame_len(read) {
+        Some(len) if len <= read.len() && wasteful(read.capacity(), len) => {
+            let mut frame = BytesMut::from(&read[..len]);
+            let packet = decoder.decode(&mut frame)?;
+            read.advance(len);
+            packet
+        }
+        _ => decoder.decode(read)?,
+    };
+    if packet.is_some() {
+        if read.is_empty() {
+            // Let the buffer go: the packet keeps what it needs of it.
+            *read = BytesMut::new();
+        } else if wasteful(read.capacity(), read.len()) {
+            *read = BytesMut::from(&read[..]);
+        }
+    }
+    Ok(packet)
+}
+
+/// Whether `len` bytes would pin a buffer of `capacity` far larger than themselves.
+fn wasteful(capacity: usize, len: usize) -> bool {
+    capacity > SHARE_FLOOR && capacity / SHARE_RATIO > len
+}
+
+/// The size of the packet at the front of `buffer`, from its fixed header: `None` until the
+/// Remaining Length is in, or when it is not a valid Variable Byte Integer, which the codec then
+/// refuses.
+fn frame_len(buffer: &[u8]) -> Option<usize> {
+    let mut remaining: usize = 0;
+    for (index, byte) in buffer.iter().skip(1).take(4).enumerate() {
+        remaining |= usize::from(byte & 0x7F) << (7 * index);
+        if byte & 0x80 == 0 {
+            return Some(1 + index + 1 + remaining);
+        }
+    }
+    None
+}
+
 /// What a data stream may not carry, either way: a packet of the control stream (section 2.1),
 /// or a PUBLISH with a Topic Alias (section 2.3). Data streams carry packet types 3 to 11.
 fn data_stream_violation(packet: &Packet) -> Option<Violation> {
@@ -418,13 +478,14 @@ impl Closed {
 }
 
 impl QuicConnection {
-    /// A connection whose handshake completed, or, with `handshake` given, one that is still
-    /// completing it and whose client opened `first` in 0-RTT.
+    /// A connection whose handshake completed, or, with `handshake` given, one whose handshake
+    /// was still going on when its client opened `first`, in 0-RTT data when `early_data`.
     pub(crate) fn new(
         connection: quinn::Connection,
         shared: &Shared,
-        handshake: Option<Handshake>,
+        handshake: Option<PendingHandshake>,
         first: Option<(SendStream, RecvStream)>,
+        early_data: bool,
     ) -> Self {
         let certificates: Vec<Certificate> = connection
             .peer_identity()
@@ -441,7 +502,6 @@ impl QuicConnection {
             .and_then(|data| data.downcast::<quinn::crypto::rustls::HandshakeData>().ok())
             .and_then(|data| data.protocol)
             .map(Bytes::from);
-        let early_data = handshake.is_some();
         let mut peer = Peer::new(connection.remote_address(), &shared.name)
             .with_certificates(Arc::from(certificates))
             .with_early_data(early_data);
@@ -459,12 +519,14 @@ impl QuicConnection {
             data: Vec::new(),
             held: Vec::new(),
             data_accepted: false,
-            handshake_done: handshake.is_none(),
-            handshake,
-            handshake_reported: false,
+            handshake: match handshake {
+                Some(pending) => Handshake::Pending(pending),
+                None => Handshake::Complete { reported: false },
+            },
             paused: false,
             failed: false,
             closed: None,
+            close_reported: false,
             backlog_limit: shared.send_backlog,
             blocked: false,
             next_read: 0,
@@ -483,18 +545,7 @@ impl QuicConnection {
             self.control = Some(Stream::new(StreamTag::Control, send, recv));
             return;
         }
-        let Ok(number) = u16::try_from(index) else {
-            // A tag never repeats on a connection, so one that has run out of them refuses
-            // further data streams; the control stream carries on.
-            tracing::debug!(
-                listener = &*self.peer.listener,
-                address = %self.peer.address,
-                "data stream refused: the client opened more than 65,535"
-            );
-            refuse(send, recv, CloseCode::StreamRefused);
-            return;
-        };
-        let tag = StreamTag::Data(number);
+        let tag = StreamTag::Data(index);
         if self.data_accepted {
             self.data.push(Stream::new(tag, send, recv));
         } else {
@@ -534,29 +585,28 @@ impl QuicConnection {
         }
     }
 
-    /// Whether the handshake is done, polling it if not.
+    /// Whether the handshake is complete, polling it if it is going on.
     fn poll_handshake(&mut self, cx: &mut Context<'_>) -> bool {
-        if !self.handshake_done {
-            let Some(handshake) = self.handshake.as_mut() else {
+        if let Handshake::Pending(pending) = &mut self.handshake {
+            let Poll::Ready(in_time) = pending.as_mut().poll(cx) else {
                 return false;
             };
-            if let Poll::Ready(in_time) = handshake.as_mut().poll(cx) {
-                self.handshake = None;
-                self.handshake_done = true;
-                if !in_time {
-                    // The client sent 0-RTT data and never completed the handshake.
-                    self.connection
-                        .close(VarInt::from_u32(CloseCode::ProtocolError.value()), b"");
-                    self.handshake_reported = true;
-                    self.closed.get_or_insert(Closed::TimedOut);
-                } else if let Some(error) = self.connection.close_reason() {
-                    // The handshake failed rather than completed, and is never reported.
-                    self.handshake_reported = true;
-                    self.lose(&error);
-                }
+            if !in_time {
+                // The client sent 0-RTT data and never completed the handshake.
+                self.connection
+                    .close(VarInt::from_u32(CloseCode::ProtocolError.value()), b"");
+                self.handshake = Handshake::Failed;
+                self.closed.get_or_insert(Closed::TimedOut);
+            } else if let Some(error) = self.connection.close_reason() {
+                // It ended with the connection rather than completing: quinn signals both the
+                // same way, and sets the close reason first.
+                self.handshake = Handshake::Failed;
+                self.lose(&error);
+            } else {
+                self.handshake = Handshake::Complete { reported: false };
             }
         }
-        self.handshake_done
+        matches!(self.handshake, Handshake::Complete { .. })
     }
 
     /// Hands what is queued to quinn, on every stream. Nothing leaves before the handshake is
@@ -629,9 +679,13 @@ impl QuicConnection {
     /// Reads the next packet, taking the streams in turn so that none starves the others.
     fn drive_reads(&mut self, cx: &mut Context<'_>) -> Option<Result<Event, Error>> {
         // A closed connection is drained whatever else holds reading back, so that a DISCONNECT
-        // that came before the close is not mistaken for an abnormal end.
+        // that came before the close is not mistaken for an abnormal end. Not one whose handshake
+        // never completed: what it sent may be a replay.
         let reading = !self.failed
-            && (self.closed.is_some() || (!self.paused && self.backlog() < self.backlog_limit));
+            && match self.closed {
+                Some(_) => matches!(self.handshake, Handshake::Complete { .. }),
+                None => !self.paused && self.backlog() < self.backlog_limit,
+            };
         if !reading {
             return None;
         }
@@ -670,14 +724,23 @@ impl MqttConnection for QuicConnection {
     }
 
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<Event, Error>> {
-        if self.poll_handshake(cx) && !self.handshake_reported {
-            self.handshake_reported = true;
+        if self.close_reported {
+            let closed = self.closed.clone().unwrap_or(Closed::Locally);
+            return Poll::Ready(Err(Error::Closed(closed)));
+        }
+        // Once quinn has a close it takes in nothing more, so a round of polls that starts after
+        // the close misses nothing that came before it.
+        let closed_before = self.closed.is_some();
+        if self.poll_handshake(cx)
+            && matches!(self.handshake, Handshake::Complete { reported: false })
+        {
+            self.handshake = Handshake::Complete { reported: true };
             return Poll::Ready(Ok(Event::HandshakeComplete {
                 early_data: self.peer.early_data,
             }));
         }
         self.drive_writes(cx);
-        if self.blocked && self.backlog() < self.backlog_limit {
+        if self.blocked && self.closed.is_none() && self.backlog() < self.backlog_limit {
             self.blocked = false;
             return Poll::Ready(Ok(Event::Writable));
         }
@@ -690,7 +753,16 @@ impl MqttConnection for QuicConnection {
             return Poll::Ready(result);
         }
         match &self.closed {
-            Some(closed) => Poll::Ready(Err(Error::Closed(closed.clone()))),
+            Some(closed) if closed_before => {
+                self.close_reported = true;
+                Poll::Ready(Err(Error::Closed(closed.clone())))
+            }
+            Some(_) => {
+                // Seen partway through this round, after some streams were read: read them all
+                // once more before saying so.
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
             None => Poll::Pending,
         }
     }
@@ -737,7 +809,7 @@ impl MqttConnection for QuicConnection {
     fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         self.drive_writes(cx);
         self.closed_error()?;
-        if self.handshake_done && self.backlog() == 0 {
+        if matches!(self.handshake, Handshake::Complete { .. }) && self.backlog() == 0 {
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending
@@ -746,7 +818,7 @@ impl MqttConnection for QuicConnection {
 
     fn finish(&mut self, stream: StreamTag) -> Result<(), Error> {
         self.closed_error()?;
-        let handshake_done = self.handshake_done;
+        let handshake_done = matches!(self.handshake, Handshake::Complete { .. });
         let target = self
             .stream_mut(stream)
             .filter(|target| target.open_for_sending())
@@ -807,7 +879,7 @@ impl MqttConnection for QuicConnection {
         for held in std::mem::take(&mut self.held) {
             refuse(held.send, held.recv, CloseCode::StreamRefused);
         }
-        let handshake_done = self.handshake_done;
+        let handshake_done = matches!(self.handshake, Handshake::Complete { .. });
         for stream in self.streams_mut() {
             if stream.open_for_sending() {
                 stream.finish = true;
@@ -839,6 +911,18 @@ impl MqttConnection for QuicConnection {
     fn close(&mut self, code: CloseCode) {
         self.connection.close(VarInt::from_u32(code.value()), b"");
         self.closed.get_or_insert(Closed::Locally);
+    }
+}
+
+impl Drop for QuicConnection {
+    /// Closes with an internal error a connection the edge let go of without closing it, as when
+    /// its task panicked or was aborted. quinn would close it with code 0, which tells the
+    /// client the end was clean (section 8).
+    fn drop(&mut self) {
+        if self.closed.is_none() {
+            self.connection
+                .close(VarInt::from_u32(CloseCode::InternalError.value()), b"");
+        }
     }
 }
 
@@ -909,6 +993,89 @@ mod tests {
             data_stream_violation(&aliased),
             Some(Violation::TopicAliasOnDataStream)
         );
+    }
+
+    /// Encodes a PUBLISH of `payload` bytes at QoS 0.
+    fn publish(payload: usize) -> BytesMut {
+        let mut bytes = BytesMut::new();
+        Packet::from(Publish {
+            topic: "t".into(),
+            payload: Bytes::from(vec![7; payload]),
+            ..Publish::default()
+        })
+        .encode(&mut bytes)
+        .unwrap();
+        bytes
+    }
+
+    /// Whether `payload` lies inside `buffer`'s memory.
+    fn inside(payload: &Bytes, buffer: std::ops::Range<usize>) -> bool {
+        buffer.contains(&(payload.as_ptr() as usize))
+    }
+
+    fn payload(packet: Option<Packet>) -> Bytes {
+        match packet {
+            Some(Packet::Publish(publish)) => publish.payload,
+            other => panic!("a PUBLISH, not {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_fixed_header_gives_the_packet_size() {
+        assert_eq!(frame_len(&[]), None);
+        assert_eq!(frame_len(&[0xC0]), None);
+        assert_eq!(frame_len(&[0xC0, 0x00]), Some(2));
+        assert_eq!(frame_len(&[0x30, 0x80, 0x10]), Some(2_051));
+        assert_eq!(frame_len(&[0x30, 0xFF, 0xFF, 0xFF]), None);
+        assert_eq!(
+            frame_len(&[0x30, 0xFF, 0xFF, 0xFF, 0x7F]),
+            Some(268_435_460)
+        );
+        // A fifth length byte: not a Variable Byte Integer, left to the codec to refuse.
+        assert_eq!(frame_len(&[0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]), None);
+        assert_eq!(frame_len(&publish(100)), Some(publish(100).len()));
+    }
+
+    #[test]
+    fn a_small_packet_does_not_keep_a_large_buffer_alive() {
+        let decoder = Decoder::new().with_sender(Sender::Client);
+        // A large packet, then a small one and the start of another, in one buffer, as a burst
+        // read into it leaves them.
+        let mut read = publish(200_000);
+        read.extend_from_slice(&publish(10));
+        read.extend_from_slice(&publish(10)[..5]);
+        let start = read.as_ptr() as usize;
+        let memory = start..start + read.capacity();
+
+        // The large packet shares the buffer, which is not much larger than it.
+        let large = payload(take_packet(&mut read, decoder).unwrap());
+        assert_eq!(large.len(), 200_000);
+        assert!(inside(&large, memory.clone()));
+        // The small one is copied out, and what follows it moves to a buffer of its own.
+        let small = payload(take_packet(&mut read, decoder).unwrap());
+        assert_eq!(small.len(), 10);
+        assert!(!inside(&small, memory.clone()));
+        assert_eq!(read.len(), 5);
+        assert!(!inside(&Bytes::copy_from_slice(&read), memory.clone()));
+        assert!(read.capacity() < SHARE_FLOOR);
+        assert_eq!(take_packet(&mut read, decoder), Ok(None));
+    }
+
+    #[test]
+    fn packets_in_a_small_buffer_share_it() {
+        let decoder = Decoder::new().with_sender(Sender::Client);
+        let mut read = publish(100);
+        read.extend_from_slice(&publish(100));
+        let start = read.as_ptr() as usize;
+        let memory = start..start + read.capacity();
+        for _ in 0..2 {
+            assert!(inside(
+                &payload(take_packet(&mut read, decoder).unwrap()),
+                memory.clone()
+            ));
+        }
+        // Emptied, the buffer is let go.
+        assert_eq!(read.capacity(), 0);
     }
 
     #[test]

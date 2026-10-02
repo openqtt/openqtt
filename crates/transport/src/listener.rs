@@ -11,7 +11,7 @@ use quinn::{TokioRuntime, VarInt};
 use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::config::ListenerConfig;
-use crate::connection::QuicConnection;
+use crate::connection::{PendingHandshake, QuicConnection};
 use crate::{CloseCode, Closed, Error};
 
 /// What a listener's endpoints and connections share.
@@ -73,6 +73,18 @@ impl Listener {
     /// [`Error::Tls`] when rustls refuses the certificate or key, and [`Error::Setting`] for a
     /// setting that cannot work, such as several endpoints where `SO_REUSEPORT` does not exist.
     pub fn new(config: ListenerConfig) -> Result<Self, Error> {
+        if config.send_backlog == 0 {
+            return Err(Error::Setting {
+                setting: "send_backlog".to_owned(),
+                reason: "at least 1 byte: a connection with none would never read".to_owned(),
+            });
+        }
+        if config.handshake_timeout.is_zero() || config.handshake_timeout > LONGEST_HANDSHAKE {
+            return Err(Error::Setting {
+                setting: "handshake_timeout".to_owned(),
+                reason: "more than 0 and at most an hour".to_owned(),
+            });
+        }
         if config.endpoints.get() > 1 && !SHARES_PORTS {
             return Err(Error::Setting {
                 setting: "endpoints".to_owned(),
@@ -200,6 +212,10 @@ impl Listener {
         Ok(socket.into())
     }
 }
+
+/// The longest handshake a listener allows: anything longer is a mistake, and an unbounded one
+/// would overflow the deadline.
+const LONGEST_HANDSHAKE: Duration = Duration::from_secs(3_600);
 
 /// Whether this platform lets several sockets bind one UDP port.
 const SHARES_PORTS: bool = cfg!(all(
@@ -339,8 +355,10 @@ impl Accepting {
     /// slow to complete it.
     pub async fn establish(self) -> Result<QuicConnection, Error> {
         let deadline = tokio::time::Instant::now() + self.shared.handshake_timeout;
-        // Dropping the attempt when time runs out closes it.
-        tokio::time::timeout_at(deadline, self.handshake(deadline))
+        // On the heap, so that a task that awaits this and then serves the connection is not
+        // sized for the handshake for the rest of the connection's life. Dropping the attempt
+        // when time runs out closes it.
+        Box::pin(tokio::time::timeout_at(deadline, self.handshake(deadline)))
             .await
             .unwrap_or(Err(Error::Handshake(Closed::TimedOut)))
     }
@@ -350,14 +368,26 @@ impl Accepting {
         let connecting = self.incoming.accept().map_err(failed)?;
         if !self.shared.early_data {
             let connection = connecting.await.map_err(failed)?;
-            return Ok(QuicConnection::new(connection, &self.shared, None, None));
+            return Ok(QuicConnection::new(
+                connection,
+                &self.shared,
+                None,
+                None,
+                false,
+            ));
         }
         // A server's attempt always converts: it may then read 0-RTT data.
         let (connection, mut handshake) = match connecting.into_0rtt() {
             Ok(converted) => converted,
             Err(connecting) => {
                 let connection = connecting.await.map_err(failed)?;
-                return Ok(QuicConnection::new(connection, &self.shared, None, None));
+                return Ok(QuicConnection::new(
+                    connection,
+                    &self.shared,
+                    None,
+                    None,
+                    false,
+                ));
             }
         };
         // Whichever comes first: the end of the handshake, or a stream the client opened, in
@@ -370,20 +400,30 @@ impl Accepting {
         let Some(stream) = first else {
             return match connection.close_reason() {
                 Some(error) => Err(failed(error)),
-                None => Ok(QuicConnection::new(connection, &self.shared, None, None)),
+                None => Ok(QuicConnection::new(
+                    connection,
+                    &self.shared,
+                    None,
+                    None,
+                    false,
+                )),
             };
         };
         let (send, recv) = stream.map_err(failed)?;
-        let handshake = recv.is_0rtt().then(|| {
-            // The rest of the handshake keeps the deadline of the whole.
-            Box::pin(async move { tokio::time::timeout_at(deadline, handshake).await.is_ok() })
-                as crate::connection::Handshake
-        });
+        // A stream taken while the handshake goes on came in 0-RTT data. One taken after it
+        // came with a handshake that completed, or with a close, which quinn tells apart only
+        // once the handshake future ends: the connection judges that, so that a close is never
+        // taken for a completed handshake.
+        let early_data = recv.is_0rtt();
+        // The rest of the handshake keeps the deadline of the whole.
+        let rest: PendingHandshake =
+            Box::pin(async move { tokio::time::timeout_at(deadline, handshake).await.is_ok() });
         Ok(QuicConnection::new(
             connection,
             &self.shared,
-            handshake,
+            Some(rest),
             Some((send, recv)),
+            early_data,
         ))
     }
 }

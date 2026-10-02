@@ -24,9 +24,11 @@ pub enum StreamTag {
     /// CONNECT, and carries every packet in single-stream mode (sections 2.1 and 2.2).
     Control,
     /// A data stream (section 2.3), numbered by the order in which the client opened its
-    /// bidirectional streams. The control stream is the first, so the first data stream is
-    /// `Data(1)`, and a number is never used twice on a connection.
-    Data(u16),
+    /// bidirectional streams: its QUIC stream index. The control stream is the first, so the
+    /// first data stream is `Data(1)`, and a number is never used twice on a connection. 64 bits
+    /// wide, since a client may open a stream for every exchange of a connection that lasts for
+    /// months.
+    Data(u64),
 }
 
 impl fmt::Display for StreamTag {
@@ -63,8 +65,9 @@ pub enum Event {
     /// (docs/spec/mqtt-over-quic.md, section 4).
     ///
     /// Packets delivered before it arrived in 0-RTT data, which an attacker can replay, so the
-    /// session acts on no PUBLISH, SUBSCRIBE or UNSUBSCRIBE among them until it comes. Whatever
-    /// is delivered after it is confirmed, whenever it arrived.
+    /// session acts on no PUBLISH, SUBSCRIBE or UNSUBSCRIBE among them until it comes, and on
+    /// none at all if the connection closes first. Whatever is delivered after it is confirmed,
+    /// whenever it arrived.
     HandshakeComplete {
         /// Whether the client's 0-RTT data was accepted, so that packets came before this.
         early_data: bool,

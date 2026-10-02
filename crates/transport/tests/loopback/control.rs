@@ -443,3 +443,31 @@ async fn an_endpoint_that_stops_accepting_keeps_its_connections() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn a_connection_let_go_without_a_close_ends_with_an_internal_error() {
+    let pki = TestPki::new("Control CA").unwrap();
+    let endpoint = bind(config(&pki));
+    let (mut client, mut server) = connected(&endpoint, &target(&endpoint, &pki)).await;
+    client.send(packets::connect("device-10")).await.unwrap();
+    take_connect(&mut server).await;
+    // As when the edge's task panics or is aborted: the client must not read a clean end.
+    drop(server);
+    assert!(matches!(
+        client.closed(WAIT).await,
+        Some(Close::Application { code: 2, .. })
+    ));
+}
+
+#[test]
+fn settings_that_cannot_work_are_refused() {
+    let pki = TestPki::new("Control CA").unwrap();
+    for config in [
+        config(&pki).send_backlog(0),
+        config(&pki).handshake_timeout(Duration::ZERO),
+        config(&pki).handshake_timeout(Duration::MAX),
+    ] {
+        let error = Listener::new(config).unwrap_err();
+        assert!(matches!(error, Error::Setting { .. }), "{error}");
+    }
+}
