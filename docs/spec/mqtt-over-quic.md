@@ -86,10 +86,15 @@ use against EMQX.
   client has not fully acknowledged, or a QoS 2 PUBLISH the client sent on the
   stream whose PUBREL the server has not received. Retransmission then follows
   the usual rules when the client reconnects.
-- Otherwise only the stream ends. An acknowledgement the server still owes on it,
-  a PUBACK, PUBCOMP, SUBACK or UNSUBACK, is sent if the server's sending side is
-  still open and dropped if not; the server then finishes its side. Subscriptions
-  made on the stream deliver on the control stream from then on.
+- An acknowledgement the server still owes on the stream (PUBACK, PUBREC,
+  PUBCOMP, SUBACK or UNSUBACK) is sent if the server's sending side is still
+  open. If the client has stopped that side, the acknowledgement can no longer
+  be delivered, and the client would hold the packet identifier, and for a
+  PUBLISH a slot of its send quota, for the rest of the connection. So the
+  server MUST then send DISCONNECT 0x82 on the control stream and close the
+  connection, and the exchange recovers when the client reconnects.
+- Otherwise only the stream ends, and the server finishes its side.
+  Subscriptions made on the stream deliver on the control stream from then on.
 - On a resumed session every subscription delivers on the control stream, and
   retransmitted PUBLISH and PUBREL packets go there too, until a SUBSCRIBE on a
   data stream replaces a subscription and moves its deliveries to that stream.
