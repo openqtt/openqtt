@@ -46,10 +46,10 @@ pub(crate) enum Command {
         properties: UnsubscribeProperties,
         reply: oneshot::Sender<Result<UnsubAck, Error>>,
     },
-    /// Send DISCONNECT and close.
+    /// Send DISCONNECT and close, or report why the DISCONNECT cannot be sent.
     Disconnect {
         disconnect: Disconnect,
-        reply: oneshot::Sender<Session>,
+        reply: oneshot::Sender<Result<Session, Error>>,
     },
 }
 
@@ -126,7 +126,7 @@ enum Reply {
 enum Stop {
     /// The client sent DISCONNECT, at a caller's request or because nothing holds the
     /// connection any more.
-    Disconnected(Option<oneshot::Sender<Session>>),
+    Disconnected(Option<oneshot::Sender<Result<Session, Error>>>),
     /// The server sent DISCONNECT.
     ByServer(Disconnect),
     /// The server broke the protocol; the client sent DISCONNECT with this code.
@@ -284,7 +284,7 @@ impl Driver {
         } = self;
         match reply {
             Some(reply) => {
-                if let Err(session) = reply.send(session) {
+                if let Err(Ok(session)) = reply.send(Ok(session)) {
                     shared.keep_session(session);
                 }
             }
@@ -622,9 +622,20 @@ impl Driver {
                 self.flush().await
             }
             Command::Disconnect { disconnect, reply } => {
-                if self.encode(&Packet::Disconnect(disconnect)).is_ok() {
-                    drop(self.flush().await);
+                // A Reason String or User Property that would take the DISCONNECT past the
+                // server's Maximum Packet Size is left out ([MQTT-3.14.2-3], [MQTT-3.14.2-4]).
+                // A DISCONNECT that still cannot be sent is the caller's to fix, and the
+                // connection carries on as it was.
+                let mut packet = Packet::Disconnect(disconnect);
+                let encoded = packet
+                    .fit_within(self.negotiated.server_maximum_packet_size)
+                    .map_err(Error::Invalid)
+                    .and_then(|_| self.encode(&packet));
+                if let Err(error) = encoded {
+                    drop(reply.send(Err(error)));
+                    return Ok(());
                 }
+                drop(self.flush().await);
                 Err(Stop::Disconnected(Some(reply)))
             }
         }

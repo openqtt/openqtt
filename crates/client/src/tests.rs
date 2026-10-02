@@ -1050,3 +1050,64 @@ async fn events_left_unread_stop_reading_until_the_application_catches_up() {
     }
     assert_eq!(server.recv().await, Packet::PubAck(PubAck::new(pid(3))));
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_disconnect_that_cannot_be_encoded_is_an_error_and_the_connection_stays() {
+    let (client, _events, mut server) = connect(ConnectOptions::new("c").keep_alive(0)).await;
+    // A string field of 70,000 bytes has no encoding.
+    let unencodable = Disconnect {
+        properties: openqtt_codec::DisconnectProperties {
+            server_reference: Some("x".repeat(70_000)),
+            ..openqtt_codec::DisconnectProperties::default()
+        },
+        ..Disconnect::default()
+    };
+    assert!(matches!(
+        client.disconnect_with(unencodable).await,
+        Err(Error::Invalid(_))
+    ));
+    // Nothing was sent, and the connection still works.
+    assert!(!client.is_closed());
+    assert!(server.silent_for(Duration::from_secs(1)).await);
+    client
+        .publish(Publish {
+            topic: "t".into(),
+            ..Publish::default()
+        })
+        .await
+        .unwrap();
+    assert!(matches!(server.recv().await, Packet::Publish(_)));
+    client.disconnect().await.unwrap();
+    assert_eq!(
+        server.recv().await,
+        Packet::Disconnect(Disconnect::default())
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_disconnect_reason_string_that_would_not_fit_the_server_is_left_out() {
+    let connack = ConnAck {
+        properties: ConnAckProperties {
+            maximum_packet_size: NonZeroU32::new(16),
+            ..ConnAckProperties::default()
+        },
+        ..ConnAck::default()
+    };
+    let (client, _events, mut server, _) =
+        connect_with(ConnectOptions::new("c").keep_alive(0), connack).await;
+    let with_will = Disconnect {
+        reason_code: DisconnectReasonCode::DisconnectWithWillMessage,
+        properties: openqtt_codec::DisconnectProperties {
+            reason_string: Some("going away for maintenance".into()),
+            ..openqtt_codec::DisconnectProperties::default()
+        },
+    };
+    client.disconnect_with(with_will).await.unwrap();
+    assert_eq!(
+        server.recv().await,
+        Packet::Disconnect(Disconnect {
+            reason_code: DisconnectReasonCode::DisconnectWithWillMessage,
+            ..Disconnect::default()
+        })
+    );
+}

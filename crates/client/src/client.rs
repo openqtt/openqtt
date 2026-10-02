@@ -424,12 +424,15 @@ impl Client {
     }
 
     /// [`disconnect`](Self::disconnect) with a DISCONNECT of the caller's: 0x04 to have the
-    /// Will Message published, or a new Session Expiry Interval.
+    /// Will Message published, or a new Session Expiry Interval. A Reason String or User
+    /// Properties that would take it past the server's Maximum Packet Size are left out
+    /// ([MQTT-3.14.2-3], [MQTT-3.14.2-4]).
     ///
     /// # Errors
     ///
     /// As [`disconnect`](Self::disconnect), and [`Error::Invalid`] for a DISCONNECT a client
-    /// may not send.
+    /// may not send or that does not encode. Nothing is sent then, and the connection stays
+    /// open.
     pub async fn disconnect_with(&self, disconnect: Disconnect) -> Result<Session, Error> {
         Packet::Disconnect(disconnect.clone())
             .check_sender(Sender::Client)
@@ -444,7 +447,7 @@ impl Client {
             return self.shared.take_session().ok_or(Error::Closed);
         }
         match response.await {
-            Ok(session) => Ok(session),
+            Ok(result) => result,
             Err(_) => self.shared.take_session().ok_or(Error::Closed),
         }
     }
