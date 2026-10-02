@@ -1,9 +1,30 @@
 //! Properties (section 2.2.2): the 27 identifiers, their data types, and the packets each may
-//! appear in (Table 2-4).
+//! appear in (Table 2-4), with the machinery that reads and writes a set of them.
+//!
+//! Each packet's properties are a struct with a field per property it allows, so a property
+//! that does not belong cannot be built. Decoding reads identifiers and values off the wire
+//! into one; encoding walks its fields as [`Value`]s. The value rules that sections 2.2.2 and 3
+//! set, such as "a Receive Maximum of 0 is a Protocol Error", live in [`check_number`] and
+//! apply both ways, so a packet that encodes always decodes.
+
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the decoder that calls the property readers arrives in a following commit"
+    )
+)]
 
 use std::fmt;
+use std::num::{NonZeroU16, NonZeroU32};
 
-use crate::PacketType;
+use bytes::{BufMut, BytesMut};
+
+use crate::primitives::{
+    Reader, binary_len, put_binary, put_string, put_variable_byte_integer, string_len,
+    variable_byte_integer_len,
+};
+use crate::{Error, MAX_PACKET_SIZE, MAX_VARIABLE_BYTE_INTEGER, PacketType, PayloadFormat, QoS};
 
 /// The data type of a property value (section 1.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -381,6 +402,260 @@ impl fmt::Display for PropertyId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.name())
     }
+}
+
+/// One property value on its way out, borrowed from the packet that holds it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Value<'a> {
+    /// A Byte.
+    Byte(u8),
+    /// A Two Byte Integer.
+    TwoByteInteger(u16),
+    /// A Four Byte Integer.
+    FourByteInteger(u32),
+    /// A UTF-8 Encoded String.
+    String(&'a str),
+    /// Binary Data.
+    Binary(&'a [u8]),
+    /// A UTF-8 String Pair.
+    Pair(&'a str, &'a str),
+}
+
+impl Value<'_> {
+    /// The value's encoded size, without its identifier.
+    fn len(self) -> usize {
+        match self {
+            Self::Byte(_) => 1,
+            Self::TwoByteInteger(_) => 2,
+            Self::FourByteInteger(_) => 4,
+            Self::String(text) => 2 + text.len(),
+            Self::Binary(data) => 2 + data.len(),
+            Self::Pair(name, value) => 4 + name.len() + value.len(),
+        }
+    }
+
+    /// Checks the value against the rules a receiver applies to property `id`.
+    fn check(self, id: PropertyId) -> Result<(), Error> {
+        match self {
+            Self::Byte(value) => check_number(id, value.into()),
+            Self::TwoByteInteger(value) => check_number(id, value.into()),
+            Self::FourByteInteger(value) => check_number(id, value),
+            Self::String(text) => string_len(text, id.name()).map(drop),
+            Self::Binary(data) => binary_len(data, id.name()).map(drop),
+            Self::Pair(name, value) => {
+                string_len(name, id.name())?;
+                string_len(value, id.name()).map(drop)
+            }
+        }
+    }
+
+    /// Writes the identifier and the value.
+    fn write(self, id: PropertyId, dst: &mut BytesMut) {
+        // Every identifier of Table 2-4 is below 128, so its Variable Byte Integer is the one
+        // byte of its value.
+        dst.put_u8(id.value());
+        match self {
+            Self::Byte(value) => dst.put_u8(value),
+            Self::TwoByteInteger(value) => dst.put_u16(value),
+            Self::FourByteInteger(value) => dst.put_u32(value),
+            Self::String(text) => put_string(dst, text),
+            Self::Binary(data) => put_binary(dst, data),
+            Self::Pair(name, value) => {
+                put_string(dst, name);
+                put_string(dst, value);
+            }
+        }
+    }
+}
+
+/// A packet's set of properties, as the fields of a struct.
+pub(crate) trait Properties {
+    /// Calls `f` with every property present, in a fixed order. A repeated property comes in
+    /// the order it was given, which keeps User Properties in order ([MQTT-3.3.2-18]).
+    fn for_each(&self, f: impl FnMut(PropertyId, Value<'_>));
+}
+
+/// The Property Length of a set: the bytes of its properties, without the length itself.
+pub(crate) fn property_length(properties: &impl Properties) -> usize {
+    let mut len = 0;
+    properties.for_each(|_, value| len += 1 + value.len());
+    len
+}
+
+/// Checks a set of properties against the rules a receiver applies, and returns its encoded
+/// size: the Property Length as a Variable Byte Integer, then the properties. A set with no
+/// properties still takes one byte, a Property Length of zero ([MQTT-2.2.2-1]).
+pub(crate) fn measure_properties(
+    properties: &impl Properties,
+    context: PropertyContext,
+) -> Result<usize, Error> {
+    let mut checked = Ok(());
+    properties.for_each(|id, value| {
+        debug_assert!(id.is_valid_in(context), "{id} in {context}");
+        if checked.is_ok() {
+            checked = value.check(id);
+        }
+    });
+    checked?;
+    let len = property_length(properties);
+    match u32::try_from(len) {
+        Ok(prefix) if prefix <= MAX_VARIABLE_BYTE_INTEGER => {
+            Ok(variable_byte_integer_len(prefix) + len)
+        }
+        _ => Err(Error::PacketTooLarge {
+            size: len,
+            maximum: MAX_PACKET_SIZE,
+        }),
+    }
+}
+
+/// Writes a set of properties checked by [`measure_properties`].
+pub(crate) fn put_properties(dst: &mut BytesMut, properties: &impl Properties) {
+    let len = property_length(properties);
+    put_variable_byte_integer(dst, u32::try_from(len).unwrap_or(MAX_VARIABLE_BYTE_INTEGER));
+    properties.for_each(|id, value| value.write(id, dst));
+}
+
+/// The numeric rules sections 3.1 to 3.15 set for property values. Decoding applies them to
+/// what arrives and encoding to what leaves, so the two cannot drift apart.
+///
+/// A Payload Format Indicator other than 0 or 1 is refused like the other Byte properties
+/// that define only those two values: section 3.3.2.3.2 lists no others, and the definitions
+/// of section 1.2 make a value that parses but is not allowed a Protocol Error.
+pub(crate) fn check_number(id: PropertyId, value: u32) -> Result<(), Error> {
+    use PropertyId as P;
+    let allowed = match id {
+        P::PayloadFormatIndicator
+        | P::RequestProblemInformation
+        | P::RequestResponseInformation
+        | P::MaximumQos
+        | P::RetainAvailable
+        | P::WildcardSubscriptionAvailable
+        | P::SubscriptionIdentifierAvailable
+        | P::SharedSubscriptionAvailable => value <= 1,
+        P::ReceiveMaximum | P::MaximumPacketSize => value != 0,
+        P::SubscriptionIdentifier => value != 0 && value <= MAX_VARIABLE_BYTE_INTEGER,
+        P::TopicAlias if value == 0 => return Err(Error::ZeroTopicAlias),
+        _ => true,
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err(Error::InvalidPropertyValue {
+            property: id,
+            value,
+        })
+    }
+}
+
+/// Reads a Property Length and the properties it covers, handing each identifier that Table
+/// 2-4 allows in `context` to `each`, which reads the value with the readers below.
+pub(crate) fn read_properties<'a>(
+    reader: &mut Reader<'a>,
+    context: PropertyContext,
+    mut each: impl FnMut(PropertyId, &mut Reader<'a>) -> Result<(), Error>,
+) -> Result<(), Error> {
+    let len = reader.variable_byte_integer("Property Length")?;
+    let len = usize::try_from(len).map_err(|_| Error::Truncated {
+        field: "Properties",
+    })?;
+    let mut properties = reader.take(len, "Properties")?;
+    while !properties.is_empty() {
+        let id = properties.variable_byte_integer("Property Identifier")?;
+        let property = u8::try_from(id)
+            .ok()
+            .and_then(PropertyId::from_u8)
+            .filter(|property| property.is_valid_in(context))
+            .ok_or(Error::InvalidPropertyId { context, id })?;
+        each(property, &mut properties)?;
+    }
+    Ok(())
+}
+
+/// The error for an identifier that a context's reader does not handle. [`read_properties`]
+/// only hands over identifiers the context allows, so this means a reader and Table 2-4
+/// disagree; the tests check every reader against the table.
+pub(crate) fn unexpected(id: PropertyId, context: PropertyContext) -> Error {
+    Error::InvalidPropertyId {
+        context,
+        id: id.value().into(),
+    }
+}
+
+/// Stores a property that may appear at most once; a second is a Protocol Error, as each
+/// property's section says.
+pub(crate) fn once<T>(slot: &mut Option<T>, value: T, id: PropertyId) -> Result<(), Error> {
+    if slot.is_some() {
+        return Err(Error::DuplicateProperty { property: id });
+    }
+    *slot = Some(value);
+    Ok(())
+}
+
+/// A Byte property defined as 0 or 1.
+pub(crate) fn read_bool(reader: &mut Reader<'_>, id: PropertyId) -> Result<bool, Error> {
+    let value = reader.u8(id.name())?;
+    check_number(id, value.into())?;
+    Ok(value == 1)
+}
+
+/// The Maximum QoS of a CONNACK, 0 or 1 (section 3.2.2.3.4).
+pub(crate) fn read_qos(reader: &mut Reader<'_>, id: PropertyId) -> Result<QoS, Error> {
+    let value = reader.u8(id.name())?;
+    check_number(id, value.into())?;
+    QoS::from_u8(value).ok_or(Error::InvalidPropertyValue {
+        property: id,
+        value: value.into(),
+    })
+}
+
+/// A Payload Format Indicator, 0 or 1.
+pub(crate) fn read_payload_format(
+    reader: &mut Reader<'_>,
+    id: PropertyId,
+) -> Result<PayloadFormat, Error> {
+    let value = reader.u8(id.name())?;
+    check_number(id, value.into())?;
+    PayloadFormat::from_u8(value).ok_or(Error::InvalidPropertyValue {
+        property: id,
+        value: value.into(),
+    })
+}
+
+/// A Two Byte Integer property.
+pub(crate) fn read_u16(reader: &mut Reader<'_>, id: PropertyId) -> Result<u16, Error> {
+    let value = reader.u16(id.name())?;
+    check_number(id, value.into())?;
+    Ok(value)
+}
+
+/// A Four Byte Integer property.
+pub(crate) fn read_u32(reader: &mut Reader<'_>, id: PropertyId) -> Result<u32, Error> {
+    let value = reader.u32(id.name())?;
+    check_number(id, value)?;
+    Ok(value)
+}
+
+/// A Two Byte Integer property that may not be 0.
+pub(crate) fn read_nonzero_u16(
+    reader: &mut Reader<'_>,
+    id: PropertyId,
+) -> Result<NonZeroU16, Error> {
+    NonZeroU16::new(read_u16(reader, id)?).ok_or(Error::InvalidPropertyValue {
+        property: id,
+        value: 0,
+    })
+}
+
+/// A Four Byte Integer property that may not be 0.
+pub(crate) fn read_nonzero_u32(
+    reader: &mut Reader<'_>,
+    id: PropertyId,
+) -> Result<NonZeroU32, Error> {
+    NonZeroU32::new(read_u32(reader, id)?).ok_or(Error::InvalidPropertyValue {
+        property: id,
+        value: 0,
+    })
 }
 
 #[cfg(test)]

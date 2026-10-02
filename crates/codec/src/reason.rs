@@ -7,7 +7,8 @@
 
 use crate::{PacketType, Sender};
 
-/// Defines a reason code enum over `u8` with its constants and conversions.
+/// Defines a reason code enum over `u8` with its constants and conversions. Each enum's
+/// default is its 0x00 code, which is what a packet that omits its reason code means.
 macro_rules! reason_code_enum {
     (
         $(#[$meta:meta])*
@@ -16,7 +17,7 @@ macro_rules! reason_code_enum {
         }
     ) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
         #[repr(u8)]
         pub enum $name {
             $( $(#[$variant_meta])* $variant = $value, )+
@@ -78,6 +79,7 @@ reason_code_enum! {
     /// and Granted QoS 0 in SUBACK. Here it is [`ReasonCode::Success`].
     pub enum ReasonCode {
         /// 0x00 Success; Normal disconnection in DISCONNECT, Granted QoS 0 in SUBACK.
+        #[default]
         Success = 0x00,
         /// 0x01 Granted QoS 1.
         GrantedQos1 = 0x01,
@@ -244,6 +246,7 @@ reason_code_enum! {
     /// ([MQTT-3.2.2-7]).
     pub enum ConnectReasonCode {
         /// 0x00 Success: the connection is accepted.
+        #[default]
         Success = 0x00,
         /// 0x80 Unspecified error: the server does not wish to reveal the reason, or none of
         /// the other codes apply.
@@ -299,6 +302,7 @@ reason_code_enum! {
     /// ([MQTT-3.4.2-1]).
     pub enum PubAckReasonCode {
         /// 0x00 Success: the message is accepted and publication of the QoS 1 message proceeds.
+        #[default]
         Success = 0x00,
         /// 0x10 No matching subscribers: accepted, but nobody subscribes. Sent only by the
         /// server.
@@ -326,6 +330,7 @@ reason_code_enum! {
     /// ([MQTT-3.5.2-1]). The same values as PUBACK.
     pub enum PubRecReasonCode {
         /// 0x00 Success: the message is accepted and publication of the QoS 2 message proceeds.
+        #[default]
         Success = 0x00,
         /// 0x10 No matching subscribers: accepted, but nobody subscribes. Sent only by the
         /// server.
@@ -353,6 +358,7 @@ reason_code_enum! {
     /// ([MQTT-3.6.2-1]).
     pub enum PubRelReasonCode {
         /// 0x00 Success: message released.
+        #[default]
         Success = 0x00,
         /// 0x92 Packet Identifier not found: not an error during recovery, otherwise a
         /// mismatch of session state.
@@ -365,6 +371,7 @@ reason_code_enum! {
     /// ([MQTT-3.7.2-1]).
     pub enum PubCompReasonCode {
         /// 0x00 Success: Packet Identifier released, publication of the QoS 2 message complete.
+        #[default]
         Success = 0x00,
         /// 0x92 Packet Identifier not found: not an error during recovery, otherwise a
         /// mismatch of session state.
@@ -377,6 +384,7 @@ reason_code_enum! {
     /// 3-8); the server uses one of these for each ([MQTT-3.9.3-2]).
     pub enum SubAckReasonCode {
         /// 0x00 Granted QoS 0: accepted, delivered at QoS 0 at most.
+        #[default]
         GrantedQos0 = 0x00,
         /// 0x01 Granted QoS 1: accepted, delivered at QoS 1 at most.
         GrantedQos1 = 0x01,
@@ -408,6 +416,7 @@ reason_code_enum! {
     /// Table 3-9); the server uses one of these for each ([MQTT-3.11.3-2]).
     pub enum UnsubAckReasonCode {
         /// 0x00 Success: the subscription is deleted.
+        #[default]
         Success = 0x00,
         /// 0x11 No subscription existed with that Topic Filter.
         NoSubscriptionExisted = 0x11,
@@ -432,6 +441,7 @@ reason_code_enum! {
     /// Table 3-10 leaves out; see [`ReasonCode::is_valid_in`].
     pub enum DisconnectReasonCode {
         /// 0x00 Normal disconnection: close normally and do not send the Will Message.
+        #[default]
         NormalDisconnection = 0x00,
         /// 0x04 Disconnect with Will Message: the client wants its Will Message published.
         DisconnectWithWillMessage = 0x04,
@@ -500,6 +510,7 @@ reason_code_enum! {
     /// one of these ([MQTT-3.15.2-1]).
     pub enum AuthReasonCode {
         /// 0x00 Success: authentication is successful. Sent by the server.
+        #[default]
         Success = 0x00,
         /// 0x18 Continue authentication with another step. Sent by either end.
         ContinueAuthentication = 0x18,

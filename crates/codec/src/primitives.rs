@@ -9,13 +9,13 @@
     not(test),
     expect(
         dead_code,
-        reason = "the packet codecs in the following commits are what call these"
+        reason = "the decoder that calls the packet decoders arrives in a following commit"
     )
 )]
 
 use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::Error;
+use crate::{Error, PacketType};
 
 /// The largest value a Variable Byte Integer holds: four bytes of seven bits (section 1.5.5,
 /// Table 1-1). It bounds the Remaining Length, every Property Length and the Subscription
@@ -25,6 +25,10 @@ pub const MAX_VARIABLE_BYTE_INTEGER: u32 = 268_435_455;
 /// The longest UTF-8 Encoded String or Binary Data value, in bytes. Both are prefixed by a Two
 /// Byte Integer length (sections 1.5.4 and 1.5.6).
 pub const MAX_STRING_LEN: usize = 65_535;
+
+/// The largest packet the protocol can express: one byte of type and flags, four of Remaining
+/// Length, and the largest Remaining Length (section 2.1.4).
+pub const MAX_PACKET_SIZE: u32 = 1 + 4 + MAX_VARIABLE_BYTE_INTEGER;
 
 /// Reads a Variable Byte Integer from the front of `bytes`, returning its value and how many
 /// bytes it took, or `None` when `bytes` ends before the integer does.
@@ -264,6 +268,19 @@ impl<'a> Reader<'a> {
         let rest = self.buf.slice(self.pos..self.end);
         self.pos = self.end;
         rest
+    }
+
+    /// Checks that the last field of a packet has been read: anything after it means the
+    /// packet does not match its format, a Malformed Packet.
+    pub(crate) fn finish(&self, packet_type: PacketType) -> Result<(), Error> {
+        if self.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::TrailingBytes {
+                packet_type,
+                count: self.remaining(),
+            })
+        }
     }
 }
 
