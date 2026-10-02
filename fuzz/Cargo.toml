@@ -1,0 +1,34 @@
+# Fuzz targets for openqtt-codec, run with cargo-fuzz on a nightly compiler (see README.md).
+# A workspace of its own, excluded from the main one, so the gate never needs nightly.
+[package]
+name = "openqtt-codec-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# The libFuzzer driver.
+libfuzzer-sys = "0.4.13"
+bytes = "1.12"
+openqtt-codec = { path = "../crates/codec" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "decode"
+path = "fuzz_targets/decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip"
+path = "fuzz_targets/roundtrip.rs"
+test = false
+doc = false
+bench = false

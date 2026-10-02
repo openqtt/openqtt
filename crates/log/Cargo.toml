@@ -1,0 +1,12 @@
+[package]
+name = "openqtt-log"
+description = "The OpenQTT log role: replicated partitions of sessions, queues and retained messages"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

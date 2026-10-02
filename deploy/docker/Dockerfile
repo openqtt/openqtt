@@ -1,87 +1,26 @@
-# THE BUILDER IS A MIRROR OF UPSTREAM'S, copied by digest into this organisation
-# so that a build never depends on EMQ keeping an image published. The release
-# workflow refreshes the mirror before it builds.
-ARG BUILD_FROM=ghcr.io/openqtt/emqx-builder:5.6-2-1.15.7-26.2.5.14-1-debian13
-ARG RUN_FROM=debian:13-slim
-ARG SOURCE_TYPE=src # tgz
+# OpenQTT 2.0: the openqtt binary, built with the pinned compiler and copied into a distroless
+# runtime that has no shell and no package manager. Each architecture builds natively.
+#
+# RUST_VERSION matches rust-toolchain.toml, which still decides: rustup in the build stage reads
+# it, so a stale RUST_VERSION costs a download, never a different compiler. The build stage is
+# Debian 12 because the runtime is: a binary linked on a newer Debian can need glibc symbols
+# that cc-debian12 does not have.
+ARG RUST_VERSION=1.99.0
 
-FROM ${BUILD_FROM} AS builder_src
-ONBUILD COPY . /emqx
+FROM rust:${RUST_VERSION}-bookworm AS build
+WORKDIR /src
+COPY . .
+# The cache mounts keep the registry and target/ between local builds; the binary is copied out
+# of target/ because a cache mount is not part of the image.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    cargo build --release --locked -p openqtt \
+    && cp target/release/openqtt /openqtt
 
-FROM ${RUN_FROM} AS builder_tgz
-ARG PROFILE=emqx
-ARG PKG_VSN
-ARG SUFFIX
-ARG TARGETARCH
-ONBUILD COPY ${PROFILE}-${PKG_VSN}${SUFFIX}-debian13-$TARGETARCH.tar.gz /${PROFILE}.tar.gz
-
-FROM builder_${SOURCE_TYPE} AS builder
-
-ARG PROFILE=emqx
-ARG IS_ELIXIR=no
-ARG DEBUG
-
-ENV OPENQTT_RELUP=false
-ENV OPENQTT_REL_FORM='docker'
-# English descriptions are generated from this tree. The Chinese translation is
-# a build-time download from a moving branch of emqx/emqx-i18n, which makes two
-# builds of one commit differ; a release build fetches nothing it does not pin.
-ENV DOWNLOAD_I18N_TRANSLATIONS=false
-
-WORKDIR /emqx/
-
-RUN mkdir -p /emqx-rel/openqtt && \
-    if [ -f "/${PROFILE}.tar.gz" ]; then \
-      tar zxf "/${PROFILE}.tar.gz" -C /emqx-rel/openqtt; \
-    else \
-      if [ -f rebar-git-cache.tar ]; then \
-        mkdir .cache && \
-        tar -xf rebar-git-cache.tar -C .cache && \
-        export REBAR_GIT_CACHE_DIR='/emqx/.cache' && \
-        export REBAR_GIT_CACHE_REF_AUTOFILL=0; \
-      fi && \
-      export OPENQTT_REL_PATH="/emqx/_build/${PROFILE}/rel/openqtt" && \
-      git config --global --add safe.directory '*' && \
-      make ${PROFILE}-tgz && \
-      tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/openqtt; \
-    fi
-
-FROM $RUN_FROM
-ARG EXTRA_DEPS=''
-
-# Elixir complains if runs without UTF-8
-ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
-
-COPY deploy/docker/docker-entrypoint.sh /usr/bin/
-
-RUN set -eu; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates procps curl $(echo "${EXTRA_DEPS}" | tr ',' ' '); \
-    rm -rf /var/lib/apt/lists/*; \
-    groupadd -r -g 1000 openqtt; \
-    useradd -r -m -u 1000 -g openqtt openqtt;
-
-COPY --from=builder --chown=openqtt:openqtt /emqx-rel /opt/
-
-RUN ln -s /opt/openqtt/bin/* /usr/local/bin/
-
-WORKDIR /opt/openqtt
-
-USER openqtt
-
-VOLUME ["/opt/openqtt/log", "/opt/openqtt/data"]
-
-# openqtt will occupy these port:
-# - 1883 port for MQTT
-# - 8083 for WebSocket/HTTP
-# - 8084 for WSS/HTTPS
-# - 8883 port for MQTT(SSL)
-# - 18083 for dashboard and API
-# - 4370 default Erlang distribution port
-# - 5369 for backplane gen_rpc
-EXPOSE 1883 8083 8084 8883 18083 4370 5369
-
-ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
-
-CMD ["/opt/openqtt/bin/openqtt", "foreground"]
+FROM gcr.io/distroless/cc-debian12:nonroot
+COPY --from=build /openqtt /openqtt
+# 14567/udp: MQTT 5 over QUIC, the client listener. 8080/tcp: HTTP for the health probes, and
+# the admin API where the admin role runs.
+EXPOSE 14567/udp 8080/tcp
+ENTRYPOINT ["/openqtt"]
+CMD ["run"]

@@ -1,0 +1,82 @@
+# OpenQTT 2.0: one workspace, crates under crates/, lowest layer first in the list below.
+# `make layers` enforces which crate may depend on which; docs/README.md indexes the design.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# The codec's fuzz targets are a crate of their own: cargo-fuzz needs a nightly compiler, and
+# the gate builds this workspace on the pinned stable one.
+exclude = ["fuzz"]
+
+[workspace.package]
+version = "2.0.0-alpha.0"
+edition = "2024"
+# Moves with rust-toolchain.toml.
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/openqtt/OpenQTT"
+# Nothing is published yet. openqtt-codec and openqtt-client are meant for crates.io once their
+# API settles; they switch to true then, and nothing else does.
+publish = false
+
+[workspace.dependencies]
+# The workspace's own crates, so a member names a sibling by name and never by path.
+openqtt-codec = { path = "crates/codec" } # MQTT 5 packets over bytes
+openqtt-topic = { path = "crates/topic" } # topic names, filters and the matching trie
+openqtt-core = { path = "crates/core" } # domain types and session placement
+openqtt-ext = { path = "crates/ext" } # the extension traits
+openqtt-auth = { path = "crates/auth" } # built-in authentication and authorization
+openqtt-session = { path = "crates/session" } # the sans-IO session state machine
+openqtt-config = { path = "crates/config" } # the one reader of the environment
+openqtt-observe = { path = "crates/observe" } # metric, span and health conventions
+openqtt-wire = { path = "crates/wire" } # the protocol between roles
+openqtt-transport = { path = "crates/transport" } # the client QUIC listener
+openqtt-cluster = { path = "crates/cluster" } # membership and placement
+openqtt-log = { path = "crates/log" } # the log role
+openqtt-router = { path = "crates/router" } # the router role
+openqtt-edge = { path = "crates/edge" } # the edge role
+openqtt-admin = { path = "crates/admin" } # the admin role
+openqtt-node = { path = "crates/node" } # assembles roles into a process
+openqtt-client = { path = "crates/client" } # the MQTT 5 over QUIC client
+openqtt-testkit = { path = "crates/testkit" } # test tooling, dev-dependency only
+
+# The command line of the openqtt binary. Not the `env` feature: only openqtt-config reads the
+# environment, and clap reading variables behind its back would undo that.
+clap = { version = "4.6", features = ["derive"] }
+# Structured diagnostics, the one logging API every crate uses. Without `attributes` for now:
+# #[instrument] is unused, and its macro crate pins syn 2 beside clap's syn 3.
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+# Formats tracing events and filters them by OPENQTT_LOG; only the binary installs it.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter"] }
+# One error enum per crate, derived rather than written by hand.
+thiserror = "2.0"
+# Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded
+# payload is a slice of the buffer it arrived in rather than a copy.
+bytes = "1.12"
+# Property tests, a dev-dependency only: random valid packets must round-trip and random bytes
+# must never panic the decoder. Without the fork and timeout features, which run each case in
+# a child process and bring tempfile and rusty-fork for it.
+proptest = { version = "1.11", default-features = false, features = ["std"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+# Tests may unwrap (clippy.toml allow-unwrap-in-tests); code that runs in the broker says why it
+# cannot fail with expect, or handles the error.
+unwrap_used = "warn"
+# A codec that silently truncates a length is a protocol bug; convert with try_from instead.
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_sign_loss = "warn"
+# An allow without a reason is a decision nobody can review.
+allow_attributes_without_reason = "warn"
+# Libraries log through tracing; only the binary writes to the terminal, and it says so.
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# A library that exits takes the broker down with it; return an error instead.
+exit = "warn"

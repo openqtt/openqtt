@@ -1,0 +1,22 @@
+[package]
+name = "openqtt"
+description = "OpenQTT, an MQTT 5 broker over QUIC: one binary for every role"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "openqtt"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+openqtt-config.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

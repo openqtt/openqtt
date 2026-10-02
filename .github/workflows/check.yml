@@ -1,0 +1,43 @@
+# The gate: `make check`, exactly as a developer runs it, on every pull request and on main.
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The toolchain is whatever rust-toolchain.toml pins, read from it rather than repeated
+      # here, so the two cannot drift.
+      - id: toolchain
+        name: Read the pinned toolchain
+        run: |
+          set -euo pipefail
+          CHANNEL=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          test -n "$CHANNEL"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # Minor versions pinned: cargo-deny 0.x changes its config schema between minors.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9,cargo-deny@0.20
+      - run: make check

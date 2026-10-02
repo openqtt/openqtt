@@ -1,0 +1,20 @@
+[package]
+name = "openqtt-codec"
+description = "MQTT 5.0 packets, properties and reason codes, encoded and decoded over bytes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Meant for crates.io once its API settles; it stays unpublished until then.
+publish.workspace = true
+
+[dependencies]
+bytes.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,66 @@
+# cargo-deny, run by `make deny` (part of `make check`). Every target is checked, not only the
+# host's, and dev-dependencies count too.
+
+[graph]
+targets = []
+all-features = false
+
+[advisories]
+# A RustSec vulnerability always fails. Unmaintained and unsound crates fail too, anywhere in
+# the tree: an MQTT broker faces the network, and a crate nobody fixes is a liability there.
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = [
+    # { id = "RUSTSEC-0000-0000", reason = "why it does not apply, and when to remove this" },
+]
+
+[licenses]
+# Permissive licences only, all compatible with distributing OpenQTT under Apache-2.0.
+# Anything copyleft, MPL included, is a decision for a pull request, not a default.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    # webpki-roots, the Mozilla root store, should a client ever need public roots.
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+# The list is written for the tree as it will be (rustls on aws-lc-rs brings ISC, BSD-3-Clause
+# and MIT-0), not only as it is today.
+unused-allowed-license = "allow"
+exceptions = []
+
+[licenses.private]
+ignore = false
+
+[bans]
+# Duplicates are reported, not refused. One that matters is refused elsewhere: `make layers`
+# fails when the binary links two versions of rustls.
+multiple-versions = "warn"
+# A registry dependency always names a version. Path dependencies inside this unpublished
+# workspace need none.
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+    # One crypto provider: rustls and quinn run on aws-lc-rs. Turn off their ring defaults
+    # (quinn's rustls-ring, rcgen's ring) rather than add an exception here.
+    { crate = "ring", reason = "aws-lc-rs is the only crypto provider" },
+]
+skip = []
+skip-tree = []
+
+[sources]
+# crates.io only: no git dependencies and no other registry.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

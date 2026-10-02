@@ -1,0 +1,7 @@
+# Rust 1.99.0, the newest stable on 2026-10-01. Local builds, CI and the Docker build stage
+# (deploy/docker/Dockerfile) all use exactly this compiler: bump them together, and
+# rust-version in Cargo.toml with them.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,0 +1,12 @@
+[package]
+name = "openqtt-edge"
+description = "The OpenQTT edge role: client connections, fan-out and takeover"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

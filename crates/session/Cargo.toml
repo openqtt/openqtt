@@ -1,0 +1,12 @@
+[package]
+name = "openqtt-session"
+description = "The MQTT 5 connection and session state machine, without IO"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

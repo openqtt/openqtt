@@ -1,0 +1,13 @@
+[package]
+name = "openqtt-client"
+description = "An MQTT 5 over QUIC client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Meant for crates.io once its API settles; it stays unpublished until then.
+publish.workspace = true
+
+[lints]
+workspace = true

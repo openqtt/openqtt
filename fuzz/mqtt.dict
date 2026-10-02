@@ -1,0 +1,10 @@
+# libFuzzer dictionary for the openqtt-codec targets: byte strings the codec looks for.
+protocol_name="\x00\x04MQTT"
+connect_header="\x00\x04MQTT\x05"
+mqtt_3_1_name="\x00\x06MQIsdp"
+largest_remaining_length="\xff\xff\xff\x7f"
+user_property="\x26\x00\x01k\x00\x01v"
+authentication_method="\x15\x00\x0bSCRAM-SHA-1"
+topic_alias="\x23\x00\x01"
+subscription_identifier="\x0b\x01"
+shared_subscription="$share/"

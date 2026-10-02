@@ -1,0 +1,12 @@
+[package]
+name = "openqtt-transport"
+description = "The OpenQTT client listener: MQTT 5 over QUIC behind a transport seam"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
