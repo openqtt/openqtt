@@ -103,6 +103,30 @@ error about the configuration. The value of an unknown key or variable is never 
 case it is a secret set by mistake, and a URL carrying a password is refused without repeating
 it.
 
+## Checking and printing
+
+Every command reads the same sources, `--config` included, which may come before or after the
+subcommand.
+
+- `openqtt config check` loads the settings, applies the rules between them, checks that every
+  file a `*_file` setting names can be opened and that `observability.log_level` parses, and
+  reports every problem, one per line. It exits with status 0 when there is none, and 2
+  otherwise.
+- `openqtt config print` writes, as TOML, what the file and the variables set.
+- `openqtt config print --effective` writes every setting, defaults included, in the order of
+  the tables below, with an unset setting as a comment. The text loads back to the same
+  settings, so it can serve as a file.
+
+`openqtt run` exits with status 2, before it starts anything, on any problem with the settings
+themselves; the files they name are read by the parts of the broker that use them.
+
+## Logs
+
+A process writes its logs to stderr. In the default format, `json`, each line is one object:
+`timestamp`, `level`, `message` and `target`, the event's own fields beside them, and `spans`,
+the spans the event was written in with their fields, among them `client_id`, `partition` and
+`node`. The format `text` writes the same as plain lines, for a person at a terminal.
+
 ## Settings
 
 <!-- BEGIN SETTINGS: written by `make config-doc` from crates/config/src/settings.rs -->

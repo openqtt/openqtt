@@ -1,61 +1,337 @@
-//! The binary as an operator meets it: help, the subcommands, and a bad log filter.
+//! The binary as an operator meets it: help, the subcommands, the configuration commands, and
+//! the logs.
 
-use std::process::Command;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use openqtt_config::{Settings, Sources};
 
 const SUBCOMMANDS: [&str; 5] = ["run", "ctl", "config", "convert", "migrate"];
 
+/// The binary, with an empty environment: the settings a test gives are the only ones, whatever
+/// the shell running the tests holds.
 fn openqtt() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_openqtt"));
-    command.env_remove("OPENQTT_LOG");
+    command.env_clear();
     command
 }
+
+/// Writes `text` to a new file of this call's own and returns its path.
+fn file(name: &str, text: &str) -> PathBuf {
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, Ordering::Relaxed);
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("openqtt-cli")
+        .join(format!("{}-{call}-{name}", std::process::id()));
+    let directory = path.parent().expect("the path is in a directory");
+    std::fs::create_dir_all(directory).expect("the test directory can be made");
+    std::fs::write(&path, text).expect("the test file can be written");
+    path
+}
+
+fn stdout(output: &Output) -> String {
+    String::from_utf8(output.stdout.clone()).expect("stdout is UTF-8")
+}
+
+fn stderr(output: &Output) -> String {
+    String::from_utf8(output.stderr.clone()).expect("stderr is UTF-8")
+}
+
+/// The variables that give the default listener the certificate the edge needs, so that the
+/// rules pass. The files are named, not read.
+const CERTIFICATE: [(&str, &str); 2] = [
+    (
+        "OPENQTT_LISTENERS__QUIC__DEFAULT__CERT_FILE",
+        "/etc/openqtt/tls/tls.crt",
+    ),
+    (
+        "OPENQTT_LISTENERS__QUIC__DEFAULT__KEY_FILE",
+        "/etc/openqtt/tls/tls.key",
+    ),
+];
 
 #[test]
 fn help_lists_every_subcommand() {
     let out = openqtt().arg("--help").output().unwrap();
     assert!(out.status.success());
-    let help = String::from_utf8(out.stdout).unwrap();
+    let help = stdout(&out);
     for name in SUBCOMMANDS {
         assert!(
             help.contains(name),
             "--help does not mention {name}:\n{help}"
         );
     }
+    let out = openqtt().args(["config", "--help"]).output().unwrap();
+    let help = stdout(&out);
+    assert!(help.contains("check") && help.contains("print"), "{help}");
 }
 
 #[test]
-fn every_subcommand_says_it_is_not_implemented_and_fails() {
-    for name in SUBCOMMANDS {
+fn the_tools_say_they_are_not_implemented_and_fail() {
+    for name in ["ctl", "convert", "migrate"] {
         let out = openqtt().arg(name).output().unwrap();
         assert_eq!(out.status.code(), Some(1), "openqtt {name}");
-        let stderr = String::from_utf8(out.stderr).unwrap();
+        let stderr = stderr(&out);
         assert!(
             stderr.contains(&format!("openqtt {name}: not implemented yet")),
             "openqtt {name}: {stderr}"
         );
     }
+    let out = openqtt().arg("config").output().unwrap();
+    assert_eq!(out.status.code(), Some(2), "config needs a subcommand");
+}
+
+#[test]
+fn run_loads_and_checks_the_settings_before_it_says_it_is_not_implemented() {
+    let out = openqtt().arg("run").envs(CERTIFICATE).output().unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(stderr(&out).contains("openqtt run: not implemented yet"));
+
+    let out = openqtt().arg("run").output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        stderr(&out),
+        "openqtt: listeners.quic.default.cert_file: required: a QUIC listener needs a \
+         certificate\nopenqtt: listeners.quic.default.key_file: required: a QUIC listener needs \
+         a private key\n"
+    );
+}
+
+#[test]
+fn unknown_names_stop_the_process_with_the_nearest_valid_one() {
+    let out = openqtt()
+        .arg("run")
+        .envs(CERTIFICATE)
+        .env("OPENQTT_LOG", "debug")
+        .env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        stderr(&out),
+        "openqtt: OTEL_EXPORTER_OTLP_ENDPOINT is set, but OpenQTT reads no OTEL_ variables: set \
+         OPENQTT_OBSERVABILITY__OTLP__ENDPOINT or another observability.otlp setting instead\n\
+         openqtt: unknown variable OPENQTT_LOG; the nearest valid one is \
+         OPENQTT_OBSERVABILITY__LOG_LEVEL\n"
+    );
 }
 
 #[test]
 fn a_log_filter_that_does_not_parse_stops_the_process() {
     let out = openqtt()
         .arg("run")
-        .env("OPENQTT_LOG", "openqtt=loudest")
+        .envs(CERTIFICATE)
+        .env("OPENQTT_OBSERVABILITY__LOG_LEVEL", "openqtt=loudest")
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("OPENQTT_LOG"), "{stderr}");
+    assert!(
+        stderr(&out).starts_with("openqtt: observability.log_level: "),
+        "{}",
+        stderr(&out)
+    );
 }
 
 #[test]
-fn a_valid_log_filter_is_used() {
+fn logs_are_json_lines_by_default_and_text_when_asked() {
     let out = openqtt()
         .arg("run")
-        .env("OPENQTT_LOG", "debug")
+        .envs(CERTIFICATE)
+        .env("OPENQTT_OBSERVABILITY__LOG_LEVEL", "debug")
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("parsed the command line"), "{stderr}");
+    let stderr = stderr(&out);
+    let line = stderr
+        .lines()
+        .find(|line| line.contains("loaded the configuration"))
+        .unwrap_or_else(|| panic!("no log line in {stderr}"));
+    let event: serde_json::Value = serde_json::from_str(line).unwrap();
+    assert_eq!(event["level"], "DEBUG");
+    assert_eq!(event["message"], "loaded the configuration");
+    assert_eq!(event["roles"], "[All]");
+    assert_eq!(event["target"], "openqtt");
+    assert!(event["timestamp"].is_string(), "{event}");
+
+    let out = openqtt()
+        .arg("run")
+        .envs(CERTIFICATE)
+        .env("OPENQTT_OBSERVABILITY__LOG_LEVEL", "debug")
+        .env("OPENQTT_OBSERVABILITY__LOG_FORMAT", "text")
+        .output()
+        .unwrap();
+    let stderr = self::stderr(&out);
+    let line = stderr
+        .lines()
+        .find(|line| line.contains("loaded the configuration"))
+        .unwrap_or_else(|| panic!("no log line in {stderr}"));
+    assert!(
+        serde_json::from_str::<serde_json::Value>(line).is_err(),
+        "{line}"
+    );
+    assert!(
+        line.contains("DEBUG") && line.contains("roles=[All]"),
+        "{line}"
+    );
+}
+
+#[test]
+fn config_check_passes_a_configuration_whose_files_exist() {
+    let certificate = file("tls.crt", "certificate");
+    let key = file("tls.key", "key");
+    let config = file(
+        "check.toml",
+        &format!(
+            "[listeners.quic.default]\ncert_file = \"{}\"\nkey_file = \"{}\"\n",
+            certificate.display(),
+            key.display()
+        ),
+    );
+    let out = openqtt()
+        .args(["config", "check", "--config"])
+        .arg(&config)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(
+        stdout(&out),
+        format!("the configuration is valid: {}\n", config.display())
+    );
+    assert_eq!(stderr(&out), "");
+}
+
+#[test]
+fn config_check_reports_every_problem_and_fails() {
+    let config = file(
+        "problems.toml",
+        "[listeners.quic.default]\ncert_file = \"/nowhere/tls.crt\"\nkey_file = \"/nowhere/tls.key\"\n\
+         identity_from_cn = true\n[observability]\nlog_level = \"openqtt=loudest\"\n",
+    );
+    let out = openqtt()
+        .args(["config", "check"])
+        .env("OPENQTT_CONFIG", &config)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(stdout(&out), "");
+    let stderr = stderr(&out);
+    let lines: Vec<&str> = stderr.lines().collect();
+    assert_eq!(lines.len(), 5, "{stderr}");
+    assert!(
+        lines.iter().all(|line| line.starts_with("openqtt: ")),
+        "{stderr}"
+    );
+    for expected in [
+        "listeners.quic.default.identity_from_cn: needs require_client_cert",
+        "listeners.quic.default.enable_authn: must be false with identity_from_cn",
+        "listeners.quic.default.cert_file: cannot read /nowhere/tls.crt",
+        "listeners.quic.default.key_file: cannot read /nowhere/tls.key",
+        "observability.log_level: ",
+    ] {
+        assert!(
+            stderr.contains(expected),
+            "`{expected}` is not in\n{stderr}"
+        );
+    }
+
+    let unknown = file(
+        "unknown.toml",
+        "[listeners.quic.default]\ncertfile = \"x\"\n",
+    );
+    let out = openqtt()
+        .args(["config", "check", "--config"])
+        .arg(&unknown)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        self::stderr(&out),
+        format!(
+            "openqtt: unknown key `listeners.quic.default.certfile` in {}; the nearest valid key \
+             is `listeners.quic.default.cert_file`\n",
+            unknown.display()
+        )
+    );
+}
+
+#[test]
+fn the_command_line_file_comes_before_openqtt_config_wherever_the_flag_is() {
+    let flag = file("flag.toml", "[cluster]\nzone = \"flag\"\n");
+    let variable = file("variable.toml", "[cluster]\nzone = \"variable\"\n");
+    for args in [
+        vec![
+            "--config".as_ref(),
+            flag.as_os_str(),
+            "config".as_ref(),
+            "print".as_ref(),
+        ],
+        vec![
+            "config".as_ref(),
+            "print".as_ref(),
+            "--config".as_ref(),
+            flag.as_os_str(),
+        ],
+    ] {
+        let out = openqtt()
+            .args(args)
+            .env("OPENQTT_CONFIG", &variable)
+            .output()
+            .unwrap();
+        assert_eq!(stdout(&out), "[cluster]\nzone = \"flag\"\n");
+    }
+    let out = openqtt()
+        .args(["config", "print"])
+        .env("OPENQTT_CONFIG", &variable)
+        .output()
+        .unwrap();
+    assert_eq!(stdout(&out), "[cluster]\nzone = \"variable\"\n");
+}
+
+#[test]
+fn config_print_effective_prints_every_setting_as_a_file_that_loads_back() {
+    let out = openqtt()
+        .args(["config", "print", "--effective"])
+        .env("OPENQTT_LIMITS__RECEIVE_MAXIMUM", "16")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let printed = stdout(&out);
+    assert!(printed.contains("receive_maximum = 16\n"), "{printed}");
+    assert!(printed.contains("# node_name is unset\n"), "{printed}");
+
+    let reloaded = Settings::load(&Sources::new(
+        Some(file("effective.toml", &printed)),
+        Vec::<(String, String)>::new(),
+    ))
+    .unwrap();
+    let mut expected = Settings::default();
+    expected.limits.receive_maximum = 16;
+    assert_eq!(reloaded.settings(), &expected);
+}
+
+#[test]
+fn no_secret_reaches_stdout_or_stderr() {
+    const SECRET: &str = "hunter2";
+    let token = file("token", SECRET);
+    let out = openqtt()
+        .args(["config", "print", "--effective"])
+        .env("OPENQTT_OBSERVABILITY__PROMETHEUS__TOKEN_FILE", &token)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(stdout(&out).contains(&token.display().to_string()));
+    assert!(!stdout(&out).contains(SECRET));
+
+    let out = openqtt()
+        .args(["config", "check"])
+        .env("OPENQTT_AUTH__PASSWORD", SECRET)
+        .env(
+            "OPENQTT_OBSERVABILITY__OTLP__ENDPOINT",
+            "https://user:hunter2@collector",
+        )
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(!stderr(&out).contains(SECRET), "{}", stderr(&out));
+    assert!(!stdout(&out).contains(SECRET));
 }

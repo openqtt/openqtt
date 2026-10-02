@@ -177,28 +177,3 @@ fn lines(errors: &[Error]) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
-
-/// The variable the binary reads its log filter from until it loads [`Settings`]; the filter
-/// then becomes `observability.log_level`, and this goes.
-pub const LOG_VAR: &str = "OPENQTT_LOG";
-
-/// The log filter from [`LOG_VAR`], or `None` when the variable is unset or blank.
-///
-/// # Errors
-///
-/// [`Error::NotUnicode`] when the variable holds bytes that are not Unicode.
-pub fn log_filter() -> Result<Option<String>, Error> {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "openqtt-config is the one crate that reads the environment"
-    )]
-    let value = std::env::var_os(LOG_VAR);
-    let Some(raw) = value else {
-        return Ok(None);
-    };
-    let text = raw.into_string().map_err(|_| Error::NotUnicode {
-        name: LOG_VAR.to_owned(),
-    })?;
-    let text = text.trim();
-    Ok((!text.is_empty()).then(|| text.to_owned()))
-}

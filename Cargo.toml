@@ -47,8 +47,9 @@ clap = { version = "4.6", features = ["derive"] }
 # Structured diagnostics, the one logging API every crate uses. Without `attributes` for now:
 # #[instrument] is unused, and its macro crate pins syn 2 beside clap's syn 3.
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
-# Formats tracing events and filters them by OPENQTT_LOG; only the binary installs it.
-tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter"] }
+# Writes tracing events as JSON or text, filtered by observability.log_level; only the binary
+# installs it. Without `ansi`, which would read NO_COLOR behind the configuration's back.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "fmt", "env-filter", "json"] }
 # One error enum per crate, derived rather than written by hand.
 thiserror = "2.0"
 # Reference-counted byte buffers. The codec decodes from and encodes into them, and a decoded

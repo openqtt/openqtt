@@ -52,7 +52,7 @@ impl Sources {
         K: Into<OsString>,
         V: Into<OsString>,
     {
-        let vars = vars
+        let mut vars: Vec<(OsString, OsString)> = vars
             .into_iter()
             .map(|(name, value)| (name.into(), value.into()))
             .filter(|(name, _)| {
@@ -60,6 +60,9 @@ impl Sources {
                 name.starts_with(PREFIX) || name.starts_with("OTEL_")
             })
             .collect();
+        // By name, so problems are reported in the same order whatever order the environment
+        // keeps its variables in.
+        vars.sort();
         Self { config, vars }
     }
 }
@@ -147,7 +150,6 @@ impl Settings {
                 vars.push((name.to_owned(), value.to_owned()));
             }
         }
-        vars.sort();
 
         let file = sources.config.clone().or(config_var);
         let mut table = match &file {
