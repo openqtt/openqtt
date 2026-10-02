@@ -99,8 +99,10 @@ fields(status) ->
                 boolean(),
                 #{
                     desc => ?DESC(enable),
-                    default => true,
-                    example => false
+                    %% OpenQTT: the config default, so a body without enable
+                    %% cannot switch reporting on.
+                    default => false,
+                    example => true
                 }
             )}
     ];

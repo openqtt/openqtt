@@ -3,8 +3,8 @@
 In order for EMQ to understand how EMQX opensource edition is being used,
 this app reports some telemetry data to [EMQ's telemetry server](https://telemetry.emqx.io/api/telemetry)
 
-To turn it off, you can set `telemetry.enable = false` in emqx.conf,
-or start EMQX with environment variable `EMQX_TELEMETRY__ENABLE=false`.
+OpenQTT ships it off. To turn it on, set `telemetry.enable = true` in emqx.conf,
+or start the node with environment variable `OPENQTT_TELEMETRY__ENABLE=true`.
 
 ## Reported Data
 

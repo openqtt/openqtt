@@ -127,6 +127,12 @@ init_per_testcase(t_send_after_enable, Config) ->
     ok = meck:expect(emqx_telemetry_config, is_official_version, fun(_) -> true end),
     mock_httpc(),
     Config;
+init_per_testcase(t_disabled_by_default, Config) ->
+    ok = meck:new(emqx_telemetry_config, [non_strict, passthrough, no_history, no_link]),
+    %% the check upstream fell back to, true for a version such as 5.8.9
+    ok = meck:expect(emqx_telemetry_config, is_official_version, 0, true),
+    mock_httpc(),
+    Config;
 init_per_testcase(t_rule_engine_and_data_bridge_info, Config) ->
     {ok, _} = emqx_cluster_rpc:start_link(node(), emqx_cluster_rpc, 1000),
     ok = emqx_bridge_SUITE:setup_fake_telemetry_data(),
@@ -192,6 +198,10 @@ end_per_testcase(t_enable, _Config) ->
     meck:unload([httpc, emqx_telemetry_config]);
 end_per_testcase(t_send_after_enable, _Config) ->
     meck:unload([httpc, emqx_telemetry_config]);
+end_per_testcase(t_disabled_by_default, _Config) ->
+    meck:unload([httpc, emqx_telemetry_config]),
+    {ok, _} = emqx:update_config([telemetry], #{}),
+    ok;
 end_per_testcase(t_rule_engine_and_data_bridge_info, _Config) ->
     ok;
 end_per_testcase(t_exhook_info, _Config) ->
@@ -498,6 +508,28 @@ t_send_after_enable(_) ->
         end
     after
         ok = snabbkaffe:stop()
+    end.
+
+%% OpenQTT: a node that sets nothing reports nothing, even on a version string
+%% upstream calls official. Upstream fell back to that check, so a build whose
+%% version reads as a release posted usage reports to telemetry.emqx.io (#9).
+t_disabled_by_default(_) ->
+    ?assert(emqx_telemetry_config:is_official_version()),
+    %% an empty telemetry section checks to off
+    {ok, _} = emqx:update_config([telemetry], #{}),
+    ?assertEqual(#{enable => false}, emqx:get_config([telemetry])),
+    %% with enable not set at all, a starting node leaves the report timer unarmed
+    ok = application:stop(emqx_telemetry),
+    ok = emqx_config:put([telemetry], #{}),
+    ok = application:start(emqx_telemetry),
+    ?assertNot(emqx_telemetry_config:is_enabled()),
+    ?assertEqual(undefined, element(6, sys:get_state(emqx_telemetry))),
+    %% the first report would go out 10 s after start; nothing goes out
+    receive
+        {request, Method, URL, _Headers, _Body} ->
+            ct:fail({reported, Method, URL})
+    after 12_000 ->
+        ok
     end.
 
 t_mqtt_runtime_insights(_) ->
