@@ -56,6 +56,14 @@ bytes = "1.12"
 # must never panic the decoder. Without the fork and timeout features, which run each case in
 # a child process and bring tempfile and rusty-fork for it.
 proptest = { version = "1.11", default-features = false, features = ["std"] }
+# The async runtime QUIC runs on. No default features; each crate names the ones it uses.
+tokio = { version = "1.53", default-features = false }
+# QUIC (RFC 9000) for the client and the test kit. Without the defaults, which bring ring
+# through rustls-ring and a platform certificate verifier: TLS runs on rustls with aws-lc-rs.
+quinn = { version = "0.11.12", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+# TLS 1.3 inside QUIC, on aws-lc-rs, the one crypto provider (deny.toml bans ring). Without the
+# defaults: QUIC needs no TLS 1.2, and logging would go through the log crate.
+rustls = { version = "0.23.45", default-features = false, features = ["aws_lc_rs", "std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
