@@ -2,7 +2,7 @@
   "args": {
     "minutes": "6",
     "n": "1000000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-churn.json"
+    "out": "../../bench/results/s2-churn.json"
   },
   "experiment": "churn",
   "machine": {

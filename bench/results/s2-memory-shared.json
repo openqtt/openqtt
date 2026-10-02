@@ -1,7 +1,7 @@
 {
   "args": {
     "n": "1000000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-memory-shared.json",
+    "out": "../../bench/results/s2-memory-shared.json",
     "workload": "c"
   },
   "experiment": "memory",

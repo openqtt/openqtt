@@ -3,7 +3,7 @@
     "floor": "1,3",
     "full-view": "0",
     "n": "10000000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-coarsen-1e7.json",
+    "out": "../../bench/results/s2-coarsen-1e7.json",
     "samples": "200000",
     "t": "16,64,256,1024"
   },

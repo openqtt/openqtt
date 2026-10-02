@@ -1,7 +1,7 @@
 {
   "args": {
     "n": "1000000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-coarsen-1e6.json",
+    "out": "../../bench/results/s2-coarsen-1e6.json",
     "samples": "200000"
   },
   "experiment": "coarsen",

@@ -2,8 +2,8 @@
   "args": {
     "duration": "20",
     "lanes": "128",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/../../bench/results/s4-handshake.json",
-    "pki": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/target/pki"
+    "out": "../../bench/results/s4-handshake.json",
+    "pki": "target/pki"
   },
   "experiment": "handshake",
   "machine": {

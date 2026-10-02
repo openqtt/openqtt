@@ -1,8 +1,8 @@
 {
   "args": {
     "conns": "10000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/../../bench/results/s4-idle-transport-profiles.json",
-    "pki": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s4-quinn/target/pki",
+    "out": "../../bench/results/s4-idle-transport-profiles.json",
+    "pki": "target/pki",
     "profiles": "streams,windows,no-datagrams,no-mtu-discovery,ack-frequency,lean",
     "window": "30"
   },

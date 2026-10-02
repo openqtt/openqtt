@@ -4,9 +4,10 @@
 # Pass experiment names to run only those: ./run.sh match fanout
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-out="$here/../../bench/results"
-mkdir -p "$out"
 cd "$here"
+# Relative paths, so that the arguments recorded in the results do not name this checkout.
+out=../../bench/results
+mkdir -p "$out"
 cargo build --release --locked
 bin="$here/target/release/openqtt-spike-s2"
 run() {

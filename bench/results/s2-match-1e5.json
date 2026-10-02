@@ -1,7 +1,7 @@
 {
   "args": {
     "n": "100000",
-    "out": "/Users/ali/company/.worktrees/openqtt-s2s4/spikes/s2-routing/../../bench/results/s2-match-1e5.json",
+    "out": "../../bench/results/s2-match-1e5.json",
     "samples": "1000000"
   },
   "experiment": "match",

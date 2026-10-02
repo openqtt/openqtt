@@ -4,12 +4,13 @@
 # Pass experiment names to run only those: ./run.sh handshake
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-out="$here/../../bench/results"
-mkdir -p "$out"
 cd "$here"
+# Relative paths, so that the arguments recorded in the results do not name this checkout.
+out=../../bench/results
+mkdir -p "$out"
 cargo build --release --locked
 bin="$here/target/release/s4"
-pki="$here/target/pki"
+pki=target/pki
 [ -f "$pki/clients.key" ] || "$bin" pki --pki "$pki"
 run() {
     name=$1
