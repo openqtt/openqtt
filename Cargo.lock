@@ -618,6 +618,8 @@ dependencies = [
 name = "openqtt-core"
 version = "2.0.0-alpha.0"
 dependencies = [
+ "bytes",
+ "openqtt-topic",
  "proptest",
  "thiserror",
  "twox-hash",

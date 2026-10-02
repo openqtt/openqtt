@@ -4,10 +4,11 @@
 //! - Assigned identifiers are 23 characters from `0-9a-zA-Z`, one for each value below 62^21.
 //! - A session's partition is below the partition count, and depends on nothing but the
 //!   identifier and the count.
+//! - A deadline never sends 0, never more than the interval received, and nothing once passed.
 
 use std::num::NonZeroU32;
 
-use openqtt_core::{ClientId, partition_of};
+use openqtt_core::{ClientId, Deadline, Timestamp, partition_of};
 use proptest::prelude::*;
 
 /// 62^21, the number of assigned identifiers.
@@ -43,5 +44,26 @@ proptest! {
         let partition = partition_of(&id, count);
         prop_assert!(partition < count.get());
         prop_assert_eq!(partition_of(&id.clone(), count), partition);
+    }
+
+    #[test]
+    fn a_deadline_sends_what_is_left_and_no_more(
+        received in 0..u64::MAX / 2,
+        interval in any::<u32>(),
+        offset in any::<i64>(),
+    ) {
+        let deadline = Deadline::after(Timestamp::from_unix_nanos(received), interval);
+        let now = Timestamp::from_unix_nanos(received.saturating_add_signed(offset));
+        match deadline.interval_at(now) {
+            None => prop_assert!(deadline.is_expired(now)),
+            Some(left) => {
+                prop_assert!(!deadline.is_expired(now));
+                prop_assert!(left.get() <= interval);
+                // The time left, rounded up, unless the clock is behind the receiving pod's.
+                let nanos = deadline.at().as_unix_nanos() - now.as_unix_nanos();
+                let rounded_up = nanos.div_ceil(1_000_000_000);
+                prop_assert_eq!(u64::from(left.get()), rounded_up.min(u64::from(interval)));
+            }
+        }
     }
 }
